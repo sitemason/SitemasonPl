@@ -1,5 +1,5 @@
-﻿package Sitemason7::Common;
-$VERSION = '7.0';
+﻿package SitemasonPl::Common;
+$VERSION = '8.0';
 
 =head1 NAME
 
@@ -126,7 +126,7 @@ sub getURL {
 		$ip = shift;
 		$args = {};
 	}
-	$agent ||= $args->{agent} || 'Mozilla/5.0 (Linux; en-us) Sitemason/' . $Sitemason7::Common::VERSION;
+	$agent ||= $args->{agent} || 'Mozilla/5.0 (Linux; en-us) Sitemason/' . $SitemasonPl::Common::VERSION;
 	$ip ||= $args->{ip};
 	my $timeout = $args->{timeout} || 15;
 	
@@ -177,7 +177,7 @@ sub postURL {
 	if (!isHash($data)) { $data = {}; }
 	if (!isHash($headers)) { $headers = {}; }
 	
-	my $agent = $headers->{agent} || 'Mozilla/5.0 (Linux; en-us) Sitemason/' . $Sitemason7::Common::VERSION;
+	my $agent = $headers->{agent} || 'Mozilla/5.0 (Linux; en-us) Sitemason/' . $SitemasonPl::Common::VERSION;
 	my $ua = LWP::UserAgent->new;
 	$ua->agent($agent);
 	$ua->timeout(15);
@@ -5768,13 +5768,13 @@ sub getEstimatedTimeRemaining {
   20120105 TJM - v6.0 mostly the same
   20120724 TJM - v5.5 copied in from Sitemason 6
   20140320 TJM - v7.0 merged 5.5 and 6
+  20171109 TJM - v8.0 Moved to SitemasonPL open source project and merged with updates
 
 =head1 AUTHOR
 
-  Tim Moses <tim@sitemason.com>
-  SiteMason <http://www.sitemason.com/>
+  Tim Moses <tim@moses.com>
+  Sitemason Open Source <https://github.com/sitemason>
 
 =cut
 
 1;
-

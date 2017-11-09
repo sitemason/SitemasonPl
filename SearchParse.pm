@@ -1,9 +1,9 @@
-package Sitemason7::Library::SearchParse;
-$VERSION = '7.0';
+package SitemasonPl::SearchParse;
+$VERSION = '8.0';
 
 =head1 NAME
 
-Sitemason7::Library::SearchParse
+SitemasonPl::SearchParse
 
 =head1 DESCRIPTION
 
@@ -14,11 +14,10 @@ SearchParse parses a single string into multiple search parameters.
 =cut
 
 use strict;
-use Sitemason7::Common;
-use Sitemason7::Debug;
-#use Sitemason7::API::Tag;
-use Sitemason7::Library::Database;
-use Sitemason7::Library::Date;
+use SitemasonPl::Common;
+use SitemasonPl::Debug;
+use SitemasonPl::Database;
+use SitemasonPl::Date;
 
 use DateTime;
 
@@ -29,7 +28,7 @@ use DateTime;
 
 Creates and returns a calendar object. One of id or id_list are required.
 
- my $searchparse = Sitemason7::Library::SearchParse->new(
+ my $searchparse = SitemasonPl::SearchParse->new(
 	options		=> {				# optional, by default all are on
 		quotes	=> 1,	# parse quoted text as single what
 		times	=> 1,	# parse common time words, like today for when
@@ -59,7 +58,7 @@ sub new {
 	if ($arg{debug}) {
 		$self->{debug} = $arg{debug};
 	} else {
-		$self->{debug} = Sitemason7::Debug->new;
+		$self->{debug} = SitemasonPl::Debug->new;
 	}
 	$self->{debug}->call;
 	
@@ -784,7 +783,7 @@ sub parse_date5 {
 		my $year = clean_year($2) || fill_year($month, $day);
 		$results->{date} = "$year-$month-$day";
 		# end date
-		my $date = Sitemason7::Library::Date->new;
+		my $date = SitemasonPl::Date->new;
 		my $dom = $date->daysInMonth($year, $month);
 		$results->{remainder} = "$year-$month-$dom " . $results->{remainder};
 	}
@@ -827,7 +826,7 @@ sub parse_date6 {
 		my $day = 1;
 		$results->{date} = "$year-$month-$day";
 		# end date
-		my $date = Sitemason7::Library::Date->new;
+		my $date = SitemasonPl::Date->new;
 		my $dom = $date->daysInMonth($year, $end_month);
 		$results->{remainder} = "$year-$end_month-$dom " . $results->{remainder};
 	}
@@ -1085,13 +1084,13 @@ sub load_abbr {
   20061025 TJM - v2.00 moved from old calendar to SearchParse
   20120105 TJM - v6.0 moved from Sitemason::System to Sitemason6::Library
   20140410 TJM - v7.0 moved to Sitemason7::Library
+  20171109 TJM - v8.0 Moved to SitemasonPL open source project
 
 =head1 AUTHOR
 
-  Tim Moses <tim@sitemason.com>
-  Sitemason <http://www.sitemason.com/>
+  Tim Moses <tim@moses.com>
+  Sitemason Open Source <https://github.com/sitemason>
 
 =cut
 
 1;
-

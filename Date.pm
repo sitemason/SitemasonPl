@@ -1,9 +1,9 @@
-package Sitemason7::Library::Date;
-$VERSION = '7.0';
+package SitemasonPl::Date;
+$VERSION = '8.0';
 
 =head1 NAME
 
-Sitemason7::Library::Date
+SitemasonPl::Date
 
 =head1 DESCRIPTION
 
@@ -15,8 +15,8 @@ Sitemason7::Library::Date
 use strict;
 use DateTime;
 
-use Sitemason7::Common;
-use Sitemason7::Debug;
+use SitemasonPl::Common;
+use SitemasonPl::Debug;
 
 
 #== new ==============================================
@@ -25,7 +25,7 @@ use Sitemason7::Debug;
 
 Creates and returns a date handle.
 
- my $date = Sitemason7::Library::Date->new( debug => $debug );
+ my $date = SitemasonPl::Date->new( debug => $debug );
 
 =cut
 #=====================================================
@@ -39,7 +39,7 @@ sub new {
 	if ($arg{debug}) {
 		$self->{debug} = $arg{debug};
 	} else {
-		$self->{debug} = Sitemason7::Debug->new;
+		$self->{debug} = SitemasonPl::Debug->new;
 	}
 	$self->{debug}->call;
 	
@@ -415,7 +415,7 @@ sub sortByDate {
 =cut
 #=====================================================
 sub byDate {
-	my $date = Sitemason7::Library::Date->new;
+	my $date = SitemasonPl::Date->new;
 	return $date->compare($a, $b);
 }
 
@@ -932,13 +932,13 @@ sub loadAbbr {
   20050627 TJM - v0.01 started development as MLI::System::Calendar
   20060921 TJM - v0.02 started development as Sitemason::System::Date
   20120105 TJM - v6.0 moved from Sitemason::System to Sitemason7::Library
+  20171109 TJM - v8.0 Moved to SitemasonPL open source project and merged with updates
 
 =head1 AUTHOR
 
-  Tim Moses <tim@sitemason.com>
-  Sitemason <http://www.sitemason.com/>
+  Tim Moses <tim@moses.com>
+  Sitemason Open Source <https://github.com/sitemason>
 
 =cut
 
 1;
-

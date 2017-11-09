@@ -1,9 +1,9 @@
-package Sitemason7::Library::Mail;
-$VERSION = '7.0';
+package SitemasonPl::Mail;
+$VERSION = '8.0';
 
 =head1 NAME
 
-Sitemason7::Library::Mail
+SitemasonPl::Mail
 
 =head1 DESCRIPTION
 
@@ -20,9 +20,9 @@ use constant FALSE => 0;
 
 use Net::SMTP;
 
-use Sitemason7::Common;
-use Sitemason7::Debug;
-use Sitemason7::Library::Database;
+use SitemasonPl::Common;
+use SitemasonPl::Debug;
+use SitemasonPl::Database;
 
 
 #=====================================================
@@ -35,9 +35,9 @@ This uses the Database module to look up server and user settings. Send dbHost a
 
 userId is not required, but is encouraged for setting Return-Path and using user smtp settings. If writing a script that will send mail from multiple users, this may be specified at the time mail is sent.
 
- my $mail = Sitemason7::Library::Mail->new( userId => $userId );
+ my $mail = SitemasonPl::Mail->new( userId => $userId );
 
- my $mail = Sitemason7::Library::Mail->new(
+ my $mail = SitemasonPl::Mail->new(
  	userId	=> $userId,
  	
  	dbHost	=> $dbHost,
@@ -68,7 +68,7 @@ sub new {
 	if ($arg{debug}) {
 		$self->{debug} = $arg{debug};
 	} else {
-		$self->{debug} = Sitemason7::Debug->new(
+		$self->{debug} = SitemasonPl::Debug->new(
 			logLevel	=> 'debug',
 			logLevelAll	=> 'info',
 			logTags		=> []
@@ -76,7 +76,7 @@ sub new {
 	}
 	$self->{debug}->call;
 	
-# 	unless ($self->{dbh}) { $self->{debug}->critical("No database handler available. Exiting from Sitemason7::Library::Mail"); return; }
+# 	unless ($self->{dbh}) { $self->{debug}->critical("No database handler available. Exiting from SitemasonPl::Mail"); return; }
 	
 	if ($self->{dbh}) {
 		my $locale = $self->{dbh}->selectallHashref("
@@ -799,13 +799,13 @@ sub getEmailTemplate {
   20071105 TJM - v0.01 started development
   20120105 TJM - v6.0 moved from Sitemason::System to Sitemason6::Library
   20150415 TJM - v7.0 updated for Sitemason 7.
+  20171109 TJM - v8.0 Moved to SitemasonPL open source project
 
 =head1 AUTHOR
 
-  Tim Moses <tim@sitemason.com>
-  Sitemason <http://www.sitemason.com/>
+  Tim Moses <tim@moses.com>
+  Sitemason Open Source <https://github.com/sitemason>
 
 =cut
 
 1;
-

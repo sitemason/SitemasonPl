@@ -1,9 +1,9 @@
-package Sitemason7::Library::Database;
-$VERSION = '7.0';
+package SitemasonPl::Database;
+$VERSION = '8.0';
 
 =head1 NAME
 
-Sitemason7::Library::Database
+SitemasonPl::Library::Database
 
 =head1 DESCRIPTION
 
@@ -22,9 +22,9 @@ use DBI;
 use DateTime;
 use Text::Iconv;
 
-use Sitemason7::Common;
-use Sitemason7::Debug;
-use Sitemason7::Library::SearchParse;
+use SitemasonPl::Common;
+use SitemasonPl::Debug;
+use SitemasonPl::SearchParse;
 
 #=====================================================
 
@@ -38,7 +38,7 @@ Errors:
 	command:	summary of every sql call
 	{sql cmd}:	each sql command has a tag, like 'select', 'insert', 'update', 'delete'
 
- my $dbh = Sitemason7::Library::Database->new(
+ my $dbh = SitemasonPl::Database->new(
 	dbType		=> 'pg' || 'mysql' || 'sqlite',
 	dbHost		=> $dbHost,
 	dbPort		=> $dbPort,
@@ -59,10 +59,10 @@ sub new {
 	
 	my $self = {
 		dbType		=> $arg{dbType}		|| 'pg',
-		dbHost		=> $arg{dbHost}		|| $Sitemason7::serverInfo->{dbInfo}->{dbHost}		|| $ENV{SMDB_HOST},
-		dbPort		=> $arg{dbPort}		|| $Sitemason7::serverInfo->{dbInfo}->{dbPort}		|| $ENV{SMDB_PORT},
-		dbUsername	=> $arg{dbUsername}	|| $Sitemason7::serverInfo->{dbInfo}->{dbUsername}	|| $ENV{SMDB_USERNAME},
-		dbPassword	=> $arg{dbPassword}	|| $Sitemason7::serverInfo->{dbInfo}->{dbPassword}	|| $ENV{SMDB_PASSWORD},
+		dbHost		=> $arg{dbHost}		|| $SitemasonPl::serverInfo->{dbInfo}->{dbHost}		|| $ENV{SMDB_HOST},
+		dbPort		=> $arg{dbPort}		|| $SitemasonPl::serverInfo->{dbInfo}->{dbPort}		|| $ENV{SMDB_PORT},
+		dbUsername	=> $arg{dbUsername}	|| $SitemasonPl::serverInfo->{dbInfo}->{dbUsername}	|| $ENV{SMDB_USERNAME},
+		dbPassword	=> $arg{dbPassword}	|| $SitemasonPl::serverInfo->{dbInfo}->{dbPassword}	|| $ENV{SMDB_PASSWORD},
 		dbSock		=> $arg{dbSock},
 		dbName		=> $arg{dbName}		|| $ENV{SMDB_NAME},
 		timeZone	=> $arg{timeZone}	|| $ENV{SM_TIMEZONE}	 || 'UTC'
@@ -78,7 +78,7 @@ sub new {
 	if ($arg{debug}) {
 		$self->{debug} = $arg{debug};
 	} else {
-		$self->{debug} = Sitemason7::Debug->new(
+		$self->{debug} = SitemasonPl::Debug->new(
 			logLevel	=> 'debug',
 			logLevelAll	=> 'info',
 			logTags		=> []
@@ -2300,19 +2300,19 @@ sub checkFieldInput {
 		undef($old);
 	} elsif ($self->{dbType} eq 'sqlite') {
 #		my @answer = `sqlite3 $self->{db_name} ".schema $table"`;
-		my @answer = load_schema($table);
-		foreach my $line (@answer) {
-			chomp($line);
-			my ($info, $type);
-			($info->{COLUMN_NAME}, $type, $info->{COLUMN_SIZE}) = $line =~ /^\s*"(\w+)"\s+(\w+)(?:\((\d+)\))?/;
-			$info->{COLUMN_NAME} || next;
-			if ($type eq 'INTEGER') {
-				$info->{TYPE_NAME} = 'int';
-			} else {
-				$info->{TYPE_NAME} = lc($type);
-			}
-			push(@{$columns}, $info);
-		}
+# 		my @answer = load_schema($table);
+# 		foreach my $line (@answer) {
+# 			chomp($line);
+# 			my ($info, $type);
+# 			($info->{COLUMN_NAME}, $type, $info->{COLUMN_SIZE}) = $line =~ /^\s*"(\w+)"\s+(\w+)(?:\((\d+)\))?/;
+# 			$info->{COLUMN_NAME} || next;
+# 			if ($type eq 'INTEGER') {
+# 				$info->{TYPE_NAME} = 'int';
+# 			} else {
+# 				$info->{TYPE_NAME} = lc($type);
+# 			}
+# 			push(@{$columns}, $info);
+# 		}
 	} else {
 		$columns = $self->getColumnInfo($table);
 	}
@@ -2630,8 +2630,8 @@ sub getServerInfo {
 	my $key = shift || return;
 	$self->{dbName} || return;
 	
-	if (exists($Sitemason7::serverInfo->{$self->{dbName}}->{$key})) {
-		return copyRef($Sitemason7::serverInfo->{$self->{dbName}}->{$key});
+	if (exists($SitemasonPl::serverInfo->{$self->{dbName}}->{$key})) {
+		return copyRef($SitemasonPl::serverInfo->{$self->{dbName}}->{$key});
 	}
 	return;
 }
@@ -2650,7 +2650,7 @@ sub setServerInfo {
 	my $value = shift;
 	$self->{dbName} || return;
 	
-	$Sitemason7::serverInfo->{$self->{dbName}}->{$key} = copyRef($value);
+	$SitemasonPl::serverInfo->{$self->{dbName}}->{$key} = copyRef($value);
 	return TRUE;
 }
 
@@ -2667,8 +2667,8 @@ sub clearServerInfo {
 	my $key = shift || return;
 	$self->{dbName} || return;
 	
-	if (exists($Sitemason7::serverInfo->{$self->{dbName}}->{$key})) {
-		delete $Sitemason7::serverInfo->{$self->{dbName}}->{$key};
+	if (exists($SitemasonPl::serverInfo->{$self->{dbName}}->{$key})) {
+		delete $SitemasonPl::serverInfo->{$self->{dbName}}->{$key};
 		return TRUE;
 	}
 	return;
@@ -2676,48 +2676,48 @@ sub clearServerInfo {
 
 
 
-sub load_schema {
-	my $table = shift;
-	my $schema;
-	if ($table eq 'server') {
-		$schema = <<"EOL";
-CREATE TABLE "server" (
-  "id" INTEGER PRIMARY KEY AUTOINCREMENT,
-  "ami" VARCHAR(24),
-  "reservation_id" VARCHAR(24),
-  "instance_id" VARCHAR(24),
-  "state" VARCHAR(24),
-  "key" VARCHAR(64),
-  "public_ip" VARCHAR(15),
-  "private_ip" VARCHAR(15),
-  "name" VARCHAR(32),
-  "enterprise" VARCHAR(32),
-  "zone" VARCHAR(16),
-  "last_checkin" INTEGER,
-  "last_load" VARCHAR(16),
-  "last_df" VARCHAR(16),
-  "server_type" VARCHAR(24),
-  "groups" VARCHAR(128)
-);
-EOL
-	} elsif ($table eq 'service') {
-		$schema = <<"EOL";
-CREATE TABLE "service" (
-  "id" INTEGER PRIMARY KEY AUTOINCREMENT,
-  "name" VARCHAR(32) NOT NULL
-);
-EOL
-	} elsif ($table eq 'server_service') {
-		$schema = <<"EOL";
-CREATE TABLE "server_service" (
-  "service_id" INTEGER,
-  "server_id" INTEGER
-);
-EOL
-	}
-	
-	return split("\n", $schema);
-}
+# sub load_schema {
+# 	my $table = shift;
+# 	my $schema;
+# 	if ($table eq 'server') {
+# 		$schema = <<"EOL";
+# CREATE TABLE "server" (
+#   "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+#   "ami" VARCHAR(24),
+#   "reservation_id" VARCHAR(24),
+#   "instance_id" VARCHAR(24),
+#   "state" VARCHAR(24),
+#   "key" VARCHAR(64),
+#   "public_ip" VARCHAR(15),
+#   "private_ip" VARCHAR(15),
+#   "name" VARCHAR(32),
+#   "enterprise" VARCHAR(32),
+#   "zone" VARCHAR(16),
+#   "last_checkin" INTEGER,
+#   "last_load" VARCHAR(16),
+#   "last_df" VARCHAR(16),
+#   "server_type" VARCHAR(24),
+#   "groups" VARCHAR(128)
+# );
+# EOL
+# 	} elsif ($table eq 'service') {
+# 		$schema = <<"EOL";
+# CREATE TABLE "service" (
+#   "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+#   "name" VARCHAR(32) NOT NULL
+# );
+# EOL
+# 	} elsif ($table eq 'server_service') {
+# 		$schema = <<"EOL";
+# CREATE TABLE "server_service" (
+#   "service_id" INTEGER,
+#   "server_id" INTEGER
+# );
+# EOL
+# 	}
+# 	
+# 	return split("\n", $schema);
+# }
 
 
 
@@ -2730,13 +2730,13 @@ EOL
   20080716 TJM - v3.50 merged Sitemason::System::Database and Sitemason::Database
   20120105 TJM - v6.0 moved from Sitemason::System to Sitemason6::Library
   20140320 TJM - v7.0 merged 3.50 and 6.0
+  20171109 TJM - v8.0 Moved to SitemasonPL open source project and merged with updates
 
 =head1 AUTHOR
 
-  Tim Moses <tim@sitemason.com>
-  Sitemason <http://www.sitemason.com/>
+  Tim Moses <tim@moses.com>
+  Sitemason Open Source <https://github.com/sitemason>
 
 =cut
 
 1;
-

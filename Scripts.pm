@@ -1,4 +1,4 @@
-package Sitemason::Scripts::Scripts;
+package SitemasonPl::Scripts;
 
 use strict;
 use utf8;
@@ -9,8 +9,8 @@ use Getopt::Long;
 use Pod::Usage qw(pod2usage);
 use Proc::ProcessTable;
 
-use Sitemason::Common;
-use Sitemason::Debug;
+use SitemasonPl::Common;
+use SitemasonPl::Debug;
 
 require Exporter;
 our @ISA = qw(Exporter);
@@ -22,9 +22,9 @@ our @EXPORT = qw(initialize isAlreadyRunning isAlreadyRunningWithArgs getOptions
 =head2 B<initialize>
 
 Sets the following:
- debug - Sitemason::Debug
- logAction - Sitemason::Debug::LogAction
- prefs - Sitemason::Debug::ScriptPreferences
+ debug - SitemasonPl::Debug
+ logAction - SitemasonPl::Debug::LogAction
+ prefs - SitemasonPl::Debug::ScriptPreferences
  
  mode - the first argument prior to options
  scriptName - name of the script as it was originally called
@@ -50,7 +50,7 @@ sub initialize {
 	$self->{options}		= {};
 	($self->{scriptName})	= $0 =~ /\/([^\/]+?)$/;
 	
-	$self->{debug} = Sitemason::Debug->new(
+	$self->{debug} = SitemasonPl::Debug->new(
 		logLevel	=> 'debug',
 		logLevelAll	=> 'info',
 		logTags		=> ['!call']
@@ -67,10 +67,10 @@ sub initialize {
 	if (@ARGV[0] && (@ARGV[0] !~ /^\-/)) { $self->{mode} = shift(@ARGV); }
 	
 	if ($arg->{logAction}) {
-		$self->{logAction} = Sitemason::Debug::LogAction->new(debug => $self->{debug}, source => $self->{scriptName}, source_arg => $self->{mode});
+		$self->{logAction} = SitemasonPl::Debug::LogAction->new(debug => $self->{debug}, source => $self->{scriptName}, source_arg => $self->{mode});
 	}
 	
-	$self->{prefs} = Sitemason::Debug::ScriptPreferences->new(debug => $self->{debug}) || return;
+	$self->{prefs} = SitemasonPl::Debug::ScriptPreferences->new(debug => $self->{debug}) || return;
 	
 	return TRUE;
 }
@@ -182,6 +182,16 @@ sub printUsage {
 
 
 
+=head1 CHANGES
+
+  ???????? TJM - moved from scripts to Sitemason7
+  20171109 TJM - v8.0 Moved to SitemasonPL open source project
+
+=head1 AUTHOR
+
+  Tim Moses <tim@moses.com>
+  Sitemason Open Source <https://github.com/sitemason>
+
+=cut
 
 1;
-

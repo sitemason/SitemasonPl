@@ -1,9 +1,9 @@
-package Sitemason7::Library::Normalize;
-$VERSION = '7.0';
+package SitemasonPl::Normalize;
+$VERSION = '8.0';
 
 =head1 NAME
 
-Sitemason7::Library::Normalize
+SitemasonPl::Normalize
 
 =head1 DESCRIPTION
 
@@ -23,7 +23,7 @@ use Text::DoubleMetaphone qw( double_metaphone );
 use Text::Levenshtein::Damerau;
 use Text::Unidecode;
 
-use Sitemason7::Common;
+use SitemasonPl::Common;
 
 require Exporter;
 our @ISA = qw(Exporter);
@@ -144,8 +144,8 @@ sub compareTitles {
 		
 		my $counter;
 		my $multiplier = 1;
-		if ($args->{address} && $Sitemason7::Library::Normalize::commonAddressWords->{$word1}) { $counter = .5; $multiplier = .5; }
-		elsif (!$args->{address} && $Sitemason7::Library::Normalize::commonWords->{$word1}) { $counter = .5; $multiplier = .5; }
+		if ($args->{address} && $SitemasonPl::Normalize::commonAddressWords->{$word1}) { $counter = .5; $multiplier = .5; }
+		elsif (!$args->{address} && $SitemasonPl::Normalize::commonWords->{$word1}) { $counter = .5; $multiplier = .5; }
 		else { $counter = 1; }
 		$wordCount += $counter;
 		
@@ -180,8 +180,8 @@ sub compareTitles {
 			my $word1 = $leftoverWordsA[$i];
 			
 			my $multiplier = 1;
-			if ($args->{address} && $Sitemason7::Library::Normalize::commonAddressWords->{$word1}) { $multiplier = .5; }
-			elsif (!$args->{address} && $Sitemason7::Library::Normalize::commonWords->{$word1}) { $multiplier = .5; }
+			if ($args->{address} && $SitemasonPl::Normalize::commonAddressWords->{$word1}) { $multiplier = .5; }
+			elsif (!$args->{address} && $SitemasonPl::Normalize::commonWords->{$word1}) { $multiplier = .5; }
 			
 			# Match anywhere
 			my @leftoverBTemp;
@@ -289,7 +289,7 @@ sub _checkSynonyms {
 	my $normA = shift;
 	my $normB = shift;
 	loadSynonyms();
-	foreach my $values (@{$Sitemason7::Library::Normalize::synonyms}) {
+	foreach my $values (@{$SitemasonPl::Normalize::synonyms}) {
 		my ($matchA, $matchB);
 		my $isA;
 		foreach my $value (@{$values}) {
@@ -451,7 +451,7 @@ sub unplural {
 sub translate {
 	my $word = shift;
 	loadTranslations();
-	my $translation = $Sitemason7::Library::Normalize::translations->{$word};
+	my $translation = $SitemasonPl::Normalize::translations->{$word};
 	$translation && return $translation;
 	return $word;
 }
@@ -460,7 +460,7 @@ sub translate {
 sub hyphenate {
 	my $word = shift;
 	loadHyphenated();
-	my $hyphenated = $Sitemason7::Library::Normalize::hyphenated->{$word};
+	my $hyphenated = $SitemasonPl::Normalize::hyphenated->{$word};
 	$hyphenated && return $hyphenated;
 	return $word;
 }
@@ -470,7 +470,7 @@ sub compound {
 	my $word1 = shift || return;
 	my $word2 = shift || return;
 	loadCompounds();
-	my $compound = $Sitemason7::Library::Normalize::compounds->{"$word1-$word2"};
+	my $compound = $SitemasonPl::Normalize::compounds->{"$word1-$word2"};
 	$compound && return $compound;
 	return;
 }
@@ -479,7 +479,7 @@ sub compound {
 sub unabbreviateAddress {
 	my $word = shift;
 	loadAddressAbbreviations();
-	my $translation = $Sitemason7::Library::Normalize::addressAbbreviations->{$word};
+	my $translation = $SitemasonPl::Normalize::addressAbbreviations->{$word};
 	$translation && return $translation;
 	return $word;
 }
@@ -510,7 +510,7 @@ sub getAddressScore {
 	my @words = split('-', $venue->{address_normalized});
 	my $hasCommonWord;
 	foreach my $word (@words) {
-		if ($Sitemason7::Library::Normalize::commonAddressWords->{$word}) { $hasCommonWord = TRUE; }
+		if ($SitemasonPl::Normalize::commonAddressWords->{$word}) { $hasCommonWord = TRUE; }
 	}
 	
 	if ($addressOnly) {
@@ -538,7 +538,7 @@ sub convertNumbers {
 	my $haveOne;
  	for (my $i = 0; $i < @words; $i++) {
 		my $word = $words[$i];
-		my $new = $Sitemason7::Library::Normalize::numbers->{$word};
+		my $new = $SitemasonPl::Normalize::numbers->{$word};
  		
  		my $reset;
 		if ($word =~ /^millions?/) {
@@ -718,22 +718,22 @@ sub _convertSaints {
 	if ($phrase !~ /\bst\-([a-z]+)\b/) { return $phrase; }
 	my $name = $1;
 	loadSaints();
-	if ($Sitemason7::Library::Normalize::saints->{$name}) {
+	if ($SitemasonPl::Normalize::saints->{$name}) {
 		$phrase =~ s/\bst\-$name\b/saint-$name/g;
 	} elsif ($name =~ /s$/) {
 		my $nonpossessive = $name;
 		$nonpossessive =~ s/s$//;
-		if ($Sitemason7::Library::Normalize::saints->{$nonpossessive}) {
+		if ($SitemasonPl::Normalize::saints->{$nonpossessive}) {
 			$phrase =~ s/\bst\-$name\b/saint-$name/g;
 		}
 	} elsif ($phrase =~ /\bst\-st\-([a-z]+)\b/) {
 		my $name = $1;
-		if ($Sitemason7::Library::Normalize::saints->{$name}) {
+		if ($SitemasonPl::Normalize::saints->{$name}) {
 			$phrase =~ s/\bst\-$name\b/saint-$name/g;
 		} elsif ($name =~ /s$/) {
 			my $nonpossessive = $name;
 			$nonpossessive =~ s/s$//;
-			if ($Sitemason7::Library::Normalize::saints->{$nonpossessive}) {
+			if ($SitemasonPl::Normalize::saints->{$nonpossessive}) {
 				$phrase =~ s/\bst\-$name\b/saint-$name/g;
 			}
 		}
@@ -849,28 +849,28 @@ sub getTimeZone {
 	my $tz = shift || return;
 	loadTimeZones();
 	my $norm = normalize($tz);
-	return $Sitemason7::Library::Normalize::timeZones->{$norm};
+	return $SitemasonPl::Normalize::timeZones->{$norm};
 }
 
 sub loadTimeZones {
-	if (!isHash($Sitemason7::Library::Normalize::timeZones)) {
+	if (!isHash($SitemasonPl::Normalize::timeZones)) {
 		my $names = DateTime::TimeZone->all_names;
 		foreach my $name (@{$names}) {
 			my $norm = normalize($name);
-			$Sitemason7::Library::Normalize::timeZones->{$norm} = $name;
+			$SitemasonPl::Normalize::timeZones->{$norm} = $name;
 		}
 		my $links = DateTime::TimeZone->links;
 		while (my($link, $name) = each(%{$links})) {
 			my $norm = normalize($link);
-			$Sitemason7::Library::Normalize::timeZones->{$norm} = $name;
+			$SitemasonPl::Normalize::timeZones->{$norm} = $name;
 		}
 	}
 }
 
 # Could add niners, etc.
 sub loadNumbers {
-	if (!isHash($Sitemason7::Library::Normalize::numbers)) {
-		$Sitemason7::Library::Normalize::numbers = {
+	if (!isHash($SitemasonPl::Normalize::numbers)) {
+		$SitemasonPl::Normalize::numbers = {
 			one => { n => '1' },
 			two => { n => '2' },
 			three => { n => '3' },
@@ -975,8 +975,8 @@ sub loadNumbers {
 }
 
 sub loadHyphenated {
-	if (!isHash($Sitemason7::Library::Normalize::hyphenated)) {
-		$Sitemason7::Library::Normalize::hyphenated = {
+	if (!isHash($SitemasonPl::Normalize::hyphenated)) {
+		$SitemasonPl::Normalize::hyphenated = {
 			ablebodied => 'able-bodied',
 			absentminded => 'absent-minded',
 			adlib => 'ad-lib',
@@ -1073,8 +1073,8 @@ sub loadHyphenated {
 }
 
 sub loadCompounds {
-	if (!isHash($Sitemason7::Library::Normalize::compounds)) {
-		$Sitemason7::Library::Normalize::compounds = {
+	if (!isHash($SitemasonPl::Normalize::compounds)) {
+		$SitemasonPl::Normalize::compounds = {
 			'after-thought' => 'afterthought',
 			'any-time' => 'anytime',
 			'any-where' => 'anywhere',
@@ -1200,8 +1200,8 @@ sub loadCompounds {
 }
 
 sub loadTranslations {
-	if (!isHash($Sitemason7::Library::Normalize::translations)) {
-		$Sitemason7::Library::Normalize::translations = {
+	if (!isHash($SitemasonPl::Normalize::translations)) {
+		$SitemasonPl::Normalize::translations = {
 			january		=> 'jan',
 			february	=> 'feb',
 			febuary		=> 'feb',
@@ -1453,8 +1453,8 @@ sub loadTranslations {
 }
 
 sub loadSynonyms {
-	isArray($Sitemason7::Library::Normalize::synonyms) && return;
-	$Sitemason7::Library::Normalize::synonyms = [
+	isArray($SitemasonPl::Normalize::synonyms) && return;
+	$SitemasonPl::Normalize::synonyms = [
 		['arena', 'amphitheater', 'auditorium', 'ballpark', 'center', 'coliseum', 'community-center', 'concert-hall', 'exhibition-hall', 'field', 'hall', 'park', 'sportsplex', 'stadium'],
 		['racetrack', 'race-track', 'racecourse', 'race-course', 'raceway', 'speedway', 'velodrome'],
 		['theater', 'amphitheater', 'auditorium', 'cabaret', 'concert-hall', 'exhibition-hall', 'hall', 'playhouse'],
@@ -1467,9 +1467,9 @@ sub loadSynonyms {
 }
 
 sub loadCommonWords {
-	isHash($Sitemason7::Library::Normalize::commonWords) && return;
+	isHash($SitemasonPl::Normalize::commonWords) && return;
 	loadSynonyms();
-	$Sitemason7::Library::Normalize::commonWords = {
+	$SitemasonPl::Normalize::commonWords = {
 		and		=> TRUE,
 		as		=> TRUE,
 		at		=> TRUE,
@@ -1491,25 +1491,25 @@ sub loadCommonWords {
 		to		=> TRUE,
 		yet		=> TRUE
 	};
-	foreach my $set (@{$Sitemason7::Library::Normalize::synonyms}) {
+	foreach my $set (@{$SitemasonPl::Normalize::synonyms}) {
 		foreach my $word (@{$set}) {
-			$Sitemason7::Library::Normalize::commonWords->{$word} = TRUE;
+			$SitemasonPl::Normalize::commonWords->{$word} = TRUE;
 		}
 	}
 }
 
 sub loadCommonAddressWords {
-	isHash($Sitemason7::Library::Normalize::commonAddressWords) && return;
+	isHash($SitemasonPl::Normalize::commonAddressWords) && return;
 	loadAddressAbbreviations();
-	$Sitemason7::Library::Normalize::commonAddressWords = {};
-	while (my($abbr, $word) = each(%{$Sitemason7::Library::Normalize::addressAbbreviations})) {
-		$Sitemason7::Library::Normalize::commonAddressWords->{$word} = TRUE;
+	$SitemasonPl::Normalize::commonAddressWords = {};
+	while (my($abbr, $word) = each(%{$SitemasonPl::Normalize::addressAbbreviations})) {
+		$SitemasonPl::Normalize::commonAddressWords->{$word} = TRUE;
 	}
 }
 
 sub loadAddressAbbreviations {
-	if (!isHash($Sitemason7::Library::Normalize::addressAbbreviations)) {
-		$Sitemason7::Library::Normalize::addressAbbreviations = {
+	if (!isHash($SitemasonPl::Normalize::addressAbbreviations)) {
+		$SitemasonPl::Normalize::addressAbbreviations = {
 			's'		=> 'south',
 			'sw'	=> 'southwest',
 			'se'	=> 'southeast',
@@ -2049,8 +2049,8 @@ sub loadAddressAbbreviations {
 
 # http://en.wikipedia.org/wiki/List_of_saints
 sub loadSaints {
-	if (!isHash($Sitemason7::Library::Normalize::saints)) {
-		$Sitemason7::Library::Normalize::saints = {};
+	if (!isHash($SitemasonPl::Normalize::saints)) {
+		$SitemasonPl::Normalize::saints = {};
 		my @saints = qw(
 abadiu abakuh abamun abanoub abaskhayroun abban abbo abdas abel abib
 abo abraam abraham abuna abundius acacius acca achilleus adalbert adalgar
@@ -2113,7 +2113,7 @@ wulfram xavier xenia xenophon yaropolk yegor yrieix zachary zdislava zita
 zofia zosimas zygmunt
 		);
 		foreach my $saint (@saints) {
-			$Sitemason7::Library::Normalize::saints->{$saint} = TRUE;
+			$SitemasonPl::Normalize::saints->{$saint} = TRUE;
 		}
 	}
 }
@@ -2121,14 +2121,14 @@ zofia zosimas zygmunt
 
 =head1 CHANGES
 
-  20140410 TJM - moved from scripts to Sitemason7::Library
+  20140410 TJM - moved from scripts to Sitemason7
+  20171109 TJM - v8.0 Moved to SitemasonPL open source project
 
 =head1 AUTHOR
 
-  Tim Moses <tim@sitemason.com>
-  Sitemason <http://www.sitemason.com/>
+  Tim Moses <tim@moses.com>
+  Sitemason Open Source <https://github.com/sitemason>
 
 =cut
 
 1;
-

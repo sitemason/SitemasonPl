@@ -1,9 +1,9 @@
-package Sitemason7::Debug;
-$VERSION = '7.0';
+package SitemasonPl::Debug;
+$VERSION = '8.0';
 
 =head1 NAME
 
-Sitemason7::Debug
+SitemasonPl::Debug
 
 =head1 DESCRIPTION
 
@@ -20,8 +20,8 @@ use constant TRUE => 1;
 use constant FALSE => 0;
 
 use Benchmark::Timer;
-use Sitemason7::Common;
-use Sitemason7::Library::Database;
+use SitemasonPl::Common;
+use SitemasonPl::Database;
 
 
 #=====================================================
@@ -1160,7 +1160,7 @@ sub sendToLeftronic {
 	my $points = shift;
 	my $debug = shift;
 	
-	my $apiKey = 'Tmu1PngknBmjGhBwVZ1vVygKwxxOqFhM';
+	my $apiKey = 'leftronic_api_key';
 	my $json = { accessKey => $apiKey };
 	
 	if (isText($streams)) {
@@ -1412,7 +1412,7 @@ sub logAction {
 	my $threat_level = shift || 0;
 	my $details = shift;
 	my $debug = shift;
-	my $logAction = Sitemason7::Debug::LogAction->new(debug => $self, source => $source, source_arg => $source_arg);
+	my $logAction = SitemasonPl::Debug::LogAction->new(debug => $self, source => $source, source_arg => $source_arg);
 	$logAction->end($threat_level, $details);
 }
 
@@ -1439,28 +1439,28 @@ sub Table {
 	my $self = shift || return;
 	my $columns = shift;
 	my $label = shift;
-	return Sitemason7::Debug::Table->new(debug => $self, columns => $columns, label => $label);
+	return SitemasonPl::Debug::Table->new(debug => $self, columns => $columns, label => $label);
 }
 
 
 
 
 
-package Sitemason7::Debug::LogAction;
+package SitemasonPl::Debug::LogAction;
 
 use strict;
 use utf8;
 use constant TRUE => 1;
 use constant FALSE => 0;
 
-use Sitemason7::Common;
-use Sitemason7::Library::Database;
+use SitemasonPl::Common;
+use SitemasonPl::Database;
 
 #=====================================================
 
 =head2 B<new>
 
- $self->{logAction} = Sitemason7::Debug::LogAction->new(debug => $self->{debug}, source => $source, source_arg => $source_arg);
+ $self->{logAction} = SitemasonPl::Debug::LogAction->new(debug => $self->{debug}, source => $source, source_arg => $source_arg);
 
 =cut
 #=====================================================
@@ -1492,13 +1492,13 @@ sub new {
 #=====================================================
 sub connectToActionDB {
 	my $self = shift || return;
-	$self->{actionDBH} ||= Sitemason7::Library::Database->new(
+	$self->{actionDBH} ||= SitemasonPl::Database->new(
 		dbType		=> 'mysql',
-		dbHost		=> 'csdb.sitemason.com',
+		dbHost		=> 'db_host',
 		dbPort		=> 3306,
-		dbName		=> 'sitemason_mcp',
-		dbUsername	=> 'sitemason_mcp',
-		dbPassword	=> 'fuCvo*k>$9ubw8n4',
+		dbName		=> 'db_name',
+		dbUsername	=> 'db_user',
+		dbPassword	=> 'db_pass',
 		debug		=> $self->{debug}
 	);
 	unless ($self->{actionDBH}) { $self->{debug}->error("Can't connect to action database"); return; }
@@ -1634,14 +1634,14 @@ sub isStarted {
 
 
 
-package Sitemason7::Debug::Table;
+package SitemasonPl::Debug::Table;
 
 use strict;
 use utf8;
 use constant TRUE => 1;
 use constant FALSE => 0;
 
-use Sitemason7::Common;
+use SitemasonPl::Common;
 
 #=====================================================
 
@@ -1970,21 +1970,21 @@ sub close {
 }
 
 
-package Sitemason7::Debug::ScriptPreferences;
+package SitemasonPl::Debug::ScriptPreferences;
 
 use strict;
 use utf8;
 use constant TRUE => 1;
 use constant FALSE => 0;
 
-use Sitemason7::Common;
-use Sitemason7::Library::Database;
+use SitemasonPl::Common;
+use SitemasonPl::Database;
 
 #=====================================================
 
 =head2 B<new>
 
- $self->{prefs} = Sitemason7::Debug::ScriptPreferences->new(debug => $self->{debug}, script => $script);
+ $self->{prefs} = SitemasonPl::Debug::ScriptPreferences->new(debug => $self->{debug}, script => $script);
 
 =cut
 #=====================================================
@@ -2017,13 +2017,13 @@ sub new {
 #=====================================================
 sub connectToActionDB {
 	my $self = shift || return;
-	$self->{mcpDBH} ||= Sitemason7::Library::Database->new(
+	$self->{mcpDBH} ||= SitemasonPl::Database->new(
 		dbType		=> 'mysql',
-		dbHost		=> 'csdb.sitemason.com',
+		dbHost		=> 'db_host',
 		dbPort		=> 3306,
-		dbName		=> 'sitemason_mcp',
-		dbUsername	=> 'sitemason_mcp',
-		dbPassword	=> 'fuCvo*k>$9ubw8n4',
+		dbName		=> 'db_name',
+		dbUsername	=> 'db_user',
+		dbPassword	=> 'db_pass',
 		debug		=> $self->{debug}
 	);
 	unless ($self->{mcpDBH}) { $self->{debug}->error("Can't connect to action database"); return; }
@@ -2120,13 +2120,13 @@ sub save {
   20120105 TJM - v6.0 mostly the same
   20140124 TJM - v2.00 added Leftronic calls
   20140320 TJM - v7.0 merged 2.00 and 6.0
+  20171109 TJM - v8.0 Moved to SitemasonPL open source project and merged with updates
 
 =head1 AUTHOR
 
-  Tim Moses <tim@sitemason.com>
-  Sitemason <http://www.sitemason.com/>
+  Tim Moses <tim@moses.com>
+  Sitemason Open Source <https://github.com/sitemason>
 
 =cut
 
 1;
-
