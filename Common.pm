@@ -46,7 +46,7 @@ our @EXPORT = qw(get_answer read_cookie generate_password
 	unique compare compress_var compressRef merge_hashes mergeHashes newHash copyRef joinRef diff
 	check_id checkId encode_id encodeId encode6_id encode6Id decode_id decodeId unique_key uniqueKey generateKey smmd5_2008 smsha2012 makeDigest
 	normalize strip strip_extra_white_space stripExtraWhiteSpace stripControlCharacters clean_filename cleanFilename strip_html stripHTML stripHTMLLink stripOutside
-	insertData summarize context toCamelCase fromCamelCase camel_case kebab_case snake_case
+	insertData summarize context to_camel_case from_camel_case is_camel_case camel_case kebab_case snake_case
 	toLatLong toLatLongHash toCoordinates distanceInMiles lookUpIP identifyNIC
 	convertStringToDateTime convertStringToEpoch convertDateTimeToString getDurationSummary getEstimatedTimeRemaining
 	is_person get_term_color make_color bold print_bold say_bold mark
@@ -5053,17 +5053,17 @@ sub context {
 
 #=====================================================
 
-=head2 B<toCamelCase>
+=head2 B<to_camel_case>
 
 Recurses through objects converting hash keys. Only converts array and scalar values at the top level.
 
- $camelCaseHash = toCamelCase($hash);		# Converts hash keys to camel case
- $camelCaseArray = toCamelCase($array);		# Converts array values to camel case
- $camelCaseScalar = toCamelCase($scalar);	# Converts scalar to camel case
+ $camelCaseHash = to_camel_case($hash);		# Converts hash keys to camel case
+ $camelCaseArray = to_camel_case($array);		# Converts array values to camel case
+ $camelCaseScalar = to_camel_case($scalar);	# Converts scalar to camel case
 
 =cut
 #=====================================================
-sub toCamelCase {
+sub to_camel_case {
 	my $input = shift;
 	my $limit = shift;
 	if ($limit >= 20) { return $input; }
@@ -5072,8 +5072,8 @@ sub toCamelCase {
 		# Always do hash keys and recurse to find more hash keys
 		my $newHash = {};
 		while (my($name, $value) = each(%{$input})) {
-			my $newName = _toCamelCaseScalar($name);
-			$newHash->{$newName} = toCamelCase($value, $limit + 1);
+			my $newName = _to_camel_case_scalar($name);
+			$newHash->{$newName} = to_camel_case($value, $limit + 1);
 		}
 		return $newHash;
 	} elsif ($limit) {
@@ -5081,7 +5081,7 @@ sub toCamelCase {
 		if (ref($input) eq 'ARRAY') {
 			my $newArray = [];
 			foreach my $value (@{$input}) {
-				my $newValue = toCamelCase($value, $limit + 1);
+				my $newValue = to_camel_case($value, $limit + 1);
 				push(@{$newArray}, $newValue);
 			}
 			return $newArray;
@@ -5095,22 +5095,22 @@ sub toCamelCase {
 			foreach my $value (@{$input}) {
 				my $newValue = $value;
 				if ((ref($value) eq 'SCALAR') || !ref($value)) {
-					$newValue = _toCamelCaseScalar($value);
+					$newValue = _to_camel_case_scalar($value);
 				} else {
-					$newValue = toCamelCase($value, $limit + 1);
+					$newValue = to_camel_case($value, $limit + 1);
 				}
 				push(@{$newArray}, $newValue);
 			}
 			return $newArray;
 		} elsif ((ref($input) eq 'SCALAR') || !ref($input)) {
-			return _toCamelCaseScalar($input);
+			return _to_camel_case_scalar($input);
 		} else {
 			return $input;
 		}
 	}
 }
 
-sub _toCamelCaseScalar {
+sub _to_camel_case_scalar {
 	my $input = shift || '';
 	my $scalar = $input;
 	if (ref($input) eq 'SCALAR') { $scalar = ${$input}; }
@@ -5121,15 +5121,15 @@ sub _toCamelCaseScalar {
 	return $scalar;
 }
 
+sub from_camel_case {
 #=====================================================
 
-=head2 B<fromCamelCase>
+=head2 B<from_camel_case>
 
 Recurses through objects converting hash keys. Only converts array and scalar values at the top level.
 
 =cut
 #=====================================================
-sub fromCamelCase {
 	my $input = shift;
 	my $limit = shift;
 	if ($limit >= 20) { return $input; }
@@ -5138,8 +5138,8 @@ sub fromCamelCase {
 		# Always do hash keys and recurse to find more hash keys
 		my $newHash = {};
 		while (my($name, $value) = each(%{$input})) {
-			my $newName = _fromCamelCaseScalar($name);
-			$newHash->{$newName} = fromCamelCase($value, $limit + 1);
+			my $newName = _from_camel_case_scalar($name);
+			$newHash->{$newName} = from_camel_case($value, $limit + 1);
 		}
 		return $newHash;
 	} elsif ($limit) {
@@ -5147,7 +5147,7 @@ sub fromCamelCase {
 		if (ref($input) eq 'ARRAY') {
 			my $newArray = [];
 			foreach my $value (@{$input}) {
-				my $newValue = fromCamelCase($value, $limit + 1);
+				my $newValue = from_camel_case($value, $limit + 1);
 				push(@{$newArray}, $newValue);
 			}
 			return $newArray;
@@ -5161,22 +5161,22 @@ sub fromCamelCase {
 			foreach my $value (@{$input}) {
 				my $newValue = $value;
 				if ((ref($value) eq 'SCALAR') || !ref($value)) {
-					$newValue = _fromCamelCaseScalar($value);
+					$newValue = _from_camel_case_scalar($value);
 				} else {
-					$newValue = fromCamelCase($value, $limit + 1);
+					$newValue = from_camel_case($value, $limit + 1);
 				}
 				push(@{$newArray}, $newValue);
 			}
 			return $newArray;
 		} elsif ((ref($input) eq 'SCALAR') || !ref($input)) {
-			return _fromCamelCaseScalar($input);
+			return _from_camel_case_scalar($input);
 		} else {
 			return $input;
 		}
 	}
 }
 
-sub _fromCamelCaseScalar {
+sub _from_camel_case_scalar {
 	my $input = shift || '';
 	my $scalar = $input;
 	if (ref($input) eq 'SCALAR') { $scalar = ${$input}; }
@@ -5185,6 +5185,11 @@ sub _fromCamelCaseScalar {
 	$scalar =~ s/([a-z])([A-Z0-9])/$1_\l$2/g;
 	if (ref($input) eq 'SCALAR') { return \$scalar; }
 	return $scalar;
+}
+
+sub is_camel_case {
+	my $text = shift;
+	if ($text =~ /^[a-z]+[A-Z][a-zA-Z0-9]+$/) { return TRUE; }
 }
 
 sub camel_case {
@@ -5196,15 +5201,25 @@ sub camel_case {
 
 sub kebab_case {
 	my $text = lc(shift);
-	$text =~ s/[^a-z0-9]+/-/g;
-	$text =~ s/--+/-/g;
+	if (is_camel_case($text)) {
+		$text =~ s/([A-Z]+)/-\L$1/g;
+	} else {
+		$text = lc($text);
+		$text =~ s/[^a-z0-9]+/-/g;
+		$text =~ s/--+/-/g;
+	}
 	return $text;
 }
 
 sub snake_case {
-	my $text = lc(shift);
-	$text =~ s/[^a-z0-9]+/_/g;
-	$text =~ s/__+/_/g;
+	my $text = shift;
+	if (is_camel_case($text)) {
+		$text =~ s/([A-Z]+)/_\L$1/g;
+	} else {
+		$text = lc($text);
+		$text =~ s/[^a-z0-9]+/_/g;
+		$text =~ s/__+/_/g;
+	}
 	return $text;
 }
 
