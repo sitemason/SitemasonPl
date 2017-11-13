@@ -27,7 +27,7 @@ use JSON;
 use LWP::UserAgent;
 use Math::Trig qw(deg2rad pi great_circle_distance asin acos);
 use Text::Unidecode;
-use XML::Parser::Expat;
+# use XML::Parser::Expat;
 use Time::gmtime;
 use Unicode::Collate;
 
@@ -68,14 +68,14 @@ $array_of_answers is an array of inputs that should be used before STDIN. Good f
 #=====================================================
 	my $inputs = shift;
 	my $answer;
-	print scalar getTermColor('bold');
+	print scalar get_term_color('bold');
 	if (is_array_with_content($inputs)) {
 		$answer = shift(@{$inputs});
 		print "$answer\n";
 	} else {
 		$answer = <STDIN>;
 	}
-	print scalar getTermColor('reset');
+	print scalar get_term_color('reset');
 	if (ord($answer) == 0) { print "\n"; return; }
 	if ($answer =~ /^exit/) { print "\n"; return; }
 	chomp($answer);
@@ -721,306 +721,6 @@ sub make_json {
 	if ($jsonp && !$depth) { $json = "$jsonp($json)"; }
 	
 	return $json;
-}
-
-
-sub parse_xml {
-#=====================================================
-
-=head2 B<parse_xml>
-
- my $xmlRef = parse_xml($xml);
- my $xmlRef = parse_xml($xml, [qw(item)]); # List contains tags to force as arrays
-
-=cut
-#=====================================================
-	my $xml = shift || return;
-	my $arrayTagList = shift;
-	my $parser = new XML::Parser::Expat;
-	my $structure = {};
-	$parser->{current} = $structure;
-	$parser->setHandlers(
-		'Start'	=> \&_parse_xml_start,
-		'End'	=> \&_parse_xml_end,
-		'Char'	=> \&_parse_xml_char
-	);
-	eval { $parser->parse($xml); };
-	if ($@) { return; }
-	my $arrayTagRef = arrayToHash($arrayTagList);
-	my $xmlRef = _parse_xml_convert($structure, $arrayTagRef);
-	
-	return $xmlRef;
-}
-
-sub _parse_xml_start {
-	my ($parser, $tag, %atts) = @_;
-	my $node = { _parent_node => $parser->{current} };
-	
-	while (my($name,$value) = each(%atts)) {
-		if ($name && $value) { $node->{_attributes}->{$name} = $value; }
-	}
-	push(@{$parser->{current}->{$tag}}, $node);
-	$parser->{current} = $node;
-}
-
-sub _parse_xml_end {
-	my ($parser, $tag) = @_;
-	$parser->{current} = $parser->{current}->{_parent_node};
-}
-
-sub _parse_xml_char {
-	my ($parser, $char) = @_;
-	if ($char =~ /\S/) { $parser->{current}->{_data} .= $char; }
-}
-
-sub _parse_xml_convert {
-	my $structure = shift || return;
-	my $arrayTagRef = shift;
-	my $xmlRef;
-	
-	while (my($tag, $ref) = each(%{$structure})) {
-		if ($tag eq '_parent_node') { next; }
-		if (ref($ref) eq 'ARRAY') {
-			my $elementRef = [];
-			my $arrayAttr;
-			foreach my $element (@{$ref}) {
-				if (ref($element) eq 'HASH') {
-					my $endNode = 1;
-					while (my($innerTag, $innerRef) = each(%{$element})) {
-						if ($innerTag !~ /^(?:_attributes|_data|_parent_node)$/) { undef($endNode); }
-					}
-					my $response;
-					if ($endNode) {
-						$response = $element->{_data};
-						$arrayAttr = $element->{_attributes};
-					} else {
-						$response = _parse_xml_convert($element, $arrayTagRef);
-					}
-					push(@{$elementRef}, $response);
-				} else {
-					print STDERR "Error: should be hash, found $element\n";
-				}
-			}
-			if ((@{$elementRef} > 1) || $arrayTagRef->{$tag} || ($ref->[0]->{_attributes}->{type} eq 'array')) {
-				my $cnt;
-				foreach my $item (@{$elementRef}) {
-					my $refitem = ref($item);
-					if (ref($item) eq 'HASH') {
-						$item->{sub_attribute} = $ref->[$cnt]->{_attributes};
-						push(@{$xmlRef->{$tag}}, $item);
-					} else {
-						push(@{$xmlRef->{$tag}}, $item);
-						push(@{$xmlRef->{"${tag}_attr"}}, $ref->[$cnt]->{_attributes});
-					}
-					$cnt++;
-				}
-# 				if ($arrayAttr) {
-# 					if ($arrayAttr->{type} eq 'array') { delete($arrayAttr->{type}); }
-# 					$xmlRef->{"${tag}_attr"} = $arrayAttr;
-# 				}
-			} else {
-				if ((ref($elementRef->[0]) eq 'HASH') && $elementRef->[0]->{sub_attribute}) {
-					if ($elementRef->[0]->{sub_attribute} eq 'array') { delete($elementRef->[0]->{sub_attribute}->{type}); }
-					$xmlRef->{"${tag}_attr"} = $elementRef->[0]->{sub_attribute};
-					delete($elementRef->[0]->{sub_attribute});
-				} elsif ($arrayAttr) {
-					if ($arrayAttr->{type} eq 'array') { delete($arrayAttr->{type}); }
-					$xmlRef->{"${tag}_attr"} = $arrayAttr;
-				}
-				$xmlRef->{$tag} = $elementRef->[0];
-			}
-		} elsif (ref($ref) eq 'HASH') {
-			my $attr = {}; mergeHashes($attr, $ref);
-			if ($attr->{type} eq 'array') { delete($attr->{type}); }
-			if (keys(%{$attr})) { $xmlRef->{sub_attribute} = $attr; }
-		} elsif ($tag eq '_data') {
-			$ref =~ s/(?:^<!\[CDATA\[|\]\]>$)//g;
-			$xmlRef = $ref;
-		} else {
-			print STDERR "Error: found other $ref\n";
-		}
-	}
-	return $xmlRef;
-}
-
-
-sub make_xml {
-#=====================================================
-
-=head2 B<make_xml>
-
- my $xml = make_xml($xmlRef);
- my $xmlToPrint = make_xml($xmlRef, {
- 	noHeader	=> 1,							# Used to suppress the outermost XML tags
- 	stylesheet	=> 'http://some.com/style.css',	# Specify a URL for a CSS stylesheet
- 	noArray	=> 1,							# Suppress the array attribute
- 	splitXML	=> 1,							# Split XML elements greater than 32k
- 	iePad		=> 1,							# Pad with elements because IE sucks
- } );
-
-=cut
-#=====================================================
-	my $data = shift;
-	my $options = shift;
-	my $noHeader = $options->{noHeader} || $options->{no_header};
-	my $stylesheet = $options->{stylesheet};
-	my $noArray = $options->{noArray} || $options->{no_array};
-	my $splitXML = $options->{splitXML} || $options->{split_xml};
-	my $iePad = $options->{iePad} || $options->{ie_pad};
-	my $depth = shift;
-	my $tabs = "\t" x $depth;
-	my $xml;
-	my $subs;
-	unless ($noHeader) {
-		$xml .= <<"EOM";
-$tabs<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-EOM
-		if ($stylesheet) {
-			$xml .= <<"EOM";
-$tabs<?xml-stylesheet type="text/css" href="$stylesheet" ?>
-EOM
-		}
-		$options->{noHeader} = 1;
-	}
-	if (ref($data) ne 'HASH') {
-		$xml .= <<"EOM";
-$tabs<warning>!! Not a hash !!</warning>
-EOM
-		return $xml;
-	}
-	my $cnt;
-	foreach my $name (sort _by_hash_key (keys(%{$data}))) {
-		if (($depth == 1) && ($name eq 'stylesheet')) { next; }
-		if ($name !~ /^\w/i) { next; }
-		my $value = $data->{$name};
-		# Filter things that break XML
-		$value =~ s/\f//;
-		my $attributes;
-		if ($data->{"${name}_attr"}) {
-			my ($attr,$attrValue);
-			while (($attr,$attrValue) = each(%{$data->{"${name}_attr"}})) {
-				if ($attr && $attrValue) {
-					xmlify($attrValue);
-					$attributes .= " $attr=\"$attrValue\"";
-				}
-			}
-		}
-		if ($name eq 'sub_attribute') {
-			my ($sub,$subValue);
-			while (($sub,$subValue) = each(%{$data->{$name}})) {
-				if ($sub && $subValue) {
-					xmlify($subValue);
-					$subs .= " $sub=\"$subValue\"";
-				}
-			}
-		} elsif ($name =~ /_attr$/) {
-		} elsif ($name =~ /_is_xml$/) {
-		} elsif (ref($value) eq 'HASH') {
-			my $subXML = make_xml($value,$options,$depth+1);
-			$xml .= <<"EOM";
-$tabs<$name$attributes>
-$subXML$tabs</$name>
-EOM
-			$cnt++;
-		} elsif (ref($value) eq 'ARRAY') {
-			my $typeArray;
-			unless ($noArray) { $typeArray = ' type="array"'; }
-			foreach (@{$value}) {
-				if (ref($_) eq 'HASH') {
-					my ($subXML, $subAttr) = make_xml($_,$options,$depth+1);
-					$xml .= <<"EOM";
-$tabs<$name$attributes$subAttr$typeArray>
-$subXML$tabs</$name>
-EOM
-				$cnt++;
-				} elsif (!ref($_)) {
-					my $subValue = $_;
-					if ($splitXML && (length($subValue) > 32766)) {
-						my $valueList = _split_xml_element($subValue);
-						foreach (@{$valueList}) {
-							my $subValue = $_;
-							xmlify($subValue);
-							$xml .= <<"EOM";
-$tabs<$name$attributes$typeArray>$subValue</$name>
-EOM
-							$cnt++;
-						}
-					} else {
-						xmlify($subValue);
-						$xml .= <<"EOM";
-$tabs<$name$attributes$typeArray>$subValue</$name>
-EOM
-						$cnt++;
-					}
-				}
-			}
-		} elsif ($value || (($name =~ /^(?:padding|margin|border)_/) && defined($value))) {
-			if ($data->{"${name}_is_xml"}) {
-				$xml .= <<"EOM";
-$tabs<$name$attributes>
-$value</$name>
-EOM
-				$cnt++;
-			} elsif ($value eq 'NULL') {
-				$xml .= <<"EOM";
-$tabs<$name$attributes />
-EOM
-				$cnt++;
-			} else {
-				if ($splitXML && (length($value) > 32766)) {
-					my $valueList = _split_xml_element($value);
-					foreach (@{$valueList}) {
-						my $subValue = $_;
-						xmlify($subValue);
-						$xml .= <<"EOM";
-$tabs<$name>$subValue</$name>
-EOM
-						$cnt++;
-					}
-				} else {
-					xmlify($value);
-					$xml .= <<"EOM";
-$tabs<$name$attributes>$value</$name>
-EOM
-					$cnt++;
-				}
-			}
-		} elsif ($attributes) {
-			$xml .= <<"EOM";
-$tabs<$name$attributes/>
-EOM
-			$cnt++;
-		}
-	}
-	if ($iePad && $depth && ($cnt <= 1)) {
-		$xml .= <<"EOM";
-$tabs<ie_sucks/>
-EOM
-	}
-	if ($subs) { return $xml, $subs; }
-	else { return $xml; }
-}
-
-sub _by_hash_key {
-	if ($a =~ /^(?:item_id|modif(?:y|ied)_timestamp)$/) { return -1; }
-	elsif ($b =~ /^(?:item_id|modif(?:y|ied)_timestamp)$/) { return 1; }
-	elsif (($a eq 'item') || ($a eq 'entry') || ($a eq 'list')) { return 1; }
-	elsif (($b eq 'item') || ($b eq 'entry') || ($b eq 'list')) { return -1; }
-	else { return $a cmp $b; }
-}
-
-sub _split_xml_element {
-	my $value = shift || return;
-	print STDERR "splitting xml value (" . length($value) . " bytes)...\n";
-	my $valueList = [];
-	my $cnt = 20;
-	while ($cnt && $value) {
-		my $temp = substr($value, 0, 32766);
-		push(@{$valueList}, $temp);
-		substr($value, 0, 32766) = '';
-		$cnt--;
-	}
-	return $valueList;
 }
 
 
@@ -6295,7 +5995,7 @@ sub convert_object_to_string {
 	
 	my $string = '';
 	my $spacing = '.   ';
-	if (termSupportsColors()) { $spacing = make_color('+---', 'silver'); }
+	if (_term_supports_colors()) { $spacing = make_color('+---', 'silver'); }
 	my $indent = $spacing x $level;
 	
 	if (is_hash($object)) {
@@ -6313,7 +6013,7 @@ sub convert_object_to_string {
 			while (my($key, $value) = each(%{$object})) {
 				if ((length($key) > $max) && (length($key) <= 20)) { $max = length($key); }
 			}
-			foreach my $key (sort { byAny($a,$b) } keys %{$object}) {
+			foreach my $key (sort { by_any($a,$b) } keys %{$object}) {
 				my $value = $object->{$key};
 				my $printKey = _convert_object_to_string_key($key, $value);
 				my $tempMax = $max + length($printKey) - length($key) ;
@@ -6368,6 +6068,318 @@ sub convert_object_to_string {
 	}
 	return $string;
 }
+
+
+
+
+#=====================================================
+
+=head2 B<Disabled functions>
+
+=cut
+#=====================================================
+
+
+# sub parse_xml {
+# #=====================================================
+# 
+# =head2 B<parse_xml>
+# 
+#  my $xmlRef = parse_xml($xml);
+#  my $xmlRef = parse_xml($xml, [qw(item)]); # List contains tags to force as arrays
+# 
+# =cut
+# #=====================================================
+# 	my $xml = shift || return;
+# 	my $arrayTagList = shift;
+# 	my $parser = new XML::Parser::Expat;
+# 	my $structure = {};
+# 	$parser->{current} = $structure;
+# 	$parser->setHandlers(
+# 		'Start'	=> \&_parse_xml_start,
+# 		'End'	=> \&_parse_xml_end,
+# 		'Char'	=> \&_parse_xml_char
+# 	);
+# 	eval { $parser->parse($xml); };
+# 	if ($@) { return; }
+# 	my $arrayTagRef = arrayToHash($arrayTagList);
+# 	my $xmlRef = _parse_xml_convert($structure, $arrayTagRef);
+# 	
+# 	return $xmlRef;
+# }
+# 
+# sub _parse_xml_start {
+# 	my ($parser, $tag, %atts) = @_;
+# 	my $node = { _parent_node => $parser->{current} };
+# 	
+# 	while (my($name,$value) = each(%atts)) {
+# 		if ($name && $value) { $node->{_attributes}->{$name} = $value; }
+# 	}
+# 	push(@{$parser->{current}->{$tag}}, $node);
+# 	$parser->{current} = $node;
+# }
+# 
+# sub _parse_xml_end {
+# 	my ($parser, $tag) = @_;
+# 	$parser->{current} = $parser->{current}->{_parent_node};
+# }
+# 
+# sub _parse_xml_char {
+# 	my ($parser, $char) = @_;
+# 	if ($char =~ /\S/) { $parser->{current}->{_data} .= $char; }
+# }
+# 
+# sub _parse_xml_convert {
+# 	my $structure = shift || return;
+# 	my $arrayTagRef = shift;
+# 	my $xmlRef;
+# 	
+# 	while (my($tag, $ref) = each(%{$structure})) {
+# 		if ($tag eq '_parent_node') { next; }
+# 		if (ref($ref) eq 'ARRAY') {
+# 			my $elementRef = [];
+# 			my $arrayAttr;
+# 			foreach my $element (@{$ref}) {
+# 				if (ref($element) eq 'HASH') {
+# 					my $endNode = 1;
+# 					while (my($innerTag, $innerRef) = each(%{$element})) {
+# 						if ($innerTag !~ /^(?:_attributes|_data|_parent_node)$/) { undef($endNode); }
+# 					}
+# 					my $response;
+# 					if ($endNode) {
+# 						$response = $element->{_data};
+# 						$arrayAttr = $element->{_attributes};
+# 					} else {
+# 						$response = _parse_xml_convert($element, $arrayTagRef);
+# 					}
+# 					push(@{$elementRef}, $response);
+# 				} else {
+# 					print STDERR "Error: should be hash, found $element\n";
+# 				}
+# 			}
+# 			if ((@{$elementRef} > 1) || $arrayTagRef->{$tag} || ($ref->[0]->{_attributes}->{type} eq 'array')) {
+# 				my $cnt;
+# 				foreach my $item (@{$elementRef}) {
+# 					my $refitem = ref($item);
+# 					if (ref($item) eq 'HASH') {
+# 						$item->{sub_attribute} = $ref->[$cnt]->{_attributes};
+# 						push(@{$xmlRef->{$tag}}, $item);
+# 					} else {
+# 						push(@{$xmlRef->{$tag}}, $item);
+# 						push(@{$xmlRef->{"${tag}_attr"}}, $ref->[$cnt]->{_attributes});
+# 					}
+# 					$cnt++;
+# 				}
+# # 				if ($arrayAttr) {
+# # 					if ($arrayAttr->{type} eq 'array') { delete($arrayAttr->{type}); }
+# # 					$xmlRef->{"${tag}_attr"} = $arrayAttr;
+# # 				}
+# 			} else {
+# 				if ((ref($elementRef->[0]) eq 'HASH') && $elementRef->[0]->{sub_attribute}) {
+# 					if ($elementRef->[0]->{sub_attribute} eq 'array') { delete($elementRef->[0]->{sub_attribute}->{type}); }
+# 					$xmlRef->{"${tag}_attr"} = $elementRef->[0]->{sub_attribute};
+# 					delete($elementRef->[0]->{sub_attribute});
+# 				} elsif ($arrayAttr) {
+# 					if ($arrayAttr->{type} eq 'array') { delete($arrayAttr->{type}); }
+# 					$xmlRef->{"${tag}_attr"} = $arrayAttr;
+# 				}
+# 				$xmlRef->{$tag} = $elementRef->[0];
+# 			}
+# 		} elsif (ref($ref) eq 'HASH') {
+# 			my $attr = {}; mergeHashes($attr, $ref);
+# 			if ($attr->{type} eq 'array') { delete($attr->{type}); }
+# 			if (keys(%{$attr})) { $xmlRef->{sub_attribute} = $attr; }
+# 		} elsif ($tag eq '_data') {
+# 			$ref =~ s/(?:^<!\[CDATA\[|\]\]>$)//g;
+# 			$xmlRef = $ref;
+# 		} else {
+# 			print STDERR "Error: found other $ref\n";
+# 		}
+# 	}
+# 	return $xmlRef;
+# }
+# 
+# 
+# sub make_xml {
+# #=====================================================
+# 
+# =head2 B<make_xml>
+# 
+#  my $xml = make_xml($xmlRef);
+#  my $xmlToPrint = make_xml($xmlRef, {
+#  	noHeader	=> 1,							# Used to suppress the outermost XML tags
+#  	stylesheet	=> 'http://some.com/style.css',	# Specify a URL for a CSS stylesheet
+#  	noArray	=> 1,							# Suppress the array attribute
+#  	splitXML	=> 1,							# Split XML elements greater than 32k
+#  	iePad		=> 1,							# Pad with elements because IE sucks
+#  } );
+# 
+# =cut
+# #=====================================================
+# 	my $data = shift;
+# 	my $options = shift;
+# 	my $noHeader = $options->{noHeader} || $options->{no_header};
+# 	my $stylesheet = $options->{stylesheet};
+# 	my $noArray = $options->{noArray} || $options->{no_array};
+# 	my $splitXML = $options->{splitXML} || $options->{split_xml};
+# 	my $iePad = $options->{iePad} || $options->{ie_pad};
+# 	my $depth = shift;
+# 	my $tabs = "\t" x $depth;
+# 	my $xml;
+# 	my $subs;
+# 	unless ($noHeader) {
+# 		$xml .= <<"EOM";
+# $tabs<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+# EOM
+# 		if ($stylesheet) {
+# 			$xml .= <<"EOM";
+# $tabs<?xml-stylesheet type="text/css" href="$stylesheet" ?>
+# EOM
+# 		}
+# 		$options->{noHeader} = 1;
+# 	}
+# 	if (ref($data) ne 'HASH') {
+# 		$xml .= <<"EOM";
+# $tabs<warning>!! Not a hash !!</warning>
+# EOM
+# 		return $xml;
+# 	}
+# 	my $cnt;
+# 	foreach my $name (sort _by_hash_key (keys(%{$data}))) {
+# 		if (($depth == 1) && ($name eq 'stylesheet')) { next; }
+# 		if ($name !~ /^\w/i) { next; }
+# 		my $value = $data->{$name};
+# 		# Filter things that break XML
+# 		$value =~ s/\f//;
+# 		my $attributes;
+# 		if ($data->{"${name}_attr"}) {
+# 			my ($attr,$attrValue);
+# 			while (($attr,$attrValue) = each(%{$data->{"${name}_attr"}})) {
+# 				if ($attr && $attrValue) {
+# 					xmlify($attrValue);
+# 					$attributes .= " $attr=\"$attrValue\"";
+# 				}
+# 			}
+# 		}
+# 		if ($name eq 'sub_attribute') {
+# 			my ($sub,$subValue);
+# 			while (($sub,$subValue) = each(%{$data->{$name}})) {
+# 				if ($sub && $subValue) {
+# 					xmlify($subValue);
+# 					$subs .= " $sub=\"$subValue\"";
+# 				}
+# 			}
+# 		} elsif ($name =~ /_attr$/) {
+# 		} elsif ($name =~ /_is_xml$/) {
+# 		} elsif (ref($value) eq 'HASH') {
+# 			my $subXML = make_xml($value,$options,$depth+1);
+# 			$xml .= <<"EOM";
+# $tabs<$name$attributes>
+# $subXML$tabs</$name>
+# EOM
+# 			$cnt++;
+# 		} elsif (ref($value) eq 'ARRAY') {
+# 			my $typeArray;
+# 			unless ($noArray) { $typeArray = ' type="array"'; }
+# 			foreach (@{$value}) {
+# 				if (ref($_) eq 'HASH') {
+# 					my ($subXML, $subAttr) = make_xml($_,$options,$depth+1);
+# 					$xml .= <<"EOM";
+# $tabs<$name$attributes$subAttr$typeArray>
+# $subXML$tabs</$name>
+# EOM
+# 				$cnt++;
+# 				} elsif (!ref($_)) {
+# 					my $subValue = $_;
+# 					if ($splitXML && (length($subValue) > 32766)) {
+# 						my $valueList = _split_xml_element($subValue);
+# 						foreach (@{$valueList}) {
+# 							my $subValue = $_;
+# 							xmlify($subValue);
+# 							$xml .= <<"EOM";
+# $tabs<$name$attributes$typeArray>$subValue</$name>
+# EOM
+# 							$cnt++;
+# 						}
+# 					} else {
+# 						xmlify($subValue);
+# 						$xml .= <<"EOM";
+# $tabs<$name$attributes$typeArray>$subValue</$name>
+# EOM
+# 						$cnt++;
+# 					}
+# 				}
+# 			}
+# 		} elsif ($value || (($name =~ /^(?:padding|margin|border)_/) && defined($value))) {
+# 			if ($data->{"${name}_is_xml"}) {
+# 				$xml .= <<"EOM";
+# $tabs<$name$attributes>
+# $value</$name>
+# EOM
+# 				$cnt++;
+# 			} elsif ($value eq 'NULL') {
+# 				$xml .= <<"EOM";
+# $tabs<$name$attributes />
+# EOM
+# 				$cnt++;
+# 			} else {
+# 				if ($splitXML && (length($value) > 32766)) {
+# 					my $valueList = _split_xml_element($value);
+# 					foreach (@{$valueList}) {
+# 						my $subValue = $_;
+# 						xmlify($subValue);
+# 						$xml .= <<"EOM";
+# $tabs<$name>$subValue</$name>
+# EOM
+# 						$cnt++;
+# 					}
+# 				} else {
+# 					xmlify($value);
+# 					$xml .= <<"EOM";
+# $tabs<$name$attributes>$value</$name>
+# EOM
+# 					$cnt++;
+# 				}
+# 			}
+# 		} elsif ($attributes) {
+# 			$xml .= <<"EOM";
+# $tabs<$name$attributes/>
+# EOM
+# 			$cnt++;
+# 		}
+# 	}
+# 	if ($iePad && $depth && ($cnt <= 1)) {
+# 		$xml .= <<"EOM";
+# $tabs<ie_sucks/>
+# EOM
+# 	}
+# 	if ($subs) { return $xml, $subs; }
+# 	else { return $xml; }
+# }
+# 
+# sub _by_hash_key {
+# 	if ($a =~ /^(?:item_id|modif(?:y|ied)_timestamp)$/) { return -1; }
+# 	elsif ($b =~ /^(?:item_id|modif(?:y|ied)_timestamp)$/) { return 1; }
+# 	elsif (($a eq 'item') || ($a eq 'entry') || ($a eq 'list')) { return 1; }
+# 	elsif (($b eq 'item') || ($b eq 'entry') || ($b eq 'list')) { return -1; }
+# 	else { return $a cmp $b; }
+# }
+# 
+# sub _split_xml_element {
+# 	my $value = shift || return;
+# 	print STDERR "splitting xml value (" . length($value) . " bytes)...\n";
+# 	my $valueList = [];
+# 	my $cnt = 20;
+# 	while ($cnt && $value) {
+# 		my $temp = substr($value, 0, 32766);
+# 		push(@{$valueList}, $temp);
+# 		substr($value, 0, 32766) = '';
+# 		$cnt--;
+# 	}
+# 	return $valueList;
+# }
+
+
 
 
 
