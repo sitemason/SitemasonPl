@@ -1,5 +1,4 @@
-package SitemasonPL::Batch;
-$VERSION = '8.0';
+package SitemasonPL::Batch 8.0;
 
 =head1 NAME
 
@@ -49,12 +48,11 @@ Without $container:
 
 =cut
 
+use v5.012;
 use strict;
 use utf8;
 use constant TRUE => 1;
 use constant FALSE => 0;
-
-use Data::Dumper;
 
 use SitemasonPL::Common;
 

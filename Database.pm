@@ -1,5 +1,4 @@
-package SitemasonPl::Database;
-$VERSION = '8.0';
+package SitemasonPl::Database 8.0;
 
 =head1 NAME
 
@@ -13,6 +12,7 @@ An enhancement to DBI.
 
 =cut
 
+use v5.012;
 use strict;
 use utf8;
 use constant TRUE => 1;
@@ -26,6 +26,7 @@ use SitemasonPl::Common;
 use SitemasonPl::Debug;
 use SitemasonPl::SearchParse;
 
+sub new {
 #=====================================================
 
 =head2 B<new>
@@ -39,13 +40,13 @@ Errors:
 	{sql cmd}:	each sql command has a tag, like 'select', 'insert', 'update', 'delete'
 
  my $dbh = SitemasonPl::Database->new(
-	dbType		=> 'pg' || 'mysql' || 'sqlite',
-	dbHost		=> $dbHost,
-	dbPort		=> $dbPort,
-	dbSock		=> $dbSock,
-	dbName		=> $dbName,
-	dbUsername	=> $dbUsername,
-	dbPassword	=> $dbPassword,
+	db_type		=> 'pg' || 'mysql' || 'sqlite',
+	db_host		=> $db_host,
+	db_port		=> $db_port,
+	db_sock		=> $db_sock,
+	db_name		=> $db_name,
+	db_username	=> $db_username,
+	db_password	=> $db_password,
 	
 	# pass original script's debug to share timing and logging
 	debug		=> $debug
@@ -53,26 +54,25 @@ Errors:
 
 =cut
 #=====================================================
-sub new {
 	my ($class, %arg) = @_;
 	$class || return;
 	
 	my $self = {
-		dbType		=> $arg{dbType}		|| 'pg',
-		dbHost		=> $arg{dbHost}		|| $SitemasonPl::serverInfo->{dbInfo}->{dbHost}		|| $ENV{SMDB_HOST},
-		dbPort		=> $arg{dbPort}		|| $SitemasonPl::serverInfo->{dbInfo}->{dbPort}		|| $ENV{SMDB_PORT},
-		dbUsername	=> $arg{dbUsername}	|| $SitemasonPl::serverInfo->{dbInfo}->{dbUsername}	|| $ENV{SMDB_USERNAME},
-		dbPassword	=> $arg{dbPassword}	|| $SitemasonPl::serverInfo->{dbInfo}->{dbPassword}	|| $ENV{SMDB_PASSWORD},
-		dbSock		=> $arg{dbSock},
-		dbName		=> $arg{dbName}		|| $ENV{SMDB_NAME},
-		timeZone	=> $arg{timeZone}	|| $ENV{SM_TIMEZONE}	 || 'UTC'
+		db_type		=> $arg{db_type}		|| 'pg',
+		db_host		=> $arg{db_host}		|| $SitemasonPl::serverInfo->{db_info}->{db_host},
+		db_port		=> $arg{db_port}		|| $SitemasonPl::serverInfo->{db_info}->{db_port},
+		db_username	=> $arg{db_username}	|| $SitemasonPl::serverInfo->{db_info}->{db_username},
+		db_password	=> $arg{db_password}	|| $SitemasonPl::serverInfo->{db_info}->{db_password},
+		db_sock		=> $arg{db_sock},
+		db_name		=> $arg{db_name},
+		time_zone	=> $arg{time_zone}	|| 'UTC'
 	};
 	
-	if ($self->{dbType} eq 'pg') {
-		$self->{dbHost}		||= $ENV{PGHOST};
-		$self->{dbPort}		||= $ENV{PGPORT};
-		$self->{dbUsername}	||= $ENV{PGUSER};
-		$self->{dbPassword}	||= $ENV{PGPASS} || $ENV{PGPASSWORD};
+	if ($self->{db_type} eq 'pg') {
+		$self->{db_host}		||= $ENV{PGHOST};
+		$self->{db_port}		||= $ENV{PGPORT};
+		$self->{db_username}	||= $ENV{PGUSER};
+		$self->{db_password}	||= $ENV{PGPASS} || $ENV{PGPASSWORD};
 	}
 	
 	if ($arg{debug}) {
@@ -88,48 +88,27 @@ sub new {
 	
 	my $host;
 	my $name;
-	if ($self->{dbName}) { $name = "dbname=$self->{dbName}"; }
+	if ($self->{db_name}) { $name = "dbname=$self->{db_name}"; }
 	my $host;
-	if ($self->{dbHost}) { $host = "host=$self->{dbHost};"; }
+	if ($self->{db_host}) { $host = "host=$self->{db_host};"; }
 	my $port;
-	if ($self->{dbPort}) { $port = "port=$self->{dbPort};"; }
+	if ($self->{db_port}) { $port = "port=$self->{db_port};"; }
 	my $sock;
-	if ($self->{dbSock}) { $sock = "mysql_socket=$self->{dbSock};"; }
+	if ($self->{db_sock}) { $sock = "mysql_socket=$self->{db_sock};"; }
 	my $user;
-	if ($self->{dbUsername}) { $user = $self->{dbUsername}; }
+	if ($self->{db_username}) { $user = $self->{db_username}; }
 	my $pass;
-	if ($self->{dbPassword}) { $pass = $self->{dbPassword}; }
+	if ($self->{db_password}) { $pass = $self->{db_password}; }
 	
 	my $type;
-	if ($self->{dbType} eq 'sqlite') { $type = 'SQLite'; }
-	elsif ($self->{dbType} eq 'mysql') { $type = 'mysql'; }
-	elsif ($self->{dbType} eq 'pg') { $type = 'Pg'; }
+	if ($self->{db_type} eq 'sqlite') { $type = 'SQLite'; }
+	elsif ($self->{db_type} eq 'mysql') { $type = 'mysql'; }
+	elsif ($self->{db_type} eq 'pg') { $type = 'Pg'; }
 	my $connectInfo = "DBI:${type}:${host}${port}${sock}${name}";
 	
 	bless $self, $class;
 	if ($type) {
 		my $connectMessage = 'Connecting';
-# 		if (!$arg{forceNew}) {
-# 			my $oldConnectInfo = $self->getServerInfo('connectInfo');
-# 			my $oldDBH = $self->getServerInfo('dbh');
-# 			if (($oldConnectInfo eq $connectInfo) && $oldDBH && $oldDBH->{dbh}) {
-# 	#			my $version = $oldDBH->{dbh}->get_info(18);
-# 	#			$self->{debug}->debug("Checked version ($version): " . $oldDBH->{dbh}->errstr . ', ' . $oldDBH->{dbh}->state . ', ' . $oldDBH->{dbh}->err);
-# 	#			if ($oldDBH->{dbh}->state && ($oldDBH->{dbh}->state ne '25P01')) {
-# 	#				$connectMessage = 'DB connection down (' . $oldDBH->{dbh}->state . '). Reconnecting';
-# 	#			} else {
-# 					my $sth = $oldDBH->{dbh}->column_info(undef, '%', 'locale', 'name');
-# 					my $state = $oldDBH->{dbh}->state;
-# #					$self->{debug}->debug('Got statement handle: ' . $oldDBH->{dbh}->errstr . ', ' . $state . ', ' . $oldDBH->{dbh}->err);
-# 					if ($state) {
-# 						$connectMessage = 'DB idle limit reached (' . $state . '). Reconnecting';
-# 					} else {
-# 						return $oldDBH;
-# 					}
-# 	#			}
-# 			}
-# 		}
-# 		$self->{debug}->debug(">>>>>> $connectMessage to db '" . $self->{dbName} . "' <<<<<<");
 		$self->{dbh} = DBI->connect($connectInfo, $user, $pass, { PrintError => 1, AutoCommit => 1 });
 	}
 	
@@ -139,20 +118,20 @@ sub new {
 	}
 	
 	# Set PostgreSQL default time zone to UTC
-	if ($self->{dbType} eq 'pg') {
+	if ($self->{db_type} eq 'pg') {
 		$self->{dbh}->{'pg_enable_utf8'} = 1;
 		$self->{dbh}->do("SET NAMES 'utf8'");
 		$self->{dbh}->do("SET SESSION TIME ZONE 'UTC'");
 	}
 	# Enable UTF8 for MySQL
-	elsif ($self->{dbType} eq 'mysql') {
+	elsif ($self->{db_type} eq 'mysql') {
 		$self->{dbh}->{'mysql_enable_utf8'} = 1;
 		$self->{dbh}->do("SET NAMES 'utf8'");
 	}
 	
-	$self->{dbInfoType} = lc($self->{dbh}->get_info(17)); # 'postgresql'
-	$self->{dbVersion} = $self->{dbh}->get_info(18);
-	$self->{dbFieldQuoteChar} = $self->{dbh}->get_info(29) || '`';
+	$self->{db_info_type} = lc($self->{dbh}->get_info(17)); # 'postgresql'
+	$self->{db_version} = $self->{dbh}->get_info(18);
+	$self->{db_field_quote_char} = $self->{dbh}->get_info(29) || '`';
 #	my $rv = $self->{dbh}->do("SET client_encoding TO 'UTF8';");
 	
 	$self->{log} = {
@@ -164,12 +143,13 @@ sub new {
 	};
 	
 	$self->{connectInfo} = $connectInfo;
-	$self->setServerInfo('connectInfo', $connectInfo);
-	$self->setServerInfo('dbh', $self);
+	$self->set_server_info('connectInfo', $connectInfo);
+	$self->set_server_info('dbh', $self);
 	return $self;
 }
 
 
+sub reconnect {
 #=====================================================
 
 =head2 B<reconnect>
@@ -181,19 +161,18 @@ After a statement is executed, check state. 57000 08000
 
 =cut
 #=====================================================
-sub reconnect {
 	my $self = shift || return; $self->{debug}->call;
 	my $state = shift || return;
 	if ($state eq '22021') { return; }
-	if ($state) { $self->{debug}->error("Potential DB idle timeout ($state) $self->{dbName}"); }
+	if ($state) { $self->{debug}->error("Potential DB idle timeout ($state) $self->{db_name}"); }
 	
 	unless (($state eq '57000') || ($state eq '08000')) { $self->{debug}->info('Failing based on state number'); return; }
 	
-	my $connectInfo = $self->{connectInfo} || $self->getServerInfo('connectInfo');
+	my $connectInfo = $self->{connectInfo} || $self->get_server_info('connectInfo');
 	if (!$connectInfo) { $self->{debug}->warning('Could not get connection info'); return; }
 	
-	$self->{debug}->info(">>>>>> Reconnecting to db '" . $self->{dbName} . "' <<<<<<");
-	$self->{dbh} = DBI->connect($connectInfo, $self->{dbUsername}, $self->{dbPassword}, { PrintError => 1, AutoCommit => 1 });
+	$self->{debug}->info(">>>>>> Reconnecting to db '" . $self->{db_name} . "' <<<<<<");
+	$self->{dbh} = DBI->connect($connectInfo, $self->{db_username}, $self->{db_password}, { PrintError => 1, AutoCommit => 1 });
 	
 	unless (defined($self->{dbh})) {
 		$self->{debug}->emergency("Failed to reach database");
@@ -201,13 +180,13 @@ sub reconnect {
 	}
 	
 	# Set PostgreSQL default time zone to UTC
-	if ($self->{dbType} eq 'pg') {
+	if ($self->{db_type} eq 'pg') {
 		$self->{dbh}->{'pg_enable_utf8'} = 1;
 		$self->{dbh}->do("SET NAMES 'utf8'");
 		$self->{dbh}->do("SET SESSION TIME ZONE 'UTC'");
 	}
 	# Enable UTF8 for MySQL
-	elsif ($self->{dbType} eq 'mysql') {
+	elsif ($self->{db_type} eq 'mysql') {
 		$self->{dbh}->{'mysql_enable_utf8'} = 1;
 		$self->{dbh}->do("SET NAMES 'utf8'");
 	}
@@ -220,6 +199,7 @@ sub reconnect {
 # DBI-like Methods
 #=====================================================
 
+sub quote {
 #=====================================================
 
 =head2 B<quote>
@@ -230,7 +210,6 @@ $type can be 'begins', 'ends', 'like', 'qlike', 'word', or default
 
 =cut
 #=====================================================
-sub quote {
 	my $self = shift || return; $self->{debug}->call;
 	my $input = shift;
 	my $type = shift;
@@ -269,14 +248,14 @@ sub quote {
 		}
 		
 		$quoted = $self->{dbh}->quote($input);
-		$quoted = _modifyQuote($quoted, $type);
+		$quoted = _modify_quote($quoted, $type);
 	} else {
 		$quoted = 'NULL';
 	}
 	return $quoted;
 }
 
-sub _modifyQuote {
+sub _modify_quote {
 	my $quoted = shift || '';
 	my $type = shift;
 	if (($type eq 'begins') || ($type eq 'like')) {
@@ -297,6 +276,7 @@ sub _modifyQuote {
 	return $quoted;
 }
 
+sub uncommit {
 #=====================================================
 
 =head2 B<uncommit>
@@ -305,12 +285,11 @@ sub _modifyQuote {
 
 =cut
 #=====================================================
-sub uncommit {
 	my $self = shift || return; $self->{debug}->call;
 	$self->{dbh}->{'AutoCommit'} = 0;
 }
 
-
+sub commit {
 #=====================================================
 
 =head2 B<commit>
@@ -319,43 +298,43 @@ sub uncommit {
 
 =cut
 #=====================================================
-sub commit {
 	my $self = shift || return; $self->{debug}->call;
 	$self->{dbh}->{'AutoCommit'} = 1;
 }
 
 
+sub current_date {
 #=====================================================
 
-=head2 B<currentDate>
+=head2 B<current_date>
 
 =cut
 #=====================================================
-sub currentDate {
 	my $self = shift || return; $self->{debug}->call;
-	my $timeZone = shift || 'UTC';
+	my $time_zone = shift || 'UTC';
 	
-	my $qzone = $self->{dbh}->quote($timeZone);
+	my $qzone = $self->{dbh}->quote($time_zone);
 	$self->uncommit;
 	$self->{dbh}->do("SET LOCAL TIME ZONE $qzone");
-	my ($currentDate) = $self->{dbh}->selectrow_array("SELECT CURRENT_DATE");
+	my ($current_date) = $self->{dbh}->selectrow_array("SELECT CURRENT_DATE");
 	$self->commit;
-	return $currentDate;
+	return $current_date;
 }
 
+sub quoted_current_date {
 #=====================================================
 
-=head2 B<quotedCurrentDate>
+=head2 B<quoted_current_date>
 
 =cut
 #=====================================================
-sub quotedCurrentDate {
 	my $self = shift || return; $self->{debug}->call;
-	my $timeZone = shift;
-	my $currentDate = $self->currentDate($timeZone);
-	return $self->{dbh}->quote($currentDate);
+	my $time_zone = shift;
+	my $current_date = $self->current_date($time_zone);
+	return $self->{dbh}->quote($current_date);
 }
 
+sub nextval {
 #=====================================================
 
 =head2 B<nextval>
@@ -365,30 +344,30 @@ sub quotedCurrentDate {
 
 =cut
 #=====================================================
-sub nextval {
 	my $self = shift || return; $self->{debug}->call;
 	my $table = shift || return;
 	my $idFieldName = shift;
 	my $log = shift;
 	
-	if (!$idFieldName || isPosInt($idFieldName) || ($idFieldName eq 'debug')) { $log = $idFieldName; $idFieldName = 'id'; }
+	if (!$idFieldName || is_pos_int($idFieldName) || ($idFieldName eq 'debug')) { $log = $idFieldName; $idFieldName = 'id'; }
 	
 	my $statement = "SELECT nextval('${table}_${idFieldName}_seq')";
-	$self->_logSQL($statement, [caller(0)], $log);
+	$self->_log_sql($statement, [caller(0)], $log);
 	
 	my $id;
 	if ($log eq 'debug') {
-		($id) = $self->selectRowArray("SELECT max($idFieldName) as id FROM $table", 'noLog');
+		($id) = $self->selectrow_array("SELECT max($idFieldName) as id FROM $table", 'noLog');
 	} else {
-		my $timerKey = $self->timerStart($statement, $log);
-		($id) = $self->selectRowArray($statement, 'noLog');
-		my $duration = $self->timerStop($timerKey, $log);
-		$self->_logTransaction($statement, $duration, [caller(0)], $log);
+		my $timerKey = $self->timer_start($statement, $log);
+		($id) = $self->selectrow_array($statement, 'noLog');
+		my $duration = $self->timer_stop($timerKey, $log);
+		$self->_log_transaction($statement, $duration, [caller(0)], $log);
 	}
 	return $id;
 }
 
 
+sub do {
 #=====================================================
 
 =head2 B<do>
@@ -398,20 +377,19 @@ sub nextval {
 
 =cut
 #=====================================================
-sub do {
 	my $self = shift || return; $self->{debug}->call;
 	my $statement = shift;
 	my $log = shift;
-	$self->_logSQL($statement, [caller(0)], $log);
+	$self->_log_sql($statement, [caller(0)], $log);
 	unless ($statement) { return; }
 	
 	my $rv;
-	$statement = $self->_cleanSQL($statement);
+	$statement = $self->_clean_sql($statement);
 	if ($log eq 'debug') {
 		$rv = '1';
-		my ($command, $table) = $self->_getCommandFromStatement($statement);
+		my ($command, $table) = $self->_get_command_from_statement($statement);
 		if (($command eq 'update') || ($command eq 'delete')) {
-			my $columns = $self->getColumnInfo($table);
+			my $columns = $self->get_column_info($table);
 			my $idName;
 			foreach my $column (@{$columns}) {
 				if (($column->{name} eq 'id') || ($column->{COLUMN_DEF} =~ /nextval/)) { $idName = $column->{name}; }
@@ -424,15 +402,15 @@ sub do {
 			}
 		}
 	} else {
-		my $timerKey = $self->timerStart($statement, $log);
+		my $timerKey = $self->timer_start($statement, $log);
 		$rv = $self->{dbh}->do($statement);
 		if ($self->reconnect($self->{dbh}->state)) {
 			$rv = $self->{dbh}->do($statement);
 		}
-		my $duration = $self->timerStop($timerKey, $log);
-		$self->_logTransaction($statement, $duration, [caller(0)], $log);
+		my $duration = $self->timer_stop($timerKey, $log);
+		$self->_log_transaction($statement, $duration, [caller(0)], $log);
 	}
-	my ($command, $table) = $self->_getCommandFromStatement($statement);
+	my ($command, $table) = $self->_get_command_from_statement($statement);
 	if ($rv eq '0E0') {
 		my $message;
 		if ($command eq 'delete') { $message = 'Nothing to delete.'; }
@@ -459,205 +437,198 @@ sub do {
 }
 
 
+sub selectrow_array {
 #=====================================================
 
-=head2 B<selectRowArray>
+=head2 B<selectrow_array>
 
- @rowAry  = $dbh->selectRowArray($statement);
+ @rowAry  = $dbh->selectrow_array($statement);
 
 =cut
 #=====================================================
-sub selectrow_array { return selectRowArray(@_); }
-sub selectRowArray {
 	my $self = shift || return; $self->{debug}->call;
 	my $statement = shift;
 	my $log = shift;
-	$self->_logSQL($statement, [caller(0)], $log);
-	$statement = $self->_cleanSQL($statement);
+	$self->_log_sql($statement, [caller(0)], $log);
+	$statement = $self->_clean_sql($statement);
 	unless ($statement) { return; }
 	
-	my $timerKey = $self->timerStart($statement, $log);
+	my $timerKey = $self->timer_start($statement, $log);
 	my @rowAry = $self->{dbh}->selectrow_array($statement);
 	if ($self->reconnect($self->{dbh}->state)) {
 		@rowAry = $self->{dbh}->selectrow_array($statement);
 	}
-	my $duration = $self->timerStop($timerKey, $log);
-	$self->_logTransaction($statement, $duration, [caller(0)], $log);
+	my $duration = $self->timer_stop($timerKey, $log);
+	$self->_log_transaction($statement, $duration, [caller(0)], $log);
 	return @rowAry;
 }
 
 
+sub selectrow_arrayref {
 #=====================================================
 
-=head2 B<selectRowArrayref>
+=head2 B<selectrow_arrayref>
 
- $aryRef  = $dbh->selectRowArrayref($statement);
+ $aryRef  = $dbh->selectrow_arrayref($statement);
 
 =cut
 #=====================================================
-sub selectrow_arrayref { return selectRowArrayref(@_); }
-sub selectRowArrayref {
 	my $self = shift || return; $self->{debug}->call;
 	my $statement = shift;
 	my $log = shift;
-	$self->_logSQL($statement, [caller(0)], $log);
-	$statement = $self->_cleanSQL($statement);
+	$self->_log_sql($statement, [caller(0)], $log);
+	$statement = $self->_clean_sql($statement);
 	unless ($statement) { return; }
 	
-	my $timerKey = $self->timerStart($statement, $log);
+	my $timerKey = $self->timer_start($statement, $log);
 	my $aryRef = $self->{dbh}->selectrow_arrayref($statement);
 	if ($self->reconnect($self->{dbh}->state)) {
 		$aryRef = $self->{dbh}->selectrow_arrayref($statement);
 	}
-	my $duration = $self->timerStop($timerKey, $log);
-	$self->_logTransaction($statement, $duration, [caller(0)], $log);
+	my $duration = $self->timer_stop($timerKey, $log);
+	$self->_log_transaction($statement, $duration, [caller(0)], $log);
 	return $aryRef;
 }
 
 
+sub selectrow_hashref {
 #=====================================================
 
-=head2 B<selectRowHashref>
+=head2 B<selectrow_hashref>
 
- $hashRef = $dbh->selectRowHashref($statement);
+ $hashRef = $dbh->selectrow_hashref($statement);
 
 =cut
 #=====================================================
-sub selectrow_hashref { return selectRowHashref(@_); }
-sub selectRowHashref {
 	my $self = shift || return; $self->{debug}->call;
 	my $statement = shift;
 	my $log = shift;
-	$self->_logSQL($statement, [caller(0)], $log);
-	$statement = $self->_cleanSQL($statement);
+	$self->_log_sql($statement, [caller(0)], $log);
+	$statement = $self->_clean_sql($statement);
 	unless ($statement) { return; }
 	
-	my $timerKey = $self->timerStart($statement, $log);
+	my $timerKey = $self->timer_start($statement, $log);
 	my $hashRef = $self->{dbh}->selectrow_hashref($statement);
 	if ($self->reconnect($self->{dbh}->state)) {
 		$hashRef = $self->{dbh}->selectrow_hashref($statement);
 	}
-	my $duration = $self->timerStop($timerKey, $log);
-	$self->_logTransaction($statement, $duration, [caller(0)], $log);
+	my $duration = $self->timer_stop($timerKey, $log);
+	$self->_log_transaction($statement, $duration, [caller(0)], $log);
 	return $hashRef;
 }
 
 
+sub selectcol_arrayref {
 #=====================================================
 
-=head2 B<selectColArrayref>
+=head2 B<selectcol_arrayref>
 
- $aryRef  = $dbh->selectColArrayref($statement);
+ $aryRef  = $dbh->selectcol_arrayref($statement);
 
 =cut
 #=====================================================
-sub selectcol_arrayref { return selectColArrayref(@_); }
-sub selectColArrayref {
 	my $self = shift || return; $self->{debug}->call;
 	my $statement = shift;
 	my $log = shift;
-	$self->_logSQL($statement, [caller(0)], $log);
-	$statement = $self->_cleanSQL($statement);
+	$self->_log_sql($statement, [caller(0)], $log);
+	$statement = $self->_clean_sql($statement);
 	unless ($statement) { return; }
 	
-	my $timerKey = $self->timerStart($statement, $log);
+	my $timerKey = $self->timer_start($statement, $log);
 	my $aryRef = $self->{dbh}->selectcol_arrayref($statement);
 	if ($self->reconnect($self->{dbh}->state)) {
 		$aryRef = $self->{dbh}->selectcol_arrayref($statement);
 	}
-	my $duration = $self->timerStop($timerKey, $log);
-	$self->_logTransaction($statement, $duration, [caller(0)], $log);
+	my $duration = $self->timer_stop($timerKey, $log);
+	$self->_log_transaction($statement, $duration, [caller(0)], $log);
 	return $aryRef;
 }
 
 
+sub selectall_arrayref {
 #=====================================================
 
-=head2 B<selectAllArrayref>
+=head2 B<selectall_arrayref>
 
-$aryRef  = $dbh->selectAllArrayref($statement);
+$aryRef  = $dbh->selectall_arrayref($statement);
 
 =cut
 #=====================================================
-sub selectall_arrayref { return selectAllArrayref(@_); }
-sub selectAllArrayref {
 	my $self = shift || return; $self->{debug}->call;
 	my $statement = shift;
 	my $log = shift;
-	$self->_logSQL($statement, [caller(0)], $log);
-	$statement = $self->_cleanSQL($statement);
+	$self->_log_sql($statement, [caller(0)], $log);
+	$statement = $self->_clean_sql($statement);
 	unless ($statement) { return; }
 	
-	my $timerKey = $self->timerStart($statement, $log);
+	my $timerKey = $self->timer_start($statement, $log);
 	my $aryRef = $self->{dbh}->selectall_arrayref($statement);
 	if ($self->reconnect($self->{dbh}->state)) {
 		$aryRef = $self->{dbh}->selectall_arrayref($statement);
 	}
-	my $duration = $self->timerStop($timerKey, $log);
-	$self->_logTransaction($statement, $duration, [caller(0)], $log);
+	my $duration = $self->timer_stop($timerKey, $log);
+	$self->_log_transaction($statement, $duration, [caller(0)], $log);
 	return $aryRef;
 }
 
 
+sub selectall_hashref {
 #=====================================================
 
-=head2 B<selectAllHashref>
+=head2 B<selectall_hashref>
 
- $hashRef = $dbh->selectAllHashref($statement, $keyField);
+ $hashRef = $dbh->selectall_hashref($statement, $keyField);
 
 =cut
 #=====================================================
-sub selectall_hashref { return selectAllHashref(@_); }
-sub selectAllHashref {
 	my $self = shift || return; $self->{debug}->call;
 	my $statement = shift;
 	my $keyField = shift;
 	my $log = shift;
-	$self->_logSQL($statement, [caller(0)], $log);
-	$statement = $self->_cleanSQL($statement);
+	$self->_log_sql($statement, [caller(0)], $log);
+	$statement = $self->_clean_sql($statement);
 	unless ($statement) { return; }
 	unless ($keyField) {
 		$self->{debug}->critical('No key field', $log);
 		return;
 	}
 	
-	my $timerKey = $self->timerStart($statement, $log);
+	my $timerKey = $self->timer_start($statement, $log);
 	my $hashRef = $self->{dbh}->selectall_hashref($statement, $keyField);
 	if ($self->reconnect($self->{dbh}->state)) {
 		$hashRef = $self->{dbh}->selectall_hashref($statement, $keyField);
 	}
-	my $duration = $self->timerStop($timerKey, $log);
-	$self->_logTransaction($statement, $duration, [caller(0)], $log);
+	my $duration = $self->timer_stop($timerKey, $log);
+	$self->_log_transaction($statement, $duration, [caller(0)], $log);
 	return $hashRef;
 }
 
 
+sub selectall_arrayhash {
 #=====================================================
 
-=head2 B<selectAllArrayhash>
+=head2 B<selectall_arrayhash>
 
-$aryRef  = $dbh->selectAllArrayhash($statement);
+$aryRef  = $dbh->selectall_arrayhash($statement);
 
 =cut
 #=====================================================
-sub selectall_arrayhash { return selectAllArrayhash(@_); }
-sub selectAllArrayhash {
 	my $self = shift || return; $self->{debug}->call;
 	my $statement = shift;
 	my $log = shift;
-	$self->_logSQL($statement, [caller(0)], $log);
-	$statement = $self->_cleanSQL($statement);
+	$self->_log_sql($statement, [caller(0)], $log);
+	$statement = $self->_clean_sql($statement);
 	unless ($statement) { return; }
 	
-	my $timerKey = $self->timerStart($statement, $log);
+	my $timerKey = $self->timer_start($statement, $log);
 	my $sth = $self->{dbh}->prepare($statement);
 	if ($self->reconnect($self->{dbh}->state)) {
 		$sth = $self->{dbh}->prepare($statement);
 	}
 	$sth->execute;
 	my $aryRef = $sth->fetchall_arrayref({});
-	my $duration = $self->timerStop($timerKey, $log);
-	$self->_logTransaction($statement, $duration, [caller(0)], $log);
+	my $duration = $self->timer_stop($timerKey, $log);
+	$self->_log_transaction($statement, $duration, [caller(0)], $log);
 	return $aryRef;
 }
 
@@ -668,11 +639,12 @@ sub selectAllArrayhash {
 # Aggregated Execute Methods
 #=====================================================
 
+sub reorder_records {
 #=====================================================
 
-=head2 B<reorderRecords>
+=head2 B<reorder_records>
 
-	$self->{dbh}->reorderRecords( {
+	$self->{dbh}->reorder_records( {
 		table		=> 'instance',
 		idName		=> 'id',
 		checkName	=> 'is_navigable',
@@ -686,8 +658,6 @@ In commands, a position of 'a' stands for above and 'b' is below. Do not confuse
 
 =cut
 #=====================================================
-sub reorder_records { return reorderRecords(@_); }
-sub reorderRecords {
 	my $self = shift || return; $self->{debug}->call;
 	my $params = shift || return;
 	my $log = shift;
@@ -729,8 +699,8 @@ sub reorderRecords {
 		my $idList = toArray($moves, 'sourceId');
 		my $targetIdList = toArray($moves, 'targetId');
 		push(@{$idList}, @{$targetIdList});
-		my $idSQL = $self->makeListSQL($idName, $idList, 'int');
-		my $records = $self->selectAllHashref("
+		my $idSQL = $self->make_list_sql($idName, $idList, 'int');
+		my $records = $self->selectall_hashref("
 			SELECT $idName as x_id, $groupName as x_group_id
 			FROM $table
 			WHERE $idSQL
@@ -740,12 +710,12 @@ sub reorderRecords {
 		my $targetGroupIdList = to_array($moves, 'target_group_id');
 		my $groupIds = toArray($records, 'x_group_id');
 		push(@{$groupIds}, @{$targetGroupIdList});
-		my $groupIdSQL = $self->makeListSQL($groupName, $groupIds, 'int');
+		my $groupIdSQL = $self->make_list_sql($groupName, $groupIds, 'int');
 		my $sortNameSQL;
 		if ($sortName) { $sortNameSQL = ", $sortName"; }
 		my $whereSQL;
 		if ($where) { $whereSQL = " and $where"; }
-		my $complete = $self->selectAllArrayhash("
+		my $complete = $self->selectall_arrayhash("
 			SELECT $idName as x_id, $groupName as x_group_id, $orderName as x_order_no
 			FROM $table
 			WHERE $groupIdSQL$whereSQL
@@ -873,7 +843,7 @@ sub reorderRecords {
 	
 	# Check records
 	if ($checkName && @checkIds) {
-		my $idSQL = $self->makeListSQL($idName, \@checkIds, 'int');
+		my $idSQL = $self->make_list_sql($idName, \@checkIds, 'int');
 		my $rv = $self->do("
 			UPDATE $table
 			SET $checkName = true
@@ -887,7 +857,7 @@ sub reorderRecords {
 	
 	# Uncheck records
 	if ($checkName && @uncheckIds) {
-		my $idSQL = $self->makeListSQL($idName, \@uncheckIds, 'int');
+		my $idSQL = $self->make_list_sql($idName, \@uncheckIds, 'int');
 		my $rv = $self->do("
 			UPDATE $table
 			SET $checkName = false
@@ -904,11 +874,12 @@ sub reorderRecords {
 }
 
 
+sub do_update_insert {
 #=====================================================
 
-=head2 B<doUpdateInsert>
+=head2 B<do_update_insert>
 
- $id = $dbh->doUpdateInsert( {
+ $id = $dbh->do_update_insert( {
  	id		=> $id,
  	table	=> $table,
  	input	=> $input,
@@ -919,13 +890,13 @@ sub reorderRecords {
  } );
  
  Most inserts...
- $id = $dbh->doUpdateInsert( {
+ $id = $dbh->do_update_insert( {
  	table	=> $table,
  	input	=> $input
  } );
  
  Most updates...
- $id = $dbh->doUpdateInsert( {
+ $id = $dbh->do_update_insert( {
  	id		=> $id,
  	table	=> $table,
  	input	=> $input
@@ -933,8 +904,6 @@ sub reorderRecords {
 
 =cut
 #=====================================================
-sub do_update_insert { return doUpdateInsert(@_); }
-sub doUpdateInsert {
 	my $self = shift || return; $self->{debug}->call;
 	my $args = shift;
 	my $log = shift || $args->{log};
@@ -976,19 +945,19 @@ sub doUpdateInsert {
 		
 		# Get an id
 		$id ||= $input->{$idName};
-		if (!$id && !$noNextval && ($self->{dbType} eq 'pg')) {
+		if (!$id && !$noNextval && ($self->{db_type} eq 'pg')) {
 			if ($idName eq 'id') { $id = $self->nextval($table, $log); }
 			else {
-				($id) = $self->selectRowArray("SELECT nextval('${table}_${idName}_seq')");
+				($id) = $self->selectrow_array("SELECT nextval('${table}_${idName}_seq')");
 			}
 			$input->{$idName} = $id;
 		}
 	}
 	
-	my ($quoted, $modified) = $self->checkFieldInput($table, $input, $old);
+	my ($quoted, $modified) = $self->check_field_input($table, $input, $old);
 	if ($modified || $force) {
-		$self->_modifyFields($input, $modifiers, $old);
-		($quoted, $modified) = $self->checkFieldInput($table, $input, $old);
+		$self->_modify_fields($input, $modifiers, $old);
+		($quoted, $modified) = $self->check_field_input($table, $input, $old);
 	} else { return $old->{$idName}; }
 	
 	my $changes;
@@ -999,7 +968,7 @@ sub doUpdateInsert {
 		while (my($field, $value) = each(%{$quoted})) {
 			$changes->{$field} = $value;
 			if ($field eq $idName) { next; }
-			push(@set, "$self->{dbFieldQuoteChar}$field$self->{dbFieldQuoteChar}=$value");
+			push(@set, "$self->{db_field_quote_char}$field$self->{db_field_quote_char}=$value");
 		}
 		if (@set) {
 			my $setSQL = join(', ', @set);
@@ -1022,7 +991,7 @@ sub doUpdateInsert {
 		while (my($field, $value) = each(%{$quoted})) {
 			$changes->{$field} = $value;
 			if ($field eq $idName) { next; }
-			push(@names, "$self->{dbFieldQuoteChar}$field$self->{dbFieldQuoteChar}");
+			push(@names, "$self->{db_field_quote_char}$field$self->{db_field_quote_char}");
 			push(@values, $value);
 		}
 		if (@names && @values) {
@@ -1050,11 +1019,11 @@ sub doUpdateInsert {
 				", $log);
 				if ($rv < 1) { $self->{debug}->critical("Insert failed in $table", $table); }
 				else {
-					if ($self->{dbType} eq 'mysql') {
+					if ($self->{db_type} eq 'mysql') {
 						($id) = $self->{dbh}->selectrow_array("
 							SELECT last_insert_id()
 						");
-					} elsif ($self->{dbType} eq 'sqlite') {
+					} elsif ($self->{db_type} eq 'sqlite') {
 						$id = $self->{dbh}->func('last_insert_rowid');
 					}
 					$action = 'insert';
@@ -1083,6 +1052,7 @@ sub doUpdateInsert {
 }
 
 
+sub copy {
 #=====================================================
 
 =head2 B<copy>
@@ -1091,15 +1061,14 @@ sub doUpdateInsert {
 
 =cut
 #=====================================================
-sub copy {
 	my $self = shift || return; $self->{debug}->call;
 	my $table = shift || return;
 	my $records = shift || return;
 	my $log = shift;
 	
-	if (!isArrayHash($records)) { return; }
+	if (!is_array_hash($records)) { return; }
 	
-	my $columns = $self->getColumnInfo($table);
+	my $columns = $self->get_column_info($table);
 	
 	my @fields;
 	my @quotedRecords;
@@ -1127,10 +1096,10 @@ sub copy {
 	
 	my $fieldList = join(', ', @fields);
 	my $copySQL = "COPY $table ($fieldList) FROM STDIN";
-	$self->_logSQL($copySQL, [caller(0)], $log);
+	$self->_log_sql($copySQL, [caller(0)], $log);
 	unless ($copySQL) { return; }
 	
-	my $timerKey = $self->timerStart($copySQL, $log);
+	my $timerKey = $self->timer_start($copySQL, $log);
 	
 	my $rv;
 	if ($log eq 'debug') { $rv = '1'; }
@@ -1158,7 +1127,7 @@ sub copy {
 				elsif ($default =~ /^(\d+)/) { $quoted = $1; }
 				else { $quoted = $null; }
 			} elsif ($type eq 'json') {
-				if ($quoted) { $quoted = $self->quoteForCopy($quoted); }
+				if ($quoted) { $quoted = $self->quote_for_copy($quoted); }
 				else { $quoted = $null; }
 			} elsif ($type eq 'point') {
 				if (!$quoted) { $quoted = $null; }
@@ -1193,8 +1162,8 @@ sub copy {
 	my $rv;
 	if ($log eq 'debug') { $rv = '1'; }
 	else { $rv = $self->{dbh}->pg_putcopyend(); }
-	my $duration = $self->timerStop($timerKey, $log);
-	$self->_logTransaction($copySQL, $duration, [caller(0)], $log);
+	my $duration = $self->timer_stop($timerKey, $log);
+	$self->_log_transaction($copySQL, $duration, [caller(0)], $log);
 	if ($rv) { return $cnt; }
 	else {
 		$self->{debug}->error('COPY failed - attempting individual line copies', $log);
@@ -1213,13 +1182,13 @@ sub copy {
 }
 
 
+sub quote_for_copy {
 #=====================================================
 
-=head2 B<quoteForCopy>
+=head2 B<quote_for_copy>
 
 =cut
 #=====================================================
-sub quoteForCopy {
 	my $self = shift || return;
 	my $value = shift;
 	$value =~ s/\\/\\\\/g;
@@ -1231,11 +1200,12 @@ sub quoteForCopy {
 }
 
 
+sub do_delete {
 #=====================================================
 
-=head2 B<doDelete>
+=head2 B<do_delete>
 
- $success = $dbh->doDelete( {
+ $success = $dbh->do_delete( {
  	table	=> $table,
  	idName	=> 'id', # defaults to 'id'
  	where	=> {
@@ -1246,8 +1216,6 @@ sub quoteForCopy {
 
 =cut
 #=====================================================
-sub do_delete { return doDelete(@_); }
-sub doDelete {
 	my $self = shift || return; $self->{debug}->call;
 	my $args = shift;
 	my $table = $args->{table} || return;
@@ -1263,11 +1231,11 @@ sub doDelete {
 	");
 	$sth->execute;
 	my $sample = $sth->fetchrow_arrayref();
-	my ($quoted) = $self->checkFieldInput($table, $where, {}, 1);
+	my ($quoted) = $self->check_field_input($table, $where, {}, 1);
 	
 	# Delete
 	if ($quoted->{$idName}) {
-		my $whereSQL = $self->makeWhereSQL($quoted);
+		my $whereSQL = $self->make_where_sql($quoted);
 		my $rv = $self->do("
 			delete FROM $table
 			WHERE $whereSQL
@@ -1291,11 +1259,13 @@ sub doDelete {
 # Internal Logging Methods
 #=====================================================
 
-=head2 B<_logSQL>
+sub _log_sql {
+#=====================================================
+
+=head2 B<_log_sql>
 
 =cut
 #=====================================================
-sub _logSQL {
 	my $self = shift || return; $self->{debug}->call;
 	my $statement = shift;
 	my $caller = shift;
@@ -1305,7 +1275,7 @@ sub _logSQL {
 	if ($statement) {
 		if ($log eq 'results') { return; }
 		if (!$log) { return; }
-		my ($cmd, $table) = $self->_getCommandFromStatement($statement);
+		my ($cmd, $table) = $self->_get_command_from_statement($statement);
 		my $level = 'debug';
 		if ($log) { $level = 'info'; }
 		$statement =~ s/^[ \t]*(\r\n|\n|\r)//;
@@ -1329,13 +1299,13 @@ sub _logSQL {
 }
 
 
+sub _log_transaction {
 #=====================================================
 
-=head2 B<_logTransaction>
+=head2 B<_log_transaction>
 
 =cut
 #=====================================================
-sub _logTransaction {
 	my $self = shift || return; $self->{debug}->call;
 	my $statement = shift || return;
 	my $duration = shift;
@@ -1347,7 +1317,7 @@ sub _logTransaction {
 	if ($statement) {
 		if ($log eq 'results') { return; }
 		if (!$log) { return; }
-		my ($cmd, $table) = $self->_getCommandFromStatement($statement);
+		my ($cmd, $table) = $self->_get_command_from_statement($statement);
 		my $message = "$cmd on $table";
 		if ($duration) {
 			$message .= " ($duration ms)";
@@ -1363,15 +1333,15 @@ sub _logTransaction {
 }
 
 
+sub _get_command_from_statement {
 #=====================================================
 
-=head2 B<_getCommandFromStatement>
+=head2 B<_get_command_from_statement>
 
- my ($cmd, $table) = $self->_getCommandFromStatement($statement);
+ my ($cmd, $table) = $self->_get_command_from_statement($statement);
 
 =cut
 #=====================================================
-sub _getCommandFromStatement {
 	my $self = shift || return; $self->{debug}->call;
 	my $statement = lc(shift) || return;
 	
@@ -1383,15 +1353,15 @@ sub _getCommandFromStatement {
 }
 
 
+sub _clean_sql {
 #=====================================================
 
-=head2 B<_cleanSQL>
+=head2 B<_clean_sql>
 
- my $statement = $self->_cleanSQL($statement);
+ my $statement = $self->_clean_sql($statement);
 
 =cut
 #=====================================================
-sub _cleanSQL {
 	my $self = shift || return; $self->{debug}->call;
 	my $statement = shift || return;
 	
@@ -1403,11 +1373,12 @@ sub _cleanSQL {
 }
 
 
+sub _modify_fields {
 #=====================================================
 
-=head2 B<_modifyFields>
+=head2 B<_modify_fields>
 
- my $modified = $self->_modifyFields($input, {
+ my $modified = $self->_modify_fields($input, {
  	fieldName	=> {
  		type		=> 'increment',  # increments the field by the given interval
  		interval	=> 1             # defaults to 1
@@ -1426,7 +1397,6 @@ sub _cleanSQL {
 
 =cut
 #=====================================================
-sub _modifyFields {
 	my $self = shift || return; $self->{debug}->call;
 	my $input = shift || return;
 	my $modifiers = shift || return;
@@ -1468,19 +1438,19 @@ sub _modifyFields {
 }
 
 
+sub timer_start {
 #=====================================================
 
-=head2 B<timerStart>
+=head2 B<timer_start>
 
 =cut
 #=====================================================
-sub timerStart {
 	my $self = shift || return;
 	my $statement = shift;
 	my $log = shift || return;
 	if ($log eq 'noLog') { return; }
 	
-	my ($cmd, $table) = $self->_getCommandFromStatement($statement);
+	my ($cmd, $table) = $self->_get_command_from_statement($statement);
 #	my ($parent) = (caller(0))[3];
 	my $unique = uniqueKey;
 	my $key = 'db_' . $cmd . '_on_' . $table . '_' . $unique;
@@ -1488,13 +1458,13 @@ sub timerStart {
 	return $key;
 }
 
+sub timer_stop {
 #=====================================================
 
-=head2 B<timerStop>
+=head2 B<timer_stop>
 
 =cut
 #=====================================================
-sub timerStop {
 	my $self = shift || return;
 	my $key = shift;
 	my $log = shift || return;
@@ -1510,13 +1480,14 @@ sub timerStop {
 # SQL Generation Methods
 #=====================================================
 
+sub make_list_sql {
 #=====================================================
 
-=head2 B<makeListSQL>
+=head2 B<make_list_sql>
 
 Returns sql for a single field of a where clause. Give it the field name and a list of values. It will quote, filter out blank values, and remove duplicates. If you also specify a type, it will test the input and generate the appropriate sql for the type.
 
- $sql = $self->{dbh}->makeListSQL($fieldName, $listOfValues, $type);
+ $sql = $self->{dbh}->make_list_sql($fieldName, $listOfValues, $type);
 
  Type can be:
    default - generates a quoted 'name = value' or 'name in (values)' clause with ORs
@@ -1531,8 +1502,6 @@ Returns sql for a single field of a where clause. Give it the field name and a l
 
 =cut
 #=====================================================
-sub make_list_sql { return makeListSQL(@_); }
-sub makeListSQL {
 	my $self = shift || return; $self->{debug}->call;
 	my $field = shift || return;
 	my $prelist = shift || return;
@@ -1580,7 +1549,7 @@ sub makeListSQL {
 		my $cleanList = [];
 		foreach my $item (@{$list}) {
 			$item = strip($item);
-			if (isPosInt($item)) {
+			if (is_pos_int($item)) {
 				push(@{$cleanList}, $item);
 			} else {
 				return;
@@ -1623,23 +1592,22 @@ sub makeListSQL {
 }
 
 
+sub make_where_sql {
 #=====================================================
 
-=head2 B<makeWhereSQL>
+=head2 B<make_where_sql>
 
 Converts a hash of name and values into a where clause. Values are used as is, unless a table name is given as a second argument. In that case, it will quote according to the field types in the table.
 
 Name/value pairs are pieced together with 'and'. In a future version, a hierarchy of name/values could be passed with args specifying 'and' or 'or'.
 
- $whereSQL = $self->{dbh}->makeWhereSQL( {
+ $whereSQL = $self->{dbh}->make_where_sql( {
  	$fieldName1	=> $listOfQuotedValues,
  	$fieldName2	=> $quotedValue
  }, $table);
 
 =cut
 #=====================================================
-sub make_where_sql { return makeWhereSQL(@_); }
-sub makeWhereSQL {
 	my $self = shift || return; $self->{debug}->call;
 	my $where = shift || return;
 	my $table = shift;
@@ -1647,7 +1615,7 @@ sub makeWhereSQL {
 	my $whereList = [];
 	
 	if ($table) {
-		my ($quoted) = $self->checkFieldInput($table, $where, {}, 1);
+		my ($quoted) = $self->check_field_input($table, $where, {}, 1);
 		$where = $quoted;
 	}
 	
@@ -1680,14 +1648,15 @@ sub makeWhereSQL {
 }
 
 
+sub make_sql {
 #=====================================================
 
-=head2 B<makeSQL>
+=head2 B<make_sql>
 
-An easier way to parse searches and call makeSearchSQL and makeOrderSQL.
+An easier way to parse searches and call make_search_sql and makeOrderSQL.
 
-	my ($whereSQL, $suffixSQL, $search) = $self->{dbh}->makeSQL($searchSchema, $searchArguments);
-	my ($whereSQL, $suffixSQL, $search) = $self->{dbh}->makeSQL( {
+	my ($whereSQL, $suffixSQL, $search) = $self->{dbh}->make_sql($searchSchema, $searchArguments);
+	my ($whereSQL, $suffixSQL, $search) = $self->{dbh}->make_sql( {
 		prefix		=> 'sr',
 		field_map	=> {
 			'sr.id'				=> 'id',
@@ -1718,18 +1687,16 @@ An easier way to parse searches and call makeSearchSQL and makeOrderSQL.
 
 =cut
 #=====================================================
-sub make_sql { return makeSQL(@_); }
-sub makeSQL {
 	my $self = shift || return; $self->{debug}->call;
 	my $args = shift || return;
 	
-	my $input = $self->processMakeSQLInput($args);
+	my $input = $self->process_make_sql_input($args);
 	my ($whereSQL, $suffixSQL);
-	my $whereSQL = $self->makeSearchSQL( {
+	my $whereSQL = $self->make_search_sql( {
 		search				=> $input->{search},
 		valid_search		=> $input->{valid_search}
 	} );
-	my $suffixSQL = $self->makeSuffixSQL( {
+	my $suffixSQL = $self->make_suffix_sql( {
 		search				=> $input->{search},
 		valid_order_by		=> $input->{valid_order_by},
 		default_order_by	=> $args->{default_order_by}
@@ -1739,9 +1706,10 @@ sub makeSQL {
 }
 
 
+sub process_make_sql_input {
 #=====================================================
 
-=head2 B<processMakeSQLInput>
+=head2 B<process_make_sql_input>
 
 Convert easy field descriptions into map of field specs. easy for human -> easy for code
 
@@ -1763,8 +1731,6 @@ Convert easy field descriptions into map of field specs. easy for human -> easy 
 
 =cut
 #=====================================================
-sub process_make_sql_input { return processMakeSQLInput(@_); }
-sub processMakeSQLInput {
 	my $self = shift || return; $self->{debug}->call;
 	my $args = shift || return;
 	my $settings = $args->{settings};
@@ -1825,7 +1791,7 @@ sub processMakeSQLInput {
 	my $search;
 	my $commands = [];
 	if ($params) {
-		if (isArrayWithContent($params->{'m'})) {
+		if (is_array_with_content($params->{'m'})) {
 			my @cmds = @{$params->{'m'}};
 			foreach my $cmd (@cmds) {
 				my ($source, $position, $target) = $cmd =~ /^(\d+)([abi])(\d+)$/;
@@ -1842,7 +1808,7 @@ sub processMakeSQLInput {
 			}
 			delete($params->{'m'});
 		}
-		if (isArrayWithContent($params->{'c'})) {
+		if (is_array_with_content($params->{'c'})) {
 			my @checkIds = @{$params->{'c'}};
 			foreach my $id (@checkIds) {
 				if ($id =~ /^(\d+)$/) {
@@ -1856,7 +1822,7 @@ sub processMakeSQLInput {
 			}
 			delete($params->{'c'});
 		}
-		if (isArrayWithContent($params->{'u'})) {
+		if (is_array_with_content($params->{'u'})) {
 			my @uncheckIds = @{$params->{'u'}};
 			foreach my $id (@uncheckIds) {
 				if ($id =~ /^(\d+)$/) {
@@ -1931,7 +1897,7 @@ sub processMakeSQLInput {
 						$search->{when}->{$fieldname}->{start} = first($params->{"$fieldname.start"});
 						$search->{when}->{$fieldname}->{start} = first($params->{$fieldname});
 						$search->{when}->{$fieldname}->{end} = first($params->{"$fieldname.end"});
-					} elsif (isArrayWithContent($params->{$fieldname})) {
+					} elsif (is_array_with_content($params->{$fieldname})) {
 						$search->{$cat}->{$fieldname} = $params->{$fieldname};
 					} elsif (defined($params->{$fieldname}) && !ref($params->{$fieldname})) {
 						$search->{$cat}->{$fieldname} = [$params->{$fieldname}];
@@ -1955,14 +1921,13 @@ sub processMakeSQLInput {
 }
 
 
+sub make_search_sql {
 #=====================================================
 
-=head2 B<makeSearchSQL>
+=head2 B<make_search_sql>
 
 =cut
 #=====================================================
-sub make_search_sql { return makeSearchSQL(@_); }
-sub makeSearchSQL {
 	my $self = shift || return; $self->{debug}->call;
 	my $options = shift || return;
 	my $valid_search = $options->{valid_search} || return;
@@ -2129,14 +2094,13 @@ sub makeSearchSQL {
 }
 
 
+sub make_suffix_sql {
 #=====================================================
 
-=head2 B<makeSuffixSQL>
+=head2 B<make_suffix_sql>
 
 =cut
 #=====================================================
-sub make_suffix_sql { return makeSuffixSQL(@_); }
-sub makeSuffixSQL {
 	my $self = shift || return; $self->{debug}->call;
 	my $options = shift || return;
 	my $search = $options->{search} || return;
@@ -2197,84 +2161,84 @@ sub makeSuffixSQL {
 #=====================================================
 
 
+sub get_table_info {
 #=====================================================
 
-=head2 B<getTableInfo>
+=head2 B<get_table_info>
 
 =cut
 #=====================================================
-sub getTableInfo {
 	my $self = shift || return; $self->{debug}->call;
 	my $table = shift || return;
 	
-	my $tableInfo = $self->getServerInfo('tableInfo');
-	if (isArrayHash($tableInfo->{$table})) {
+	my $tableInfo = $self->get_server_info('tableInfo');
+	if (is_array_hash($tableInfo->{$table})) {
 		return $tableInfo->{$table};
 	} else {
 		my $sth = $self->{dbh}->table_info(undef, '%', $table, 'TABLE');
 		my $tableResults = $sth->fetchall_arrayref({});
 		$tableInfo->{$table} = $tableResults->[0];
-		$self->setServerInfo('tableInfo', $tableInfo);
+		$self->set_server_info('tableInfo', $tableInfo);
 		return $tableInfo->{$table};
 	}
 }
 
 
+sub get_column_info {
 #=====================================================
 
-=head2 B<getColumnInfo>
+=head2 B<get_column_info>
 
 =cut
 #=====================================================
-sub getColumnInfo {
 	my $self = shift || return; $self->{debug}->call;
 	my $table = shift || return;
 	
-	my $columnInfo = $self->getServerInfo('columnInfo');
-	if (isArrayHash($columnInfo->{$table})) {
+	my $columnInfo = $self->get_server_info('columnInfo');
+	if (is_array_hash($columnInfo->{$table})) {
 		return $columnInfo->{$table};
 	} else {
 		my $sth = $self->{dbh}->column_info(undef, '%', $table, '%');
 		my $columns = $sth->fetchall_arrayref({});
 		foreach my $column (@{$columns}) {
 			$column->{name} = $column->{COLUMN_NAME};
-			$column->{name} =~ s/["`$self->{dbFieldQuoteChar}]//g;
-			$column->{quoted} = "$self->{dbFieldQuoteChar}$column->{name}$self->{dbFieldQuoteChar}";
+			$column->{name} =~ s/["`$self->{db_field_quote_char}]//g;
+			$column->{quoted} = "$self->{db_field_quote_char}$column->{name}$self->{db_field_quote_char}";
 		}
 		
 		$columnInfo->{$table} = $columns;
-		$self->setServerInfo('columnInfo', $columnInfo);
+		$self->set_server_info('columnInfo', $columnInfo);
 		return $columns;
 	}
 }
 
 
+sub check_input {
 #=====================================================
 
-=head2 B<checkInput>
+=head2 B<check_input>
 
- $success = $dbh->checkInput($fieldType, $fieldValue);
+ $success = $dbh->check_input($fieldType, $fieldValue);
 
 =cut
 #=====================================================
-sub check_input { return checkInput(@_); }
-sub checkInput {
 	my $self = shift || return; $self->{debug}->call;
 	my $type = shift || return;
 	my $value = shift || return;
 	
-	my ($quoted) = $self->checkFieldInput('noTable', { field => $value }, $type);
+	my ($quoted) = $self->check_field_input('noTable', { field => $value }, $type);
 	return $quoted->{field};
 }
 
 
+sub check_field_input {
 #=====================================================
 
-=head2 B<checkFieldInput>
+=head2 B<check_field_input>
 
 You probably won't need to call this method directly. It is used by other methods in this module.
 
- my $quoted = $self->checkFieldInput($table, $input, $old);
+ my $quoted = $self->check_field_input($table, $input, $old);
  
  $table - name of the table
  $input - hash of field name/value pairs of new data
@@ -2282,8 +2246,6 @@ You probably won't need to call this method directly. It is used by other method
 
 =cut
 #=====================================================
-sub check_field_input { return checkFieldInput(@_); }
-sub checkFieldInput {
 	my $self = shift || return; $self->{debug}->call;
 	my $table = shift || return;
 	my $input = shift;
@@ -2298,7 +2260,7 @@ sub checkFieldInput {
 			TYPE_NAME	=> $old
 		});
 		undef($old);
-	} elsif ($self->{dbType} eq 'sqlite') {
+	} elsif ($self->{db_type} eq 'sqlite') {
 #		my @answer = `sqlite3 $self->{db_name} ".schema $table"`;
 # 		my @answer = load_schema($table);
 # 		foreach my $line (@answer) {
@@ -2314,7 +2276,7 @@ sub checkFieldInput {
 # 			push(@{$columns}, $info);
 # 		}
 	} else {
-		$columns = $self->getColumnInfo($table);
+		$columns = $self->get_column_info($table);
 	}
 # 	if ($table eq 'item_time_draft') {
 # 		$self->{debug}->print_object($input, 'check_field_input $input');
@@ -2325,7 +2287,7 @@ sub checkFieldInput {
 	my $quoted;
 	foreach my $column (@{$columns}) {
 		my $field = $column->{COLUMN_NAME};
-		$field =~ s/["`$self->{dbFieldQuoteChar}]//g;
+		$field =~ s/["`$self->{db_field_quote_char}]//g;
 		my $type = lc($column->{TYPE_NAME});
 		my $prec = $column->{COLUMN_SIZE};
 		
@@ -2369,7 +2331,7 @@ sub checkFieldInput {
 					} else {
 						if ($hour == 12) { $hour = 0; }
 					}
-					my $tz = $part->[7] || $self->{timeZone};
+					my $tz = $part->[7] || $self->{time_zone};
 					if ($part->[3] || $part->[4] || $part->[5]) {
 						if ($type =~ /without/) { undef($tz); }
 						elsif ($tz =~ /^([+-])(\d+)$/) { $tz = $1 . sprintf("%02d", $2); }
@@ -2393,7 +2355,7 @@ sub checkFieldInput {
 					} else {
 						if ($hour == 12) { $hour == 0; }
 					}
-					my $tz = $part->[7] || $self->{timeZone};
+					my $tz = $part->[7] || $self->{time_zone};
 					if ($part->[3] || $part->[4] || $part->[5]) {
 						if ($type =~ /without/) { undef($tz); }
 						elsif ($tz =~ /^([+-])(\d+)$/) { $tz = $1 . sprintf("%02d", $2); }
@@ -2419,7 +2381,7 @@ sub checkFieldInput {
 					my $hour = sprintf("%02d", $part->[3]);
 					my $minute = sprintf("%02d", $part->[4]);
 					my $second = sprintf("%02d", $part->[5]);
-					my $tz = $part->[6] || $self->{timeZone};
+					my $tz = $part->[6] || $self->{time_zone};
 					if ($part->[3] || $part->[4] || $part->[5]) {
 						if ($type =~ /without/) { undef($tz); }
 						elsif ($tz =~ /^([+-])(\d+)$/) { $tz = $1 . sprintf("%02d", $2); }
@@ -2597,16 +2559,16 @@ sub checkFieldInput {
 	return ($quoted, $modified);
 }
 
+sub get_iso_timestamp {
 #=====================================================
 
-=head2 B<getISOTimestamp>
+=head2 B<get_iso_timestamp>
 
- $timestamp = $dbh->getISOTimestamp;
+ $timestamp = $dbh->get_iso_timestamp;
  returns '2012-10-08T22:24:52.178Z'
 
 =cut
 #=====================================================
-sub getISOTimestamp {
 	my $self = shift || return;
 	my ($current) = $self->{dbh}->selectrow_array("
 		SELECT CURRENT_TIMESTAMP(3) at time zone 'UTC'
@@ -2617,58 +2579,58 @@ sub getISOTimestamp {
 }
 
 
+sub get_server_info {
 #=====================================================
 
-=head2 B<getServerInfo>
+=head2 B<get_server_info>
 
- my $info = getServerInfo($key);
+ my $info = get_server_info($key);
 
 =cut
 #=====================================================
-sub getServerInfo {
 	my $self = shift || return;
 	my $key = shift || return;
-	$self->{dbName} || return;
+	$self->{db_name} || return;
 	
-	if (exists($SitemasonPl::serverInfo->{$self->{dbName}}->{$key})) {
-		return copyRef($SitemasonPl::serverInfo->{$self->{dbName}}->{$key});
+	if (exists($SitemasonPl::serverInfo->{$self->{db_name}}->{$key})) {
+		return copyRef($SitemasonPl::serverInfo->{$self->{db_name}}->{$key});
 	}
 	return;
 }
 
+sub set_server_info {
 #=====================================================
 
-=head2 B<setServerInfo>
+=head2 B<set_server_info>
 
- my $info = setServerInfo($key, $value);
+ my $info = set_server_info($key, $value);
 
 =cut
 #=====================================================
-sub setServerInfo {
 	my $self = shift || return;
 	my $key = shift || return;
 	my $value = shift;
-	$self->{dbName} || return;
+	$self->{db_name} || return;
 	
-	$SitemasonPl::serverInfo->{$self->{dbName}}->{$key} = copyRef($value);
+	$SitemasonPl::serverInfo->{$self->{db_name}}->{$key} = copyRef($value);
 	return TRUE;
 }
 
+sub clear_server_info {
 #=====================================================
 
-=head2 B<clearServerInfo>
+=head2 B<clear_server_info>
 
- clearServerInfo($key);
+ clear_server_info($key);
 
 =cut
 #=====================================================
-sub clearServerInfo {
 	my $self = shift || return;
 	my $key = shift || return;
-	$self->{dbName} || return;
+	$self->{db_name} || return;
 	
-	if (exists($SitemasonPl::serverInfo->{$self->{dbName}}->{$key})) {
-		delete $SitemasonPl::serverInfo->{$self->{dbName}}->{$key};
+	if (exists($SitemasonPl::serverInfo->{$self->{db_name}}->{$key})) {
+		delete $SitemasonPl::serverInfo->{$self->{db_name}}->{$key};
 		return TRUE;
 	}
 	return;

@@ -1,5 +1,4 @@
-package SitemasonPl::SearchParse;
-$VERSION = '8.0';
+package SitemasonPl::SearchParse 8.0;
 
 =head1 NAME
 
@@ -13,6 +12,7 @@ SearchParse parses a single string into multiple search parameters.
 
 =cut
 
+use v5.012;
 use strict;
 use SitemasonPl::Common;
 use SitemasonPl::Debug;

@@ -1,5 +1,4 @@
-﻿package SitemasonPl::Common;
-$VERSION = '8.0';
+﻿package SitemasonPl::Common 8.0;
 
 =head1 NAME
 
@@ -11,11 +10,13 @@ Contains standard routines that defy a more specific locale.
 
 =cut
 
+use v5.012;
 use strict;
 use utf8;
 use constant TRUE => 1;
 use constant FALSE => 0;
 
+use B qw(svref_2object);
 use DateTime;
 use DateTime::TimeZone;
 use Digest::MD5;
@@ -27,38 +28,76 @@ use LWP::UserAgent;
 use Math::Trig qw(deg2rad pi great_circle_distance asin acos);
 use Text::Unidecode;
 use XML::Parser::Expat;
+use Time::gmtime;
+use Unicode::Collate;
 
 require Exporter;
 our @ISA = qw(Exporter);
-our @EXPORT = qw(read_cookie readCookie readFile get_url getURL postURL parseQueryString urlDecode urlEncode
-	parseJSON make_json makeJSON read_xml parseXML make_xml makeXML jsonify xmlify
-	html_entities_to_text htmlEntitiesToText to_html_entities toHTMLEntities from_html_entities fromHTMLEntities convert_to_utf8 convertToUTF8 read_vfile readVFile
-	isBoolean isText isJSON isPosInt isNumber isOrdinal isArray isArrayWithContent isHash isHashWithContent isHashKey isArrayHash isArrayHashWithContent isObject
+our @EXPORT = qw(get_answer read_cookie generate_password
+	get_filename_utc_minute get_filename_utc_hour get_filename_utc_date convert_arrays_to_csv read_file_list read_file write_file
+	get_url post_url parse_query_string url_decode url_encode
+	parse_json make_json make_json parse_xml make_xml jsonify xmlify
+	html_entities_to_text to_html_entities from_html_entities convert_to_utf8 read_vfile
+	is_boolean is_text is_json is_pos_int is_number is_ordinal is_array is_array_with_content is_hash is_hash_with_content is_hash_key is_array_hash is_array_hash_with_content is_object
 	isDomain isHostname isEmail isIPv4 isIPv6 getDomainName isStateCode getStateCode getRegionCode getRegionAliases getPostalCode getCountryCode getMonth
-	round significant percent max min isClose summarizeNumber summarizeBytes makeOrdinal pluralize
-	arrayLength first value ref_to_scalar refToScalar array_to_list arrayToList list_to_array listToArray listToArrayAuto addToList removeFromArray to_array toArray to_hash toList toHash arrayhash_to_hashhash toHashHash array_to_hash arrayToHash unique_array uniqueArray contains
+	round significant percent max min isClose summarizeNumber summarizeBytes makeOrdinal pluralize join_text
+	arrayLength first value ref_to_scalar refToScalar array_to_list arrayToList list_to_array listToArray listToArrayAuto addToList removeFromArray to_array to_hash toList toHash
+	arrayhash_to_hashhash toHashHash array_to_hash arrayToHash unique_array uniqueArray contains by_any max_length
 	unique compare compress_var compressRef merge_hashes mergeHashes newHash copyRef joinRef diff
 	check_id checkId encode_id encodeId encode6_id encode6Id decode_id decodeId unique_key uniqueKey generateKey smmd5_2008 smsha2012 makeDigest
 	normalize strip strip_extra_white_space stripExtraWhiteSpace stripControlCharacters clean_filename cleanFilename strip_html stripHTML stripHTMLLink stripOutside
-	addSitemasonCom stripSitemasonCom
-	insertData summarize context toCamelCase fromCamelCase
+	insertData summarize context toCamelCase fromCamelCase camel_case kebab_case snake_case
 	toLatLong toLatLongHash toCoordinates distanceInMiles lookUpIP identifyNIC
-	convertStringToDateTime convertStringToEpoch convertDateTimeToString getDurationSummary getEstimatedTimeRemaining);
+	convertStringToDateTime convertStringToEpoch convertDateTimeToString getDurationSummary getEstimatedTimeRemaining
+	is_person get_term_color make_color bold print_bold say_bold mark
+	print_object convert_object_to_string
+);
 
 
+sub get_answer {
 #=====================================================
 
-=head2 B<readCookie>
+=head2 B<get_answer>
 
-Why? Because Apache2::Cookie chokes on cookies with commas.
+ defined(my $answer = get_answer) || return;
+ defined(my $answer = get_answer($array_of_inputs) || return;
 
- readCookie($req);
- readCookie($req, $cookieName);
+$array_of_answers is an array of inputs that should be used before STDIN. Good for grabbing some advance answers in the original command line args.
 
 =cut
 #=====================================================
-sub read_cookie { return readCookie(@_); }
-sub readCookie {
+	my $inputs = shift;
+	my $answer;
+	print scalar getTermColor('bold');
+	if (is_array_with_content($inputs)) {
+		$answer = shift(@{$inputs});
+		print "$answer\n";
+	} else {
+		$answer = <STDIN>;
+	}
+	print scalar getTermColor('reset');
+	if (ord($answer) == 0) { print "\n"; return; }
+	if ($answer =~ /^exit/) { print "\n"; return; }
+	chomp($answer);
+	$answer =~ s/(?:^\s+|\s+$)//g;
+	if (!length($answer)) { return ""; }
+	if (!$answer) { return '0'; }
+	return $answer;
+}
+
+
+sub read_cookie {
+#=====================================================
+
+=head2 B<read_cookie>
+
+Why? Because Apache2::Cookie chokes on cookies with commas.
+
+ read_cookie($req);
+ read_cookie($req, $cookieName);
+
+=cut
+#=====================================================
 	my $req = shift || return;
 	my $name = shift;
 	my $cookieString = $req->headers_in->{Cookie} || return;
@@ -68,8 +107,8 @@ sub readCookie {
 	foreach my $cookie (@cookies) {
 		my ($key, $value) = $cookie =~ /^(.*?)=(.*)$/;
 		if ($key) {
-			$key = urlDecode($key);
-			$value = urlDecode($value);
+			$key = url_decode($key);
+			$value = url_decode($value);
 			if ($name && ($key eq $name)) { return $value; }
 			$cookieHash->{$key} = $value;
 		}
@@ -80,15 +119,127 @@ sub readCookie {
 }
 
 
+sub generate_password {
 #=====================================================
 
-=head2 B<readFile>
+=head2 B<generate_password>
 
- my $data = readFile($filename);
+ my $password = generate_password($options);
+ $options = {
+ 	charset	=> 'default' || 'alpha' || 'letters' || 'numeric' || 'lower' || 'upper' || 'blank',	# defaults to 'default'
+ 	length	=> $lengthOfPassword	# defaults to 32
+ }
+ 
+=cut
+#=====================================================
+	my $defaultOption = shift;
+	my $options = shift;
+	if (is_hash($defaultOption)) { $options = $defaultOption; }
+	if (!is_hash($options)) { $options = {}; }
+	
+	if (is_pos_int($defaultOption)) { $options->{length} = $defaultOption; }
+	elsif (is_text($defaultOption)) { $options->{charset} = $defaultOption; }
+	$options->{length} ||= 32;
+	$options->{charset} ||= 'default';
+	if ($options->{charset} eq 'blank') { return; }
+	
+	my @chars = ('a'..'z', 'A'..'Z', 0..9, '`', '~', '!', '@', '#', '$', '^', '&', '*', '(', ')', '-', '_', '=', '+', '[', '{', ']', '}', '|', ';', ',', '<', '.', '>', '/', '?');
+	if ($options->{charset} eq 'alpha') { @chars = ('a'..'z', 'A'..'Z', 0..9); }
+	elsif ($options->{charset} eq 'letters') { @chars = ('a'..'z', 'A'..'Z'); }
+	elsif ($options->{charset} eq 'numeric') { @chars = (0..9); }
+	elsif ($options->{charset} eq 'lower') { @chars = ('a'..'z'); }
+	elsif ($options->{charset} eq 'upper') { @chars = ('A'..'Z'); }
+	
+	my $pass;
+	for (my $i = 0; $i < $options->{length}; $i++) {
+		$pass .= $chars[int(rand(@chars))];
+	}
+	return $pass;
+}
+
+
+sub get_filename_utc_minute {
+	my $gm = gmtime();
+	my $year = $gm->year + 1900; my $mon = $gm->mon + 1;
+	return sprintf("%04d-%02d-%02d_%02d-%02d", $year, $mon, $gm->mday, $gm->hour, $gm->min);
+}
+
+sub get_filename_utc_hour {
+	my $gm = gmtime();
+	my $year = $gm->year + 1900; my $mon = $gm->mon + 1;
+	return sprintf("%04d-%02d-%02d_%02d", $year, $mon, $gm->mday, $gm->hour);
+}
+
+sub get_filename_utc_date {
+	my $gm = gmtime();
+	my $year = $gm->year + 1900; my $mon = $gm->mon + 1;
+	return sprintf("%04d-%02d-%02d", $year, $mon, $gm->mday);
+}
+
+sub convert_arrays_to_csv {
+#=====================================================
+
+=head2 B<convert_arrays_to_csv>
+
+ my $csv = convert_arrays_to_csv($table, $debug);
 
 =cut
 #=====================================================
-sub readFile {
+	my $data = shift || return;
+	my $debug = shift;
+	my $csv;
+	my $cnt;
+	foreach my $row (@{$data}) {
+		my @csvRow;
+		foreach my $value (@{$row}) {
+			$value =~ s/"/""/g;
+			if ($value =~ /[",\n\r]/) { $value = "\"$value\""; }
+			push(@csvRow, $value);
+		}
+		my $line = join(',',@csvRow);
+		$csv .=  "$line\r\n";
+		if (($cnt <= 2) && $debug) { print "convert_arrays_to_csv: $line\n"; }
+		elsif (($cnt == 3) && $debug) { print "convert_arrays_to_csv: ...\n"; }
+		$cnt++
+	}
+	return $csv;
+}
+
+sub read_file_list {
+# my $array = read_file_list($basePath);
+	my $base = shift || return;
+	my $path = shift;
+	my $array = shift || [];
+	my $filepath = $base;
+	if ($path) { $filepath .= "/$path"; }
+	
+	if (!opendir(FILES, $filepath)) { print STDERR "Can't open dir $filepath: $!"; return; }
+	my @files = grep { !/^\./ } readdir(FILES);
+	closedir FILES;
+	
+	foreach my $file (@files) {
+		my $output = $file;
+		if ($path) { $output = "$path/$file"; }
+		if (-d "$filepath/$file") {
+			my $innerArray = read_file_list($base, $output);
+			push(@{$array}, @{$innerArray});
+		}
+		elsif (-f "$filepath/$file") {
+			push(@{$array}, $output);
+		}
+	}
+	return $array;
+}
+
+sub read_file {
+#=====================================================
+
+=head2 B<read_file>
+
+ my $data = read_file($filename);
+
+=cut
+#=====================================================
 	my $filename = shift || return;
 	if (-s $filename) {
 		my $data;
@@ -105,23 +256,82 @@ sub readFile {
 	}
 }
 
-
+sub write_file {
 #=====================================================
 
-=head2 B<getURL>
+=head2 B<write_file>
 
- my $content, $status = getURL($url);
- my $content = getURL($url, $userAgentString);
- my $content = getURL($url, $userAgentString, $serverIp);
+ my $newpath = write_file($path, $content, {
+ 	addDate		=> TRUE || FALSE,
+ 	makeDirs	=> TRUE || FALSE,
+ 	overwrite	=> TRUE || FALSE,
+ 	printErrors	=> TRUE || FALSE,
+ }, $debug);
 
 =cut
 #=====================================================
-sub get_url { return getURL(@_); }
-sub getURL {
+	my $fullpath = shift || return;
+	my $content = shift || return;
+	my $options = shift;
+	my $debug = shift;
+	if (!is_hash($options)) { $options = {}; }
+	if ($debug) { $options->{printErrors} = TRUE; }
+	
+	my ($path, $filename) = $fullpath =~ /(?:(.*)\/)?(.*?)$/;
+	
+	# Make dir, if needed
+	if ($path && !-d $path) {
+		if ($options->{makeDirs}) { system("mkdir -p $path"); }
+		else {
+			$options->{printErrors} && print STDERR "ERROR: Directory doesn't exist: $path\n";
+			return;
+		}
+	}
+	
+	if ($options->{addDate}) {
+		my $time = get_filename_utc_date;
+		my ($name, $ext) = $filename =~ /(.*)\.(.*?)$/;
+		if ($name && $ext) {
+			$filename = "${name}_$time.$ext";
+		} else {
+			$filename .= "_$time";
+		}
+		$fullpath = "$path/$filename";
+	}
+	
+	if (!$options->{overwrite} && -s $fullpath) {
+		$options->{printErrors} && print STDERR "ERROR: File already exists: $fullpath\n";
+		return;
+	}
+	
+	unless (open(FILE, ">$fullpath")) {
+		$options->{printErrors} && print STDERR "ERROR: Can't open file for writing: $fullpath\n";
+		return;
+	}
+	print FILE $content;
+	close(FILE);
+	if ($filename =~ /\.(sh|pl|py|js)$/) { chmod 0755, $fullpath; }
+	
+	$debug && print "write_file: path: $fullpath\n";
+	return $fullpath;
+}
+
+
+sub get_url {
+#=====================================================
+
+=head2 B<get_url>
+
+ my $content, $status = get_url($url);
+ my $content = get_url($url, $userAgentString);
+ my $content = get_url($url, $userAgentString, $serverIp);
+
+=cut
+#=====================================================
 	my $url = shift || return;
 	my $args = shift;
 	my ($agent, $ip);
-	if (!isHash($args)) {
+	if (!is_hash($args)) {
 		$agent = $args;
 		$ip = shift;
 		$args = {};
@@ -159,23 +369,23 @@ sub getURL {
 }
 
 
+sub post_url {
 #=====================================================
 
-=head2 B<postURL>
+=head2 B<post_url>
 
- my $content, $status = postURL($url, $data, $headers);
+ my $content, $status = post_url($url, $data, $headers);
  my $content = postURL($url, $data, $headers);
  my $content = postURL($url, $data, $headers, $serverIp);
 
 =cut
 #=====================================================
-sub postURL {
 	my $url = shift || return;
 	my $data = shift;
 	my $headers = shift;
 	my $ip = shift;
-	if (!isHash($data)) { $data = {}; }
-	if (!isHash($headers)) { $headers = {}; }
+	if (!is_hash($data)) { $data = {}; }
+	if (!is_hash($headers)) { $headers = {}; }
 	
 	my $agent = $headers->{agent} || 'Mozilla/5.0 (Linux; en-us) Sitemason/' . $SitemasonPl::Common::VERSION;
 	my $ua = LWP::UserAgent->new;
@@ -206,8 +416,8 @@ sub postURL {
 	$req->header('Content-Type' => 'application/x-www-form-urlencoded');
 	my @content;
 	while (my($field, $value) = each(%{$data})) {
-		my $qfield = urlEncode($field);
-		my $qvalue = urlEncode($value);
+		my $qfield = url_encode($field);
+		my $qvalue = url_encode($value);
 		push(@content, "$qfield=$qvalue");
 	}
 	my $content = join('&', @content) || '';
@@ -222,20 +432,20 @@ sub postURL {
 }
 
 
+sub parse_query_string {
 #=====================================================
 
-=head2 B<parseQueryString>
+=head2 B<parse_query_string>
 
 =cut
 #=====================================================
-sub parseQueryString {
 	my $queryString = shift || return '';
 	my @pairs = split('&', $queryString);
 	my $queryHash;
 	foreach my $pair (@pairs) {
 		my ($name, $value) = split('=', $pair);
-		my $newName = urlDecode($name);
-		my $newValue = urlDecode($value);
+		my $newName = url_decode($name);
+		my $newValue = url_decode($value);
 		if (ref($queryHash->{$newName}) eq 'ARRAY') {
 			push(@{$queryHash->{$newName}}, $newValue);
 		} elsif ($queryHash->{$newName}) {
@@ -248,40 +458,40 @@ sub parseQueryString {
 }
 
 
+sub url_decode {
 #=====================================================
 
-=head2 B<urlDecode>
+=head2 B<url_decode>
 
 URL decodes scalar and array values and hash keys and values.
 Does not recurse.
 
 =cut
 #=====================================================
-sub urlDecode {
 	my $input = shift;
-	if (isHash($input)) {
+	if (is_hash($input)) {
 		my $newHash;
 		while (my($name, $value) = each(%{$input})) {
-			my $newName = _urlDecodeScalar($name);
-			$newHash->{$newName} = _urlDecodeScalar($value);
+			my $newName = _url_decode_scalar($name);
+			$newHash->{$newName} = _url_decode_scalar($value);
 		}
 		return $newHash;
 	} elsif (ref($input) eq 'ARRAY') {
 		my $newArray = [];
 		foreach my $value (@{$input}) {
-			my $newValue = _urlDecodeScalar($value);
+			my $newValue = _url_decode_scalar($value);
 			push(@{$newArray}, $newValue);
 		}
 		return $newArray;
 	} elsif (ref($input) eq 'SCALAR') {
-		my $newScalar = _urlDecodeScalar(${$input});
-		return _urlDecodeScalar(\$newScalar);
+		my $newScalar = _url_decode_scalar(${$input});
+		return _url_decode_scalar(\$newScalar);
 	} elsif (!ref($input)) {
-		return _urlDecodeScalar($input);
+		return _url_decode_scalar($input);
 	}
 }
 
-sub _urlDecodeScalar {
+sub _url_decode_scalar {
 	my $input = shift || return '';
 	if (!ref($input)) {
 		$input =~ tr/+/ /;
@@ -292,40 +502,40 @@ sub _urlDecodeScalar {
 }
 
 
+sub url_encode {
 #=====================================================
 
-=head2 B<urlEncode>
+=head2 B<url_encode>
 
 URL decodes scalar and array values and hash keys and values.
 Does not recurse.
 
 =cut
 #=====================================================
-sub urlEncode {
 	my $input = shift;
-	if (isHash($input)) {
+	if (is_hash($input)) {
 		my $newHash;
 		while (my($name, $value) = each(%{$input})) {
-			my $newName = _urlEncodeScalar($name);
-			$newHash->{$newName} = _urlEncodeScalar($value);
+			my $newName = _url_encode_scalar($name);
+			$newHash->{$newName} = _url_encode_scalar($value);
 		}
 		return $newHash;
 	} elsif (ref($input) eq 'ARRAY') {
 		my $newArray = [];
 		foreach my $value (@{$input}) {
-			my $newValue = _urlEncodeScalar($value);
+			my $newValue = _url_encode_scalar($value);
 			push(@{$newArray}, $newValue);
 		}
 		return $newArray;
 	} elsif (ref($input) eq 'SCALAR') {
-		my $newScalar = _urlEncodeScalar(${$input});
-		return _urlEncodeScalar(\$newScalar);
+		my $newScalar = _url_encode_scalar(${$input});
+		return _url_encode_scalar(\$newScalar);
 	} elsif (!ref($input)) {
-		return _urlEncodeScalar($input);
+		return _url_encode_scalar($input);
 	}
 }
 
-sub _urlEncodeScalar {
+sub _url_encode_scalar {
 	my $input = shift || return '';
 	if (!ref($input)) {
 		$input =~ s/([^A-Za-z0-9 ])/sprintf("%%%02X", ord($1))/seg;
@@ -336,24 +546,22 @@ sub _urlEncodeScalar {
 }
 
 
+sub parse_json {
 #=====================================================
 
-=head2 B<parseJSON>
+=head2 B<parse_json>
 
 Returns a reference matching the given JSON if successful or scalar error message, if not.
 
- my $ref = parseJSON($jsonString, TRUE);
+ my $ref = parse_json($jsonString);
 
 =cut
 #=====================================================
-sub parseJSON {
 	my $jsonString = shift || return;
-	isJSON($jsonString) || return;
-	my $useUTF8 = shift;
 	
 	# Newer JSON code
 	my $json = JSON->new;
-	if ($useUTF8) { $json = $json->utf8(0); }
+	$json = $json->utf8(0);
 	my $perl;
 	
 	eval { $perl = $json->decode($jsonString); };
@@ -366,12 +574,13 @@ sub parseJSON {
 }
 
 
+sub make_json {
 #=====================================================
 
-=head2 B<makeJSON>
+=head2 B<make_json>
 
- my $json = makeJSON($jsonRef);
- my $jsonToPrint = makeJSON($jsonRef, {
+ my $json = make_json($jsonRef);
+ my $jsonToPrint = make_json($jsonRef, {
  	splitValues	=> 1,		# Split values greater than 32k
  	includeNulls	=> 1,		# Includes all entries, even those with blank, false, or null values
  	compress		=> 1,		# Don't include unnecessary tabs, spaces, or CRs
@@ -382,8 +591,6 @@ sub parseJSON {
 
 =cut
 #=====================================================
-sub make_json { return makeJSON(@_); }
-sub makeJSON {
 	my $data = shift;
 	my $options = shift;
 	my $depth = shift;
@@ -406,12 +613,12 @@ sub makeJSON {
 	}
 	
 	if ($depth >= 16) {
-		print STDERR "Sitemason::Common::makeJSON - EXCEEDED DEPTH LIMIT ($depth)\n";
+		print STDERR "Sitemason::Common::make_json - EXCEEDED DEPTH LIMIT ($depth)\n";
 		$options->{linesCount}++;
 		return "$es\"[EXCEEDED DEPTH LIMIT]\"$se";
 	}
 	if ($options->{linesCount} >= 100000) {
-		print STDERR "Sitemason::Common::makeJSON - EXCEEDED LINE LIMIT ($options->{linesCount})\n";
+		print STDERR "Sitemason::Common::make_json - EXCEEDED LINE LIMIT ($options->{linesCount})\n";
 		$options->{linesCount}++;
 		return "$es\"[EXCEEDED LINE LIMIT]\"$se";
 	}
@@ -425,17 +632,17 @@ sub makeJSON {
 	if ($compress) { $tabs = $tabsplus = $space = $n = ''; }
 	
 	if (ref($data) eq 'HASH') {
-		foreach my $name (sort _byHashKey (keys(%{$data}))) {
+		foreach my $name (sort _by_hash_key (keys(%{$data}))) {
 			if ($name !~ /^\w/i) { next; }
 			if ($name =~ /\W/) { next; }
 			my $value = $data->{$name};
 			if (ref($value) eq 'SCALAR') { $value = ${$value}; }
-			if (isBoolean($value)) {
+			if (is_boolean($value)) {
 				# booleans
 				if ($value) { push(@subJSON, "${tabsplus}${ls}\"$name\"${se}:${space}true"); }
 				elsif ($includeNulls) { push(@subJSON, "${tabsplus}${ls}\"$name\"${se}:${space}false"); }
 			} elsif ((ref($value) eq 'HASH') || (ref($value) eq 'ARRAY')) {
-				my $subJSON = makeJSON($value,$options,$depth+1);
+				my $subJSON = make_json($value,$options,$depth+1);
 				if ($subJSON) { push(@subJSON, "${tabsplus}${ls}\"$name\"${se}:${space}$subJSON"); }
 			} elsif (!ref($value)) {
 				if (defined($value) || $includeNulls) {
@@ -448,8 +655,8 @@ sub makeJSON {
 						elsif ($includeNulls) { push(@subJSON, "${tabsplus}${ls}\"$name\"${se}:${space}${vs}false${se}"); }
 					} elsif (($name =~ /^display(?:_|[A-Z])/) && !$value && !$includeNulls) {
 						# probably booleans
-					} elsif ($value || isNumber($value)) {
-						if (isNumber($value) && !$value) { $value = '0'; }
+					} elsif ($value || is_number($value)) {
+						if (is_number($value) && !$value) { $value = '0'; }
 						else { $value = jsonify($value, $options->{outputHTML}, $options->{unidecode}); }
 						push(@subJSON, "${tabsplus}${ls}\"$name\"${se}:${space}${qs}\"$value\"${se}");
 					} elsif ($includeNulls) {
@@ -476,7 +683,7 @@ sub makeJSON {
 			my $value = $item;
 			if (ref($value) eq 'SCALAR') { $value = ${$value}; }
 			if ((ref($value) eq 'HASH') || (ref($value) eq 'ARRAY')) {
-				my $subJSON = makeJSON($value,$options,$depth+1);
+				my $subJSON = make_json($value,$options,$depth+1);
 				if ($subJSON) { push(@subJSON, $subJSON); }
 			} elsif (!ref($value)) {
 				if (defined($value)) {
@@ -517,36 +724,35 @@ sub makeJSON {
 }
 
 
+sub parse_xml {
 #=====================================================
 
-=head2 B<parseXML>
+=head2 B<parse_xml>
 
- my $xmlRef = parseXML($xml);
- my $xmlRef = parseXML($xml, [qw(item)]); # List contains tags to force as arrays
+ my $xmlRef = parse_xml($xml);
+ my $xmlRef = parse_xml($xml, [qw(item)]); # List contains tags to force as arrays
 
 =cut
 #=====================================================
-sub read_xml { return parseXML(@_); }
-sub parseXML {
 	my $xml = shift || return;
 	my $arrayTagList = shift;
 	my $parser = new XML::Parser::Expat;
 	my $structure = {};
 	$parser->{current} = $structure;
 	$parser->setHandlers(
-		'Start'	=> \&_parseXMLStart,
-		'End'	=> \&_parseXMLEnd,
-		'Char'	=> \&_parseXMLChar
+		'Start'	=> \&_parse_xml_start,
+		'End'	=> \&_parse_xml_end,
+		'Char'	=> \&_parse_xml_char
 	);
 	eval { $parser->parse($xml); };
 	if ($@) { return; }
 	my $arrayTagRef = arrayToHash($arrayTagList);
-	my $xmlRef = _parseXMLConvert($structure, $arrayTagRef);
+	my $xmlRef = _parse_xml_convert($structure, $arrayTagRef);
 	
 	return $xmlRef;
 }
 
-sub _parseXMLStart {
+sub _parse_xml_start {
 	my ($parser, $tag, %atts) = @_;
 	my $node = { _parent_node => $parser->{current} };
 	
@@ -557,17 +763,17 @@ sub _parseXMLStart {
 	$parser->{current} = $node;
 }
 
-sub _parseXMLEnd {
+sub _parse_xml_end {
 	my ($parser, $tag) = @_;
 	$parser->{current} = $parser->{current}->{_parent_node};
 }
 
-sub _parseXMLChar {
+sub _parse_xml_char {
 	my ($parser, $char) = @_;
 	if ($char =~ /\S/) { $parser->{current}->{_data} .= $char; }
 }
 
-sub _parseXMLConvert {
+sub _parse_xml_convert {
 	my $structure = shift || return;
 	my $arrayTagRef = shift;
 	my $xmlRef;
@@ -588,7 +794,7 @@ sub _parseXMLConvert {
 						$response = $element->{_data};
 						$arrayAttr = $element->{_attributes};
 					} else {
-						$response = _parseXMLConvert($element, $arrayTagRef);
+						$response = _parse_xml_convert($element, $arrayTagRef);
 					}
 					push(@{$elementRef}, $response);
 				} else {
@@ -638,12 +844,13 @@ sub _parseXMLConvert {
 }
 
 
+sub make_xml {
 #=====================================================
 
-=head2 B<makeXML>
+=head2 B<make_xml>
 
- my $xml = makeXML($xmlRef);
- my $xmlToPrint = makeXML($xmlRef, {
+ my $xml = make_xml($xmlRef);
+ my $xmlToPrint = make_xml($xmlRef, {
  	noHeader	=> 1,							# Used to suppress the outermost XML tags
  	stylesheet	=> 'http://some.com/style.css',	# Specify a URL for a CSS stylesheet
  	noArray	=> 1,							# Suppress the array attribute
@@ -653,8 +860,6 @@ sub _parseXMLConvert {
 
 =cut
 #=====================================================
-sub make_xml { return makeXML(@_); }
-sub makeXML {
 	my $data = shift;
 	my $options = shift;
 	my $noHeader = $options->{noHeader} || $options->{no_header};
@@ -684,7 +889,7 @@ EOM
 		return $xml;
 	}
 	my $cnt;
-	foreach my $name (sort _byHashKey (keys(%{$data}))) {
+	foreach my $name (sort _by_hash_key (keys(%{$data}))) {
 		if (($depth == 1) && ($name eq 'stylesheet')) { next; }
 		if ($name !~ /^\w/i) { next; }
 		my $value = $data->{$name};
@@ -711,7 +916,7 @@ EOM
 		} elsif ($name =~ /_attr$/) {
 		} elsif ($name =~ /_is_xml$/) {
 		} elsif (ref($value) eq 'HASH') {
-			my $subXML = makeXML($value,$options,$depth+1);
+			my $subXML = make_xml($value,$options,$depth+1);
 			$xml .= <<"EOM";
 $tabs<$name$attributes>
 $subXML$tabs</$name>
@@ -722,7 +927,7 @@ EOM
 			unless ($noArray) { $typeArray = ' type="array"'; }
 			foreach (@{$value}) {
 				if (ref($_) eq 'HASH') {
-					my ($subXML, $subAttr) = makeXML($_,$options,$depth+1);
+					my ($subXML, $subAttr) = make_xml($_,$options,$depth+1);
 					$xml .= <<"EOM";
 $tabs<$name$attributes$subAttr$typeArray>
 $subXML$tabs</$name>
@@ -731,7 +936,7 @@ EOM
 				} elsif (!ref($_)) {
 					my $subValue = $_;
 					if ($splitXML && (length($subValue) > 32766)) {
-						my $valueList = _splitXMLElement($subValue);
+						my $valueList = _split_xml_element($subValue);
 						foreach (@{$valueList}) {
 							my $subValue = $_;
 							xmlify($subValue);
@@ -763,7 +968,7 @@ EOM
 				$cnt++;
 			} else {
 				if ($splitXML && (length($value) > 32766)) {
-					my $valueList = _splitXMLElement($value);
+					my $valueList = _split_xml_element($value);
 					foreach (@{$valueList}) {
 						my $subValue = $_;
 						xmlify($subValue);
@@ -796,7 +1001,7 @@ EOM
 	else { return $xml; }
 }
 
-sub _byHashKey {
+sub _by_hash_key {
 	if ($a =~ /^(?:item_id|modif(?:y|ied)_timestamp)$/) { return -1; }
 	elsif ($b =~ /^(?:item_id|modif(?:y|ied)_timestamp)$/) { return 1; }
 	elsif (($a eq 'item') || ($a eq 'entry') || ($a eq 'list')) { return 1; }
@@ -804,7 +1009,7 @@ sub _byHashKey {
 	else { return $a cmp $b; }
 }
 
-sub _splitXMLElement {
+sub _split_xml_element {
 	my $value = shift || return;
 	print STDERR "splitting xml value (" . length($value) . " bytes)...\n";
 	my $valueList = [];
@@ -819,6 +1024,7 @@ sub _splitXMLElement {
 }
 
 
+sub jsonify {
 #=====================================================
 
 =head2 B<jsonify>
@@ -827,7 +1033,6 @@ Escape text values for JSON.
 
 =cut
 #=====================================================
-sub jsonify {
 	my $value = shift || return;
 	my $isHTML = shift;
 	my $shouldUnidecode = shift;
@@ -853,6 +1058,7 @@ sub jsonify {
 	return $value;
 }
 
+sub xmlify {
 #=====================================================
 
 =head2 B<xmlify>
@@ -861,7 +1067,6 @@ Escape text values for XML.
 
 =cut
 #=====================================================
-sub xmlify {
 	foreach (@_) {
 		s/&/&#x26;/g;
 		s/</&#x3C;/g;
@@ -875,18 +1080,17 @@ sub xmlify {
 }
 
 
+sub html_entities_to_text {
 #=====================================================
 
-=head2 B<htmlEntitiesToText>
+=head2 B<html_entities_to_text>
 
- my $text = htmlEntitiesToText($html);
+ my $text = html_entities_to_text($html);
 
  (c) - &copy; - &#169; - &#xA9;
 
 =cut
 #=====================================================
-sub html_entities_to_text { return htmlEntitiesToText(@_); }
-sub htmlEntitiesToText {
 	my $text = shift || return '';
 	my @mapping = (
 		{ text => ' ',  html => '&nbsp;', unicode => '&#160;', hexcode => '&#xA0;' },
@@ -926,16 +1130,15 @@ sub htmlEntitiesToText {
 	return $text;
 }
 
+sub to_html_entities {
 #=====================================================
 
-=head2 B<toHTMLEntities>
+=head2 B<to_html_entities>
 
- my $html = toHTMLEntities($utf8);
+ my $html = to_html_entities($utf8);
 
 =cut
 #=====================================================
-sub to_html_entities { return toHTMLEntities(@_); }
-sub toHTMLEntities {
 	my $text = shift || return '';
 	my @mapping = (
 		{ unicode => '160',  html => '&nbsp;' },
@@ -967,18 +1170,17 @@ sub toHTMLEntities {
 	return $text;
 }
 
+sub from_html_entities {
 #=====================================================
 
-=head2 B<fromHTMLEntities>
+=head2 B<from_html_entities>
 
 From http://www.w3.org/TR/html4/sgml/entities.html
 
- my $utf8 = fromHTMLEntities($html);
+ my $utf8 = from_html_entities($html);
 
 =cut
 #=====================================================
-sub from_html_entities { return fromHTMLEntities(@_); }
-sub fromHTMLEntities {
 	my $text = shift || return '';
 	$text =~ s/\&#(\d+);/chr($1)/eg;
 	$text =~ s/\&#x([a-f0-9]+);/chr(hex($1))/ieg;
@@ -1251,16 +1453,15 @@ sub fromHTMLEntities {
 }
 
 
+sub convert_to_utf8 {
 #=====================================================
 
-=head2 B<convertToUTF8>
+=head2 B<convert_to_utf8>
 
 =cut
 #=====================================================
-sub convert_to_utf8 { return convertToUTF8(@_); }
-sub convertToUTF8 {
 	my $source = shift;
-	my $list = toArray($source);
+	my $list = to_array($source);
 	my $mapping = {
 		'25'	=> 0x27,
 		'128'	=> 0xC4,	'129'	=> 0xC5,	'130'	=> 0xC7,	'131'	=> 0xC9,
@@ -1329,14 +1530,13 @@ sub convertToUTF8 {
 }
 
 
+sub read_vfile {
 #=====================================================
 
-=head2 B<readVFile>
+=head2 B<read_vfile>
 
 =cut
 #=====================================================
-sub read_vfile { return readVFile(@_); }
-sub readVFile {
 	my $vfile = shift || return;
 	
 	eval {
@@ -1347,33 +1547,33 @@ sub readVFile {
 	
 	my @lines = split("(?:\r\n|\r|\n)", $vfile);
 	my $vfileRef = Text::vFile::asData->new->parse_lines( @lines );
-	my $container = _readVFileInternal(first($vfileRef->{objects}));
+	my $container = _read_vfile_internal(first($vfileRef->{objects}));
 	
 	return $container;
 }
 
-sub _readVFileInternal {
+sub _read_vfile_internal {
 	my $item = shift || return;
 	my $convertedItem = { type => lc($item->{type}) };
 	
 	if ($item->{properties}) {
 		while (my($name, $value) = each(%{$item->{properties}})) {
-			if (isArray($value) && @{$value} > 1) {
+			if (is_array($value) && @{$value} > 1) {
 				foreach my $subitem (@{$value}) {
 					my $convertedSubItem = {};
-					_readVFileProperty($convertedSubItem, $name, $subitem);
+					_read_vfile_property($convertedSubItem, $name, $subitem);
 					push(@{$convertedItem->{lc($name) . '_array'}}, $convertedSubItem);
 				}
 			}
 			my $entry = first($value);
-			_readVFileProperty($convertedItem, $name, $entry);
+			_read_vfile_property($convertedItem, $name, $entry);
 		}
 	}
 	
-	if (isArrayWithContent($item->{objects})) {
+	if (is_array_with_content($item->{objects})) {
 		$convertedItem->{items} = [];
 		foreach my $subitem (@{$item->{objects}}) {
-			my $convertedSubItem = _readVFileInternal($subitem);
+			my $convertedSubItem = _read_vfile_internal($subitem);
 			push(@{$convertedItem->{items}}, $convertedSubItem);
 		}
 	}
@@ -1381,7 +1581,7 @@ sub _readVFileInternal {
 	return $convertedItem;
 }
 
-sub _readVFileProperty {
+sub _read_vfile_property {
 	my $item = shift || return;
 	my $name = shift || return;
 	my $entry = shift || return;
@@ -1416,13 +1616,13 @@ sub _unvfileify {
 
 #=====================================================
 
-=head2 B<isBoolean>
+=head2 B<is_boolean>
 
- isBoolean($value) || return;
+ is_boolean($value) || return;
 
 =cut
 #=====================================================
-sub isBoolean {
+sub is_boolean {
 	my $value = shift;
 	if (ref($value) =~ /\bBoolean$/i) {
 		return TRUE;
@@ -1432,13 +1632,13 @@ sub isBoolean {
 
 #=====================================================
 
-=head2 B<isText>
+=head2 B<is_text>
 
- isText($value) || return;
+ is_text($value) || return;
 
 =cut
 #=====================================================
-sub isText {
+sub is_text {
 	my $value = shift;
 	if (!ref($value) && defined($value)) {
 		if ($value =~ /\S/) {
@@ -1450,13 +1650,13 @@ sub isText {
 
 #=====================================================
 
-=head2 B<isJSON>
+=head2 B<is_json>
 
- isJSON($value) || return;
+ is_json($value) || return;
 
 =cut
 #=====================================================
-sub isJSON {
+sub is_json {
 	my $value = shift;
 	if (!ref($value) && defined($value)) {
 		if (($value =~ /^\s*\{/) && ($value =~ /\}\s*$/)) { return TRUE; }
@@ -1467,14 +1667,14 @@ sub isJSON {
 
 #=====================================================
 
-=head2 B<isPosInt>
+=head2 B<is_pos_int>
 
- isPosInt($value) || return;
- isPosInt($value, $min, $max) || return;
+ is_pos_int($value) || return;
+ is_pos_int($value, $min, $max) || return;
 
 =cut
 #=====================================================
-sub isPosInt {
+sub is_pos_int {
 	my $value = shift;
 	my $min = shift;
 	my $max = shift;
@@ -1491,16 +1691,16 @@ sub isPosInt {
 
 #=====================================================
 
-=head2 B<isNumber>
+=head2 B<is_number>
 
 Started with a simple number to text comparison, then it got out of hand. If there are any problems with this, it will be time to scrap this approach and find something simpler.
 
- isNumber($value) || return;
- isNumber($value, $min, $max) || return;
+ is_number($value) || return;
+ is_number($value, $min, $max) || return;
 
 =cut
 #=====================================================
-sub isNumber {
+sub is_number {
 	my $value = shift;
 	my $min = shift;
 	my $max = shift;
@@ -1540,13 +1740,13 @@ sub isNumber {
 
 #=====================================================
 
-=head2 B<isOrdinal>
+=head2 B<is_ordinal>
 
  Recognizes English and English metaphones of digit-based ordinals.
 
 =cut
 #=====================================================
-sub isOrdinal {
+sub is_ordinal {
 	my $ordinal = shift;
 	
 	if ($ordinal =~ /^[1-9]\d*(?:st|n[dt]|r[dt]|th)$/i) { return TRUE; }
@@ -1554,13 +1754,13 @@ sub isOrdinal {
 
 #=====================================================
 
-=head2 B<isArray>
+=head2 B<is_array>
 
 Returns 1 if the argument is an array ref and has one or more elements.
 
 =cut
 #=====================================================
-sub isArray {
+sub is_array {
 	my $array = shift || return;
 	if (ref($array) eq 'ARRAY') { return TRUE; }
 	return;
@@ -1568,25 +1768,25 @@ sub isArray {
 
 #=====================================================
 
-=head2 B<isArrayWithContent>
+=head2 B<is_array_with_content>
 
 =cut
 #=====================================================
-sub isArrayWithContent {
+sub is_array_with_content {
 	my $array = shift || return;
-	if (isArray($array) && @{$array}) { return TRUE; }
+	if (is_array($array) && @{$array}) { return TRUE; }
 	return;
 }
 
 #=====================================================
 
-=head2 B<isHash>
+=head2 B<is_hash>
 
 Returns positive if the argument is a hash ref.
 
 =cut
 #=====================================================
-sub isHash {
+sub is_hash {
 	my $hash = shift || return;
 	if ((ref($hash) eq 'HASH') || ($hash =~ /=HASH\(/)) { return TRUE; }
 	return;
@@ -1594,46 +1794,46 @@ sub isHash {
 
 #=====================================================
 
-=head2 B<isHashWithContent>
+=head2 B<is_hash_with_content>
 
 =cut
 #=====================================================
-sub isHashWithContent {
+sub is_hash_with_content {
 	my $hash = shift || return;
-	if (isHash($hash) && keys(%{$hash})) { return TRUE; }
+	if (is_hash($hash) && keys(%{$hash})) { return TRUE; }
 	return;
 }
 
 #=====================================================
 
-=head2 B<isHashKey>
+=head2 B<is_hash_key>
 
- if (isHashKey($hash, $key))
+ if (is_hash_key($hash, $key))
 
 =cut
 #=====================================================
-sub isHashKey {
+sub is_hash_key {
 	my $hash = shift || return;
 	my $key = shift || return;
-	if (isHash($hash) && exists($hash->{$key})) { return TRUE; }
+	if (is_hash($hash) && exists($hash->{$key})) { return TRUE; }
 	return;
 }
 
 
 #=====================================================
 
-=head2 B<isArrayHash>
+=head2 B<is_array_hash>
 
 Returns positive if argument is an array containing only one or more hash refs.
 Returns defined if argument is an array containing only zero or more hash refs.
 Does not recurse.
 
- if (isArrayHash($arrayHash))			# array with only hashes
- if (defined(isArrayHash($arrayHash)))	# empty array or array with only hashes
+ if (is_array_hash($arrayHash))			# array with only hashes
+ if (defined(is_array_hash($arrayHash)))	# empty array or array with only hashes
 
 =cut
 #=====================================================
-sub isArrayHash {
+sub is_array_hash {
 	my $array = shift || return;
 	my $answer;
 	if (ref($array) eq 'ARRAY') {
@@ -1650,27 +1850,27 @@ sub isArrayHash {
 
 #=====================================================
 
-=head2 B<isArrayHashWithContent>
+=head2 B<is_array_hash_with_content>
 
 =cut
 #=====================================================
-sub isArrayHashWithContent {
+sub is_array_hash_with_content {
 	my $array = shift || return;
-	if (isArrayHash($array) && @{$array}) { return TRUE; }
+	if (is_array_hash($array) && @{$array}) { return TRUE; }
 	return;
 }
 
 #=====================================================
 
-=head2 B<isObject>
+=head2 B<is_object>
 
 Returns positive if the argument is an object.
 
 =cut
 #=====================================================
-sub isObject {
+sub is_object {
 	my $object = shift || return;
-	if ((ref($object) =~ /::/) && isHash($object)) { return TRUE; }
+	if ((ref($object) =~ /::/) && is_hash($object)) { return TRUE; }
 	return;
 }
 
@@ -2864,7 +3064,7 @@ sub getRegionAliases {
 			last;
 		}
 	}
-	if (isArray($aliases)) {
+	if (is_array($aliases)) {
 		foreach my $alias (@{$aliases}) {
 			$alias =~ s/-(.)/ \u$1/;
 			$alias = ucfirst($alias);
@@ -3215,7 +3415,7 @@ sub getMonth {
 	my $num = 1;
 	foreach my $month (@months) {
 		if ($name eq lc($month)) { last; }
-		elsif (isPosInt($name)) { if ($name == $num) { last; } }
+		elsif (is_pos_int($name)) { if ($name == $num) { last; } }
 		else {
 			my $abbr = substr($month, 0, 3);
 			if ($name eq lc($abbr)) { last; }
@@ -3301,7 +3501,7 @@ sub percent {
 sub max {
 	my @input = @_;
 	my $numbers = \@input;
-	if (ref($input[0])) { $numbers = toArray(@input); }
+	if (ref($input[0])) { $numbers = to_array(@input); }
 	@{$numbers} || return;
 	
 	my $max = shift(@{$numbers});
@@ -3326,7 +3526,7 @@ sub max {
 sub min {
 	my @input = @_;
 	my $numbers = \@input;
-	if (ref($input[0])) { $numbers = toArray(@input); }
+	if (ref($input[0])) { $numbers = to_array(@input); }
 	@{$numbers} || return;
 	
 	my $min = shift(@{$numbers});
@@ -3414,7 +3614,7 @@ sub summarizeBytes {
 #=====================================================
 sub makeOrdinal {
 	my $number = shift || return;
-	isPosInt($number) || return $number;
+	is_pos_int($number) || return $number;
 	if ($number =~ /1$/) { return $number . 'st'; }
 	if ($number =~ /2$/) { return $number . 'nd'; }
 	if ($number =~ /3$/) { return $number . 'rd'; }
@@ -3462,6 +3662,26 @@ sub pluralize {
 }
 
 
+sub join_text {
+#=====================================================
+
+=head2 B<join_text>
+
+=cut
+#=====================================================
+	my $list = shift || return;
+	is_array_with_content($list) || return;
+	if (@{$list} < 2) { return $list->[0]; }
+	if (@{$list} == 2) { return "$list->[0] and $list->[1]"; }
+	my $string = $list->[0];
+	for (my $i = 1; $i < @{$list}; $i++) {
+		if ($i == @{$list} - 1) { $string .= ", and $list->[$i]"; }
+		else { $string .= ", $list->[$i]"; }
+	}
+	return $string;
+}
+
+
 #=====================================================
 
 =head2 B<arrayLength>
@@ -3486,13 +3706,13 @@ sub arrayLength {
 Returns the first element of an array or if a string is given, it returns a string.
 It used to return a null, if not an array. That was probably for using it with if statements. I removed it from all ifs.
 Be careful using in if statements as a first element of 0 will return a negative.
-See isArray, isArrayWithContent, or arrayLength.
+See is_array, is_array_with_content, or arrayLength.
 
 =cut
 #=====================================================
 sub first {
 	my $array = shift || return;
-	if (isArrayWithContent($array)) {
+	if (is_array_with_content($array)) {
 		return $array->[0];
 	} elsif (ref($array) eq 'SCALAR') {
 		return ${$array};
@@ -3520,11 +3740,11 @@ sub value {
 	my $key = shift;
 	if (ref($ref) eq 'SCALAR') {
 		return ${$ref};
-	} elsif (isArrayHash($ref)) {
+	} elsif (is_array_hash($ref)) {
 		if ($key && $ref->[0]->{$key}) { return $ref->[0]->{$key}; }
 	} elsif (ref($ref) eq 'ARRAY') {
 		if ($ref->[0]) { return $ref->[0]; }
-	} elsif (isHash($ref)) {
+	} elsif (is_hash($ref)) {
 		if ($key) { return $ref->{$key}; }
 	} else {
 		return $ref;
@@ -3674,7 +3894,7 @@ sub listToArrayAuto {
 sub addToList {
 	my $list = shift;
 	my $delimiter = shift;
-	my $array = toArray($list);
+	my $array = to_array($list);
 	foreach my $item (@_) {
 		if (!contains($array, $item)) { push(@{$array}, $item); }
 	}
@@ -3711,29 +3931,28 @@ sub removeFromArray {
 
 #=====================================================
 
-=head2 B<toArray>
+=head2 B<to_array>
 
 Given an array of hashes and a key, this will return an array of the values of that key from all the hashes.
 
- $array = toArray($arrayhash, $key);
- $array = toArray($hashhash, $key);
- $array = toArray($arrayarray);
- $array = toArray($hasharray);
- $array = toArray($array);
- $array = toArray($hash);
- $array = toArray($scalar);
+ $array = to_array($arrayhash, $key);
+ $array = to_array($hashhash, $key);
+ $array = to_array($arrayarray);
+ $array = to_array($hasharray);
+ $array = to_array($array);
+ $array = to_array($hash);
+ $array = to_array($scalar);
 
 =cut
 #=====================================================
-sub to_array { return toArray(@_); }
-sub toArray {
+sub to_array {
 	my $list = shift || return [];
 	my $key = shift;
 	
 	my $newList = [];
-	if (isHash($list)) {
+	if (is_hash($list)) {
 		while(my($name, $item) = each(%{$list})) {
-			if (isHash($item)) {
+			if (is_hash($item)) {
 				if ($key && $item->{$key}) {
 					push(@{$newList}, $item->{$key});
 				}
@@ -3749,7 +3968,7 @@ sub toArray {
 		}
 	} elsif (ref($list) eq 'ARRAY') {
 		foreach my $item (@{$list}) {
-			if (isHash($item)) {
+			if (is_hash($item)) {
 				if ($key && $item->{$key}) {
 					push(@{$newList}, $item->{$key});
 				}
@@ -3783,7 +4002,7 @@ sub toArray {
 
 Should do better at distinguishing delimiter vs. key.
 
-Wrapper for toArray to make a delimited list based on output from toArray.
+Wrapper for to_array to make a delimited list based on output from to_array.
 
  $array = toList($arrayhash, $key, $delimiter);
  $array = toList($hashhash, $key, $delimiter);
@@ -3800,9 +4019,9 @@ sub toList {
 	my $key = shift;
 	my $delimiter = shift;
 	
-	if (isArrayHash($list)) { }
+	if (is_array_hash($list)) { }
 	elsif (!$delimiter && ($key !~ /[a-zA-Z0-9]/)) { $delimiter = $key; undef $key; }
-	my $array = toArray($list, $key);
+	my $array = to_array($list, $key);
 	return arrayToList($array, $delimiter);
 	
 }
@@ -3827,14 +4046,14 @@ sub toHash {
 	my $value = shift;
 	
 	my $hash;
-	if (isHash($list)) {
+	if (is_hash($list)) {
 		if ($key && $list->{$key}) {
 			if ($value && $list->{$value}) { $hash->{$list->{$key}} = $list->{$value}; }
 			else { $hash->{$list->{$key}} = 1; }
 		}
 	} elsif (ref($list) eq 'ARRAY') {
 		foreach my $item (@{$list}) {
-			if (isHash($item)) {
+			if (is_hash($item)) {
 				if ($key && $item->{$key}) {
 					if ($value && $item->{$value}) { $hash->{$item->{$key}} = $item->{$value}; }
 					else { $hash->{$item->{$key}} = 1; }
@@ -3928,13 +4147,13 @@ sub unique_array { return uniqueArray(@_); }
 sub uniqueArray {
 	my $list = shift || return;
 	my $key = shift;
-	isArrayWithContent($list) || return [];
+	is_array_with_content($list) || return [];
 	
 	my $new = [];
 	my $itemHash;
 	foreach my $item (@{$list}) {
 		my $value;
-		if ($key && isHash($item)) {
+		if ($key && is_hash($item)) {
 			if (defined($item->{$key})) { $value = $item->{$key}; }
 			else { next; }
 		}
@@ -3976,11 +4195,11 @@ sub contains {
 			if ($input =~ /$match/) { $cnt++; }
 		} elsif (ref($input) eq 'SCALAR') {
 			if (${$input} =~ /$match/) { $cnt++; }
-		} elsif (isArray($input)) {
+		} elsif (is_array($input)) {
 			foreach my $value (@{$input}) {
 				if (!ref($value) && ($value =~ /$match/)) { $cnt++; }
 			}
-		} elsif (isHash($input)) {
+		} elsif (is_hash($input)) {
 			while (my($name, $value) = each(%{$input})) {
 				if (!ref($value) && ($value =~ /$match/)) { $cnt++; }
 			}
@@ -3990,11 +4209,11 @@ sub contains {
 			if ($input eq $match) { $cnt++; }
 		} elsif (ref($input) eq 'SCALAR') {
 			if (${$input} eq $match) { $cnt++; }
-		} elsif (isArray($input)) {
+		} elsif (is_array($input)) {
 			foreach my $value (@{$input}) {
 				if (!ref($value) && ($value eq $match)) { $cnt++; }
 			}
-		} elsif (isHash($input)) {
+		} elsif (is_hash($input)) {
 			while (my($name, $value) = each(%{$input})) {
 				if (!ref($value) && ($value eq $match)) { $cnt++; }
 			}
@@ -4002,6 +4221,115 @@ sub contains {
 	}
 	return $cnt;
 }
+
+
+sub by_any {
+#=====================================================
+
+=head2 B<by_any>
+
+Sorts on one or more fields in an array of arrays, hashes, or values.
+
+ my @sortedArray = sort { by_any($a,$b,$options) } @unsortedArray;
+ my @sortedArray = sort { by_any($a,$b,$columnToSort,$options) } @unsortedArray;
+ my @sortedArray = sort { by_any($a,$b,$listOfColumnsToSort,$options) } @unsortedArray;
+
+ $columnToSort is the field name (for hashes) or element number (for arrays) on which to sort. It defaults to 0.
+ $listOfColumnsToSort is an array ref of the field names (for hashes) or element numbers (for arrays) in order of which such take precedence in sorting. It defaults to [0].
+ $options can include the following. The default is for numbers and undefined/blanks to sort first. The sort columns can be included here instead of as the third argument.
+ {
+ 	numbersLast		=> TRUE,
+ 	nullsLast		=> TRUE,
+ 	sortList		=> $listOfColumnsToSort
+ }
+
+ my @unsortedArray = ('eggplant', '', undef, '.5', 2.5, 'egg', '½', 'aardvark', '0', 'umbrella', '.eggs', 'e.ggs', 'éek', 'eggs', '2', 'zebra', '10', 'éggplant');
+ my @sortedArray = sort { by_any($a,$b) } @unsortedArray;
+ foreach my $item (@sortedArray) { print "  $item\n"; }
+
+=cut
+#=====================================================
+	my $a = shift;
+	my $b = shift;
+	my $options = shift;
+	my $fieldList = [0];
+	if (is_array($options) || is_text($options)) {
+		$fieldList = $options;
+		$options = shift;
+	}
+	if (!is_hash($options)) { $options = {}; }
+	
+	if ($options->{sortList}) { $fieldList = $options->{sortList}; }
+	if (is_text($fieldList)) { $fieldList = [$fieldList]; }
+	if (!is_array($fieldList)) { $fieldList = [0]; }
+	
+	sub isNothing {
+		my $input = shift;
+		if (!is_number($input) && !$input) { return TRUE; }
+	}
+	
+	my $collator = Unicode::Collate->new();
+	
+	for (my $i = 0; $i < @{$fieldList}; $i++) {
+		my ($a1, $b1);
+		if (is_array($a)) {
+			$a1 = $a->[$fieldList->[$i]];
+			$b1 = $b->[$fieldList->[$i]];
+		} elsif (is_hash($a)) {
+			$a1 = $a->{$fieldList->[$i]};
+			$b1 = $b->{$fieldList->[$i]};
+		} else {
+			$a1 = $a;
+			$b1 = $b;
+		}
+		
+		# Handle undefined or blank vs. something
+		if ($options->{nullsLast}) {
+			if (isNothing($a1) && !isNothing($b1)) { return 1; }
+			elsif (!isNothing($a1) && isNothing($b1)) { return -1; }
+		} else {
+			if (isNothing($a1) && !isNothing($b1)) { return -1; }
+			elsif (!isNothing($a1) && isNothing($b1)) { return 1; }
+		}
+		# Handle numbers vs. non-numbers
+		if ($options->{numbersLast}) {
+			if (is_number($a1) && !is_number($b1)) { return 1; }
+			elsif (!is_number($a1) && is_number($b1)) { return -1; }
+		} else {
+			if (is_number($a1) && !is_number($b1)) { return -1; }
+			elsif (!is_number($a1) && is_number($b1)) { return 1; }
+		}
+		# Handle numbers
+		no warnings 'numeric';
+		if ($a1 <=> $b1) { return $a1 <=> $b1; }
+		use warnings 'numeric';
+		# Handle undefineds and blanks
+		my $comp = $a1 cmp $b1;
+		# Handle all others in a Unicode friendly way
+		if ($a1 && $b1) { $comp = $collator->cmp($a1, $b1); }
+		if ($comp) { return $comp; }
+	}
+	return 0;
+}
+
+sub max_length {
+	my $object = shift || return;
+	my $limit = shift || 8192;
+	my $array = [];
+	if (is_hash($object)) {
+		@{$array} = values(%{$object});
+	} elsif (is_array($object)) {
+		$array = $object;
+	} elsif (!ref($object)) {
+		return length($object);
+	} else { return; }
+	my $max = 0;
+	foreach my $item (@{$array}) {
+		if ((length($item) > $max) && (length($item) <= $limit)) { $max = length($item); }
+	}
+	return $max;
+}
+
 
 
 #=====================================================
@@ -4017,7 +4345,7 @@ This will return an array of unique values from the given array. Values can be a
 #=====================================================
 sub unique {
 	my $array = shift || return;
-	isArray($array) || return;
+	is_array($array) || return;
 	
 	my $map;
 	foreach my $item (@{$array}) {
@@ -4044,15 +4372,15 @@ sub compare {
 	my $first = shift;
 	my $second = shift;
 	
-	if ((isHash($first) && isHash($second)) || (isArray($first) && isArray($second))) {
-		my $firstJSON = makeJSON($first, { compress => 1 });
-		my $secondJSON = makeJSON($second, { compress => 1 });
+	if ((is_hash($first) && is_hash($second)) || (is_array($first) && is_array($second))) {
+		my $firstJSON = make_json($first, { compress => 1 });
+		my $secondJSON = make_json($second, { compress => 1 });
 		if ($firstJSON eq $secondJSON) { return TRUE; }
 	}
-	elsif ((isNumber($first) && isNumber($second)) && ($first == $second)) {
+	elsif ((is_number($first) && is_number($second)) && ($first == $second)) {
 		return TRUE;
 	}
-	elsif ((isText($first) && isText($second)) && ($first eq $second)) {
+	elsif ((is_text($first) && is_text($second)) && ($first eq $second)) {
 		return TRUE;
 	}
 }
@@ -4087,7 +4415,7 @@ sub compressRef {
 				}
 				if ($outArray && @{$outArray}) { push(@output, $outArray); }
 			}
-		} elsif (isHash($input)) {
+		} elsif (is_hash($input)) {
 			my $subOut;
 			my $cnt;
 			while (my($name, $value) = each(%{$input})) {
@@ -4124,10 +4452,10 @@ Does not recurse.
 sub merge_hashes { return mergeHashes(@_); }
 sub mergeHashes {
 	my $targetHash = shift;
-	isHash($targetHash) || return;
+	is_hash($targetHash) || return;
 	
 	foreach my $src (@_) {
-		isHash($src) || next;
+		is_hash($src) || next;
 		while (my ($key, $value) = each(%{$src})) {
 			if ($key =~ /^(?:can|is|does|has|should)(?:_|[A-Z])/) {
 				$targetHash->{$key} = $value;
@@ -4199,8 +4527,8 @@ sub joinRef {
 	my $answer;
 	if (!ref($reference)) { $answer = $reference; }
 	elsif (ref($reference) eq 'SCALAR') { $answer = $$reference; }
-	elsif (isArrayHash($reference)) {
-		my $tempArray = toArray($reference, $delimiter);
+	elsif (is_array_hash($reference)) {
+		my $tempArray = to_array($reference, $delimiter);
 		$answer = join($delimiter2, @{$tempArray});
 	}
 	elsif (ref($reference) eq 'ARRAY') { $answer = join($delimiter, @{$reference}); }
@@ -4222,7 +4550,7 @@ Returns a hash with the key value pairs from the second hash.
 sub diff {
 	my $old = shift || {};
 	my $new = shift || {};
-	if (!isHash($old) || !isHash($new)) { return; }
+	if (!is_hash($old) || !is_hash($new)) { return; }
 	
 	my @keys = (keys(%{$old}), keys(%{$new}));
 	my $keys = uniqueArray(\@keys);
@@ -4231,8 +4559,8 @@ sub diff {
 		if ((!exists($old->{$key}) || !defined($old->{$key})) && (!exists($new->{$key}) || !defined($new->{$key}))) { next; }
 		elsif ((exists($old->{$key}) && defined($old->{$key})) && (!exists($new->{$key}) || !defined($new->{$key}))) { $diff->{$key} = undef; }
 		elsif ((!exists($old->{$key}) || !defined($old->{$key})) && (exists($new->{$key}) && defined($new->{$key}))) { $diff->{$key} = $new->{$key}; }
-		elsif (isHash($old->{$key}) && isHash($new->{$key}) && compare($old->{$key}, $new->{$key})) { next; }
-		elsif (isArray($old->{$key}) && isArray($new->{$key}) && compare($old->{$key}, $new->{$key})) { next; }
+		elsif (is_hash($old->{$key}) && is_hash($new->{$key}) && compare($old->{$key}, $new->{$key})) { next; }
+		elsif (is_array($old->{$key}) && is_array($new->{$key}) && compare($old->{$key}, $new->{$key})) { next; }
 		elsif (($old->{$key} == $new->{$key}) && ($old->{$key} eq $new->{$key})) {}
 		else { $diff->{$key} = $new->{$key}; }
 	}
@@ -4484,10 +4812,10 @@ Make a B64 digest out of a string, array, or hash.
 #=====================================================
 sub makeDigest {
 	my $input = shift || return;
-	if (isHash($input) || isArray($input)) {
-		$input = makeJSON($input, { compress => 1 });
+	if (is_hash($input) || is_array($input)) {
+		$input = make_json($input, { compress => 1 });
 	}
-	elsif (!isText($input)) { return; }
+	elsif (!is_text($input)) { return; }
 	
 	my $sha = Digest::MD5->new();
 	$sha->add($input);
@@ -4617,7 +4945,7 @@ sub strip {
 		foreach my $value (@{$input}) {
 			if (!ref($value)) { $value =~ s/(?:^$char|$char$)//g; }
 		}
-	} elsif (isHash($input)) {
+	} elsif (is_hash($input)) {
 		while (my($name, $value) = each(%{$input})) {
 			if (!ref($value)) {
 				$value =~ s/(?:^$char|$char$)//g;
@@ -4656,7 +4984,7 @@ sub stripExtraWhiteSpace {
 				$value =~ s/\s+/ /g;
 			}
 		}
-	} elsif (isHash($input)) {
+	} elsif (is_hash($input)) {
 		while (my($name, $value) = each(%{$input})) {
 			if (!ref($value)) {
 				$value =~ s/(?:^\s+|\s+$)//g;
@@ -4692,7 +5020,7 @@ sub stripControlCharacters {
 				$value = _stripControlCharacters($value, $all);
 			}
 		}
-	} elsif (isHash($input)) {
+	} elsif (is_hash($input)) {
 		while (my($name, $value) = each(%{$input})) {
 			if (!ref($value)) {
 				$input->{$name} = _stripControlCharacters($value, $all);
@@ -4736,7 +5064,7 @@ sub cleanFilename {
 				$value = _cleanFilename($value);
 			}
 		}
-	} elsif (isHash($input)) {
+	} elsif (is_hash($input)) {
 		while (my($name, $value) = each(%{$input})) {
 			if (!ref($value)) {
 				$input->{$name} = _cleanFilename($value);
@@ -4809,7 +5137,7 @@ sub stripHTML {
 	$html =~ s/\[stripHTML::preservedTag\]/</g;
 	
 	if ($settings->{convertEntities} || $settings->{convert_entities}) {
-		$html = htmlEntitiesToText($html);
+		$html = html_entities_to_text($html);
 	}
 	
 	if ($settings->{escapeForJS} || $settings->{escape_for_js}) {
@@ -4865,7 +5193,7 @@ sub stripOutside {
 	my $mode = shift;
 	
 	$string = stripHTML($string);
-	$string = fromHTMLEntities($string);
+	$string = from_html_entities($string);
 	$string = stripControlCharacters($string);
 	$string =~ s/\(.*?\)//g;
 	$string =~ s/\[.*?\]//g;
@@ -4892,42 +5220,6 @@ sub stripOutside {
 
 #=====================================================
 
-=head2 B<addSitemasonCom>
-
-=cut
-#=====================================================
-sub addSitemasonCom {
-	my $input = shift;
-	my $hostname = shift;
-	
-	if ($input && $hostname && ($hostname =~ /^[a-z0-9.-]+$/) && ($hostname !~ /\.sitemason\.com$/)) {
-		$hostname =~ s/\./\\./g;
-		$input =~ s#"(http://$hostname)(/|")#"$1.sitemason.com$2#ig;
-	}
-	return $input;
-}
-
-
-#=====================================================
-
-=head2 B<stripSitemasonCom>
-
-=cut
-#=====================================================
-sub stripSitemasonCom {
-	my $input = shift;
-	my $hostname = shift;
-	
-	if ($input && $hostname && ($hostname =~ /^[a-z0-9.-]+$/) && ($hostname !~ /\.sitemason\.com$/)) {
-		$hostname =~ s/\./\\./g;
-		$input =~ s#"(http://$hostname)\.sitemason\.com#"$1#ig;
-	}
-	return $input;
-}
-
-
-#=====================================================
-
 =head2 B<insertData>
 
 Recursively replaces ${key} variables in any string in a complex object with the supplied hash of key/values.
@@ -4944,20 +5236,20 @@ sub insertData {
 	my $data = shift;
 	my $depth = shift;
 	if ($depth > 20) { return; }
-	isHash($data) || return $template;
+	is_hash($data) || return $template;
 	
 	if (ref($template) eq 'SCALAR') {
 		my $value = _insertDataIntoString(${$template}, $data);
 		return ${$value};
 	}
-	elsif (isArray($template)) {
+	elsif (is_array($template)) {
 		my $newTemplate = [];
 		foreach my $value (@{$template}) {
 			push(@{$newTemplate}, insertData($value, $data, $depth+1));
 		}
 		return $newTemplate;
 	}
-	elsif (isHash($template)) {
+	elsif (is_hash($template)) {
 		my $newTemplate = {};
 		while (my($key, $value) = each(%{$template})) {
 			$newTemplate->{$key} = insertData($value, $data, $depth+1);
@@ -5195,6 +5487,27 @@ sub _fromCamelCaseScalar {
 	return $scalar;
 }
 
+sub camel_case {
+	my $text = lc(shift);
+	$text =~ s/[^a-z0-9]+([a-z])/\u$a/g;
+	$text =~ s/[^a-z0-9]+//g;
+	return $text;
+}
+
+sub kebab_case {
+	my $text = lc(shift);
+	$text =~ s/[^a-z0-9]+/-/g;
+	$text =~ s/--+/-/g;
+	return $text;
+}
+
+sub snake_case {
+	my $text = lc(shift);
+	$text =~ s/[^a-z0-9]+/_/g;
+	$text =~ s/__+/_/g;
+	return $text;
+}
+
 
 #=====================================================
 
@@ -5215,10 +5528,10 @@ sub toLatLong {
 	my $long = shift;
 	my $latitude;
 	my $longitude;
-	if (isNumber($coords) && isNumber($long)) {
+	if (is_number($coords) && is_number($long)) {
 		$latitude = $coords;
 		$longitude = $long;
-	} elsif (isText($coords)) {
+	} elsif (is_text($coords)) {
 		if ($coords =~ /\(/) { # PostgreSQL point is x, y - long, lat
 			$coords =~ s/^\(|\)$//g;
 			my ($long, $lat) = split(/\s*,\s*/, $coords);
@@ -5229,20 +5542,20 @@ sub toLatLong {
 			$latitude = $lat;
 			$longitude = $long;
 		}
-	} elsif (isHashKey($coords, 'lat')) {
+	} elsif (is_hash_key($coords, 'lat')) {
 		$latitude = $coords->{lat};
 		$longitude = $coords->{long} || $coords->{lng};
-	} elsif (isHashKey($coords, 'latitude')) {
+	} elsif (is_hash_key($coords, 'latitude')) {
 		$latitude = $coords->{latitude};
 		$longitude = $coords->{longitude};
-	} elsif (isHashKey($coords, 'coordinates')) {
+	} elsif (is_hash_key($coords, 'coordinates')) {
 		($latitude, $longitude) = toLatLong($coords->{coordinates});
-	} elsif (isArray($coords) && isNumber($coords->[0]) && isNumber($coords->[1])) {
+	} elsif (is_array($coords) && is_number($coords->[0]) && is_number($coords->[1])) {
 		$latitude = $coords->[0];
 		$longitude =  $coords->[1];
 	}
 	
-	if (!isNumber($latitude) || !isNumber($longitude)) { return; }
+	if (!is_number($latitude) || !is_number($longitude)) { return; }
 	if (($latitude < -90) || ($latitude > 90)) { return; }
 	if (($longitude < -180) || ($longitude > 180)) { return; }
 	
@@ -5275,23 +5588,23 @@ Returns:
 sub toLatLongHash {
 	my $coords = shift || return;
 	my $long = shift;
-	if (isNumber($coords) && isNumber($long)) {
+	if (is_number($coords) && is_number($long)) {
 		return {
 			latitude	=> $coords,
 			longitude	=> $long
 		};
-	} elsif (isText($coords)) {
+	} elsif (is_text($coords)) {
 		my ($lat, $long) = toLatLong($coords);
 		return {
 			latitude	=> $lat,
 			longitude	=> $long
 		};
-	} elsif (isArray($coords) && isNumber($coords->[0])) {
+	} elsif (is_array($coords) && is_number($coords->[0])) {
 		return {
 			latitude	=> $coords->[0],
 			longitude	=> $coords->[1]
 		};
-	} elsif (isArray($coords) && isText($coords->[0])) {
+	} elsif (is_array($coords) && is_text($coords->[0])) {
 		my $newCoords = [];
 		foreach my $coord (@{$coords}) {
 			my ($lat, $long) = toLatLong($coord);
@@ -5301,14 +5614,14 @@ sub toLatLongHash {
 			});
 		}
 		return $newCoords;
-	} elsif (isHashKey($coords, 'lat')) {
+	} elsif (is_hash_key($coords, 'lat')) {
 		return {
 			latitude	=> $coords->{lat},
 			longitude	=> $coords->{long} || $coords->{lng}
 		};
-	} elsif (isHashKey($coords, 'latitude')) {
+	} elsif (is_hash_key($coords, 'latitude')) {
 		return $coords;
-	} elsif (isArrayHash($coords) && isHashKey($coords->[0], 'lat')) {
+	} elsif (is_array_hash($coords) && is_hash_key($coords->[0], 'lat')) {
 		my $newCoords = [];
 		foreach my $coord (@{$coords}) {
 			push(@{$newCoords}, {
@@ -5317,7 +5630,7 @@ sub toLatLongHash {
 			});
 		}
 		return $newCoords;
-	} elsif (isArrayHash($coords) && isHashKey($coords->[0], 'latitude')) {
+	} elsif (is_array_hash($coords) && is_hash_key($coords->[0], 'latitude')) {
 		return $coords;
 	}
 	
@@ -5333,7 +5646,7 @@ Takes the same input as toLatLong but returns the lat/long as a PostgreSQL point
 #=====================================================
 sub toCoordinates {
 	my ($lat, $long) = toLatLong(@_);
-	if (isNumber($lat) && isNumber($long)) {
+	if (is_number($lat) && is_number($long)) {
 		return '(' . $long . ',' . $lat . ')';
 	}
 }
@@ -5349,9 +5662,9 @@ sub toCoordinates {
 #=====================================================
 sub distanceInMiles {
 	my ($coord1, $coord2, $coord3, $coord4) = @_;
-	if (isNumber($coord1) && isNumber($coord2) && isNumber($coord3) && isNumber($coord4)) {
+	if (is_number($coord1) && is_number($coord2) && is_number($coord3) && is_number($coord4)) {
 		return _distanceInMiles($coord1, $coord2, $coord3, $coord4);
-	} elsif (isText($coord1) && isText($coord2)) {
+	} elsif (is_text($coord1) && is_text($coord2)) {
 		my ($lat1, $long1) = toLatLong($coord1);
 		my ($lat2, $long2) = toLatLong($coord2);
 		return _distanceInMiles($lat1, $long1, $lat2, $long2);
@@ -5381,15 +5694,15 @@ sub lookUpIP {
 	isIPv4($ip) || return;
 # 	my $apiKey = 'b6e5cd50ec721a27aac617c5f3742ddb45acf1c9db5625e7a7dc5c5b592904d7';
 # 	my $url = 'http://api.ipinfodb.com/v3/ip-city/?format=json&key=' . $apiKey . '&ip=' . $ip;
-# 	my $jsonText = getURL($url);
-# 	my $json = parseJSON($jsonText);
+# 	my $jsonText = get_url($url);
+# 	my $json = parse_json($jsonText);
 # 	$json->{NIC} = identifyNIC($ip);
 # 	sleep 1;
 # 	return $json;
 	
 	my $apiKey = 'JE562K-H58HG85G77';
 	my $url = 'http://api.wolframalpha.com/v2/query?input=' . $ip . '&appid=' . $apiKey;
-	my $xml = getURL($url);
+	my $xml = get_url($url);
 	sleep 1;
 	my $xml_ref = read_xml($xml, [qw(pod subpod info state)]);
 	if ($xml_ref->{queryresult} && $xml_ref->{queryresult}->{pod} && @{$xml_ref->{queryresult}->{pod}}) {
@@ -5757,6 +6070,303 @@ sub getEstimatedTimeRemaining {
 	my $duration = $durTime->subtract_datetime($startTime);
 	my $output = getDurationSummary($duration);
 	return $output;
+}
+
+sub is_person {
+	if (($ENV{TERM} && ($ENV{TERM} ne 'dumb') && ($ENV{TERM} ne 'tty')) || $ENV{SSH_AUTH_SOCK}) {
+		return TRUE;
+	}
+}
+
+sub _term_supports_colors {
+	if ($ENV{TERM} && ($ENV{TERM} ne 'dumb') && ($ENV{TERM} ne 'tty')) { return TRUE; }
+}
+
+sub _get_term_color_numbers {
+	# https://en.wikipedia.org/wiki/ANSI_escape_code
+	# https://en.wikipedia.org/wiki/Web_colors
+	my $debug = shift;
+	if (!$debug && is_hash($MonkeynessPl::Common::TermColors)) { return $MonkeynessPl::Common::TermColors; }
+	
+	my $colors = [
+		{ name => 'reset',			num => 0 },
+		{ name => 'default',		num => 39 },
+		{ name => 'defaultBg',		num => 49 },
+		
+		{ name => 'bold',			num => 1 },	# reset 21 # yes
+		{ name => 'faint',			num => 2 },	# reset 22 # yes
+		{ name => 'italic',			num => 3 },	# reset 23
+		{ name => 'underline',		num => 4 },	# reset 24 # yes
+		{ name => 'blink',			num => 5 },	# reset 25 # yes
+		{ name => 'rapid',			num => 6 },	# reset 26
+		{ name => 'inverse',		num => 7 },	# reset 27 # yes
+		{ name => 'conceal',		num => 8 },	# reset 28 # yes
+		{ name => 'crossed',		num => 9 },	# reset 29
+		
+		{ name => 'white',			num => 97 },
+		{ name => 'silver',			num => 37 },
+		{ name => 'gray',			num => 90 },
+		{ name => 'black',			num => 30 },
+		
+		{ name => 'red',			num => 91 },
+		{ name => 'maroon',			num => 31 },
+		{ name => 'yellow',			num => 93 },
+		{ name => 'olive',			num => 33 },
+		{ name => 'lime',			num => 92 },
+		{ name => 'green',			num => 32 },
+		{ name => 'cyan',			num => 96 },
+		{ name => 'teal',			num => 36 },
+		{ name => 'blue',			num => 94 },
+		{ name => 'azure',			num => 34 },
+		{ name => 'pink',			num => 95 },
+		{ name => 'magenta',		num => 35 },
+		
+		{ name => 'whiteBg',		num => 107 },
+		{ name => 'silverBg',		num => 47 },
+		{ name => 'grayBg',			num => 100 },
+		{ name => 'blackBg',		num => 40 },
+		
+		{ name => 'redBg',			num => 101 },
+		{ name => 'maroonBg',		num => 41 },
+		{ name => 'yellowBg',		num => 103 },
+		{ name => 'oliveBg',		num => 43 },
+		{ name => 'limeBg',			num => 102 },
+		{ name => 'greenBg',		num => 42 },
+		{ name => 'cyanBg',			num => 106 },
+		{ name => 'tealBg',			num => 46 },
+		{ name => 'blueBg',			num => 104 },
+		{ name => 'azureBg',		num => 44 },
+		{ name => 'pinkBg',			num => 105 },
+		{ name => 'magentaBg',		num => 45 }
+	];
+	my $colorRef = {};
+	for (my $color = 0; $color < @{$colors}; $color++) {
+		my $item = $colors->[$color];
+		$colorRef->{$item->{name}} = $item->{num};
+		if ($debug) {
+			my $s = "\e[$item->{num}"; my $e = "\e[0m";
+			if ($color < 12) {
+				printf("%14s: ${s}m%s$e\n", $item->{name}, $item->{name});
+			} else {
+				if ($color == 12) {
+					my $header = sprintf("%14s  %-14s %-14s %-14s %-14s", '', 'default', 'bold', 'faint', 'inverse');
+					print "\n" . make_color($header, ['bold', 'underline']) . "\n";
+					printf("%14s: \e[39m%-14s$e \e[39;1m%-14s$e \e[39;2m%-14s$e \e[39;7m%-14s$e\n", 'default', 'default', 'default', 'default', 'default');
+				} elsif ($color == 28) {
+					print "\n";
+				}
+				my $name = $item->{name};
+				$name =~ s/Bg$//;
+				printf("%14s: ${s}m%-14s$e ${s};1m%-14s$e ${s};2m%-14s$e ${s};7m%-14s$e\n", $name, $name, $name, $name, $name);
+			}
+		}
+	}
+	if ($debug) { print "\n"; }
+	$MonkeynessPl::Common::TermColors = $colorRef;
+	return $colorRef;
+}
+sub get_term_color {
+	# my $colorCode = get_term_color($colorName);
+	my $name = shift;
+	if ($name && _term_supports_colors()) {
+		my $colors = _get_term_color_numbers;
+		if (defined($colors->{$name})) {
+			return sprintf("\e[%dm", $colors->{$name});
+		}
+	}
+	return '';
+}
+
+sub make_color {
+	my $text = shift;
+	my $color = shift || 'bold';
+	my $bg = shift;
+	_term_supports_colors() || return $text;
+	my $debug = shift;
+	
+	if ($bg) {
+		if (is_array($color)) { push(@{$color}, "${bg}Bg"); }
+		else { $color = [$color, "${bg}Bg"]; }
+	}
+	
+	my $colorNumbers = _get_term_color_numbers($debug);
+	if (is_array($color)) {
+		my @colorList;
+		foreach my $item (@{$color}) {
+			if ($colorNumbers->{$item}) { push(@colorList, $colorNumbers->{$item}); }
+		}
+		@colorList || return $text;
+		return sprintf("\e[%sm%s\e[0m", join(';', @colorList), $text);
+	} elsif ($colorNumbers->{$color}) {
+		return sprintf("\e[%dm%s\e[0m", $colorNumbers->{$color}, $text);
+	}
+	return $text;
+}
+
+sub resetColor {
+	my $colors = get_term_color();
+	if (exists($colors->{reset})) { return $colors->{reset}; }
+	return '';
+}
+
+sub bold {
+	return make_color(shift, 'bold');
+}
+
+sub print_bold {
+	print make_color(shift, 'bold');
+}
+
+sub say_bold {
+	print make_color(shift, 'bold') . "\n";
+}
+
+sub mark {
+	my $label = shift;
+	if ($label) { $label .= ' '; }
+	
+	my @returns = caller(1);
+	my $location = "$returns[3] - Line $returns[2]";
+	if (!@returns) { @returns = caller(0); $location = "$returns[1] - Line $returns[2]"; }
+	
+	state $counter = 0;
+	print make_color(' ' . $counter++ . ' ', ['bold', 'inverse']) . 
+		bold(" ${label}===> $location") . "\n";
+}
+
+sub print_object {
+#=====================================================
+
+=head2 B<print_object>
+
+	my $string = 'string';
+	my $function = sub { print "Lambda\n"; };
+	my $function2 = \&readCustomerConfig;
+	my $object = {
+		test => 'sdflkj',
+		very_extra_long_key_name => 1,
+		a => TRUE,
+		an_array => [1, 'blue', undef, "Something with a\nnewline", { a => 0, b => 1, longer => 2 }, 6, 7, 8, [], 9, 10, 11],
+		undefined => undef,
+		scalarref => \$string,
+		function => $function,
+		function2 => $function2,
+		object => $self,
+		emptyHash => {},
+		emptyArray => []
+	};
+	
+	print_object($object, 'My Object', 5);
+	print_object('test', 'My String', 5);
+	print_object('test', undef, 5);
+	print_object([], undef, 5);
+	print_object($function2, undef, 5);
+
+=cut
+#=====================================================
+	my $object = shift;
+	my $label = shift || '';
+	my $indent = shift || 0;
+	
+	if ($label) { $label = make_color($label, 'bold'); }
+	my $string = convert_object_to_string($object);
+	my $indentString = ' ' x $indent;
+	$string =~ s/\n/\n$indentString/gs;
+	$string =~ s/$indentString$//;
+	if ($label) {
+		print "$indentString$label: $string";
+	} else {
+		print "$indentString$string";
+	}
+}
+
+sub _convert_object_to_string_key {
+	my $key = shift;
+	my $value = shift;
+	my $printKey = $key;
+	if (is_hash($value)) { $printKey = make_color($key, ['green', 'bold']); }
+	elsif (is_array($value)) { $printKey = make_color($key, ['azure', 'bold']); }
+	else { $printKey = make_color($key, ['gray', 'bold']); }
+	return $printKey;
+}
+sub convert_object_to_string {
+	my $object = shift;
+	my $level = shift || 0;
+	
+	my $string = '';
+	my $spacing = '.   ';
+	if (termSupportsColors()) { $spacing = make_color('+---', 'silver'); }
+	my $indent = $spacing x $level;
+	
+	if (is_hash($object)) {
+		if (is_hash_with_content($object)) {
+			my $opening = make_color('{', ['green', 'bold']);
+			my $closing = make_color('}', ['green', 'bold']);
+			
+			if ($object =~ /^(.*?)=HASH/) {
+				my $printObject = make_color($1, 'teal');
+				$string .= "$printObject $opening\n";
+			} else {
+				$string .= "$opening\n";
+			}
+			my $max = 0;
+			while (my($key, $value) = each(%{$object})) {
+				if ((length($key) > $max) && (length($key) <= 20)) { $max = length($key); }
+			}
+			foreach my $key (sort { byAny($a,$b) } keys %{$object}) {
+				my $value = $object->{$key};
+				my $printKey = _convert_object_to_string_key($key, $value);
+				my $tempMax = $max + length($printKey) - length($key) ;
+				$string .= sprintf("%s%s%-${tempMax}s => ", $indent, $spacing, $printKey);
+				$string .= convert_object_to_string($value, $level + 1);
+			}
+			$string .= "$indent$closing\n";
+		} else {
+			$string .= "{}\n";
+		}
+	} elsif (is_array($object)) {
+		if (is_array_with_content($object)) {
+			my $opening = make_color('[', ['blue', 'bold']);
+			my $closing = make_color(']', ['blue', 'bold']);
+			$string .= "$opening\n";
+			my $arrayLength = @{$object};
+			my $max = length($arrayLength);
+			if ($max > 20) { $max = 20; }
+			my $key = 0;
+			foreach my $value (@{$object}) {
+				my $fullKey = sprintf("[%${max}s]", $key);
+				my $printKey = _convert_object_to_string_key($fullKey, $value);
+				$string .= sprintf("%s%s%s => ", $indent, $spacing, $printKey);
+				$string .= convert_object_to_string($value, $level + 1);
+				$key++;
+			}
+			$string .= "$indent$closing\n";
+		} else {
+			$string .= "[]\n";
+		}
+	} elsif (ref($object) eq 'CODE') {
+		my $cv = svref_2object ( $object );
+		my $gv = $cv->GV;
+		my $printObject = make_color("sub " . $gv->NAME, 'blue');
+		$string .= "$printObject\n";
+	} elsif (ref($object) eq 'SCALAR') {
+		${$object} =~ s/\n/\\n/gm;
+		${$object} =~ s/\r/\\r/gm;
+		my $printObject = make_color('"' . ${$object} . '"', 'maroon');
+		$string .= "scalar $printObject\n";
+	} elsif (ref($object)) {
+		my $printObject = make_color($object, 'olive');
+		$string .= "$printObject\n";
+	} elsif (!defined($object)) {
+		my $printObject = make_color('undef', 'line');
+		$string .= "$printObject\n";
+	} else {
+		$object =~ s/\n/\\n/gm;
+		$object =~ s/\r/\\r/gm;
+		my $printObject = make_color('"' . $object . '"', 'maroon');
+		$string .= "$printObject\n";
+	}
+	return $string;
 }
 
 

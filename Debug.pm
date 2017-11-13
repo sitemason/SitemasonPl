@@ -1,5 +1,4 @@
-package SitemasonPl::Debug;
-$VERSION = '8.0';
+package SitemasonPl::Debug 8.0;
 
 =head1 NAME
 
@@ -14,6 +13,7 @@ Debug contains timer, logging, and Leftronic dashboard functions.
 =cut
 
 
+use v5.012;
 use strict;
 use utf8;
 use constant TRUE => 1;
@@ -48,7 +48,7 @@ sub new {
 		client		=> $arg{client},
 		errors		=> []
 	};
-	if (!isArray($arg{logTags})) { $self->{logTags} = [$arg{logTags}]; }
+	if (!is_array($arg{logTags})) { $self->{logTags} = [$arg{logTags}]; }
 	if ($arg{indent}) { $self->{indent} = '    '; }
 	if ($arg{label}) { $self->{timerArgs}->{label} = $arg{label}; }
 	if (defined($arg{header}) && !$arg{header}) { $self->{header} = FALSE; }
@@ -265,7 +265,7 @@ sub timerResults {
 	my $self = shift || return;
 	my $message = shift;
 	my $req;
-	if (isObject($message)) { $req = $message; undef $message; }
+	if (is_object($message)) { $req = $message; undef $message; }
 	$self->{timer} || return;
 	my $threshold = $self->{locale}->{timer_threshold} || 4;
 	my $testThreshold = $self->{locale}->{test_threshold};
@@ -438,7 +438,7 @@ sub post {
 	
 	$error->{levelNum} = $self->_convertToErrorNum($error->{level});
 	
-	if ($error->{tags} && !isArray($error->{tags})) { $error->{tags} = [$error->{tags}]; }
+	if ($error->{tags} && !is_array($error->{tags})) { $error->{tags} = [$error->{tags}]; }
 	
 	my ($line) = (caller($start))[2]; $start++;
 	my ($package, $parentLine) = (caller($start))[3,2]; $start++;
@@ -577,7 +577,7 @@ sub printList {
 	my $array = shift;
 	my $header = shift;
 	my $args = shift;
-	isArray($array) || return;
+	is_array($array) || return;
 	
 	my $max = $header;
 	foreach my $item (@{$array}) {
@@ -660,12 +660,12 @@ sub _includeStatus {
 	my $errorTagList = shift;
 	my $searchTagList = shift;
 	
-	if (isArrayWithContent($searchTagList)) {
+	if (is_array_with_content($searchTagList)) {
 		foreach my $searchTag (@{$searchTagList}) {
 			my $testTag = $searchTag; my $isPos = 1; my $found;
 			if ($searchTag =~ /^\!(.+)$/) { $testTag = $1; $isPos = 0; $found = 1; }
 			
-			if (isArrayWithContent($errorTagList)) {
+			if (is_array_with_content($errorTagList)) {
 				foreach my $errorTag (@{$errorTagList}) {
 					if (!$isPos && ($1 eq $errorTag)) { undef($found); last; }
 					elsif ($isPos && ($searchTag eq $errorTag)) { $found = 1; }
@@ -878,7 +878,7 @@ EOM
 			my $value = $data->{$name};
 			if (ref($value) eq 'DateTime') {
 				printf STDERR ("$indent${tabs}%-20s DateTime: %s %s %s\n", $name, $value->ymd, $value->hms, $value->time_zone_long_name);
-			} elsif (isBoolean($value)) {
+			} elsif (is_boolean($value)) {
 				printf STDERR ("$indent${tabs}%-20s Boolean: %s\n", $name, $value);
 			} elsif (ref($value)) {
 				printf STDERR ("$indent${tabs}%-20s REF: %s\n", $name, $value);
@@ -905,17 +905,17 @@ sub toString {
 	my $value = shift;
 	my $shouldQuote = shift;
 	my $string;
-	if (isHash($value)) {
+	if (is_hash($value)) {
 		my @keys = keys(%{$value});
 		my @out;
 		foreach my $key (sort @keys) { push(@out, "$key: '$value->{$key}'"); }
 		$string = '{ ' . join(', ', @out) . ' }';
 	}
-	elsif (isArray($value)) {
+	elsif (is_array($value)) {
 		$string .= "['" . join("', '", @{$value}) . "']";
 	}
 	elsif (!defined($value)) { $string = '<N>'; }
-	elsif (($value eq ($value+0)) && isPosInt($value)) { $string = $value + 0; }
+	elsif (($value eq ($value+0)) && is_pos_int($value)) { $string = $value + 0; }
 	elsif ($value) {
 		if ($shouldQuote) { $string = "'$value'"; }
 		else { $string = "$value"; }
@@ -968,7 +968,7 @@ sub pause {
 	my $self = shift || return;
 	my $seconds = shift || return;
 	my $displayStart = shift;
-	isPosInt($seconds) || return;
+	is_pos_int($seconds) || return;
 	
 	if (!$self->{isPerson}) { sleep $seconds; return; }
 	
@@ -1065,7 +1065,7 @@ sub truncate {
 	my $self = shift || return;
 	my $text = shift || return '';
 	my $width = shift || return $text;
-	isPosInt($width) || return $text;
+	is_pos_int($width) || return $text;
 	
 	if (length($text) > $width) {
 		return substr($text, 0, $width - 1) . '…';
@@ -1163,20 +1163,20 @@ sub sendToLeftronic {
 	my $apiKey = 'leftronic_api_key';
 	my $json = { accessKey => $apiKey };
 	
-	if (isText($streams)) {
+	if (is_text($streams)) {
 		$json->{streamName} = $streams;
-		if (isText($points) && ($points eq 'clear')) {
+		if (is_text($points) && ($points eq 'clear')) {
 			$json->{command} = 'clear';
-		} elsif (isHash($points) || isArray($points)) {
+		} elsif (is_hash($points) || is_array($points)) {
 			$json->{point} = $points;
 		}
-	} elsif (isHash($streams)) {
+	} elsif (is_hash($streams)) {
 		$json->{streams} = [];
 		while (my($streamName, $points) = each(%{$streams})) {
 			my $stream = { streamName => $streamName };
-			if (isText($stream->{command}) && ($stream->{command} eq 'clear')) {
+			if (is_text($stream->{command}) && ($stream->{command} eq 'clear')) {
 				$stream->{command} = 'clear';
-			} elsif (isHash($points) || isArray($points)) {
+			} elsif (is_hash($points) || is_array($points)) {
 				$stream->{point} = $points;
 			} else {
 				$self->warning("Invalid hash stream");
@@ -1185,15 +1185,15 @@ sub sendToLeftronic {
 			}
 			push(@{$json->{streams}}, $stream);
 		}
-	} elsif (isArray($streams)) {
+	} elsif (is_array($streams)) {
 		$json->{streams} = [];
 		foreach my $stream (@{$streams}) {
-			if (isText($stream->{streamName})) {
-				if (isText($stream->{command}) && ($stream->{command} eq 'clear')) {
+			if (is_text($stream->{streamName})) {
+				if (is_text($stream->{command}) && ($stream->{command} eq 'clear')) {
 					push(@{$json->{streams}}, $stream);
-				} elsif (isHash($stream->{point}) || isArray($stream->{point})) {
+				} elsif (is_hash($stream->{point}) || is_array($stream->{point})) {
 					push(@{$json->{streams}}, $stream);
-				} elsif (isText($stream->{point})) {
+				} elsif (is_text($stream->{point})) {
 					push(@{$json->{streams}}, $stream);
 				} else {
 					$self->warning("Invalid array stream");
@@ -1242,8 +1242,8 @@ sub sendToLeftronicNotice {
 	my $streamName = shift || return;
 	my $messages = shift;
 	my $debug = shift;
-	if (isText($messages)) { $messages = [$messages]; }
-	if (!isArray($messages)) { return; }
+	if (is_text($messages)) { $messages = [$messages]; }
+	if (!is_array($messages)) { return; }
 	
 	my $displayTime = localtime();
 	$displayTime =~ s/(^\w+\s+|:\d+\s+\d+$)//g;
@@ -1289,12 +1289,12 @@ sub mapToLeftronic {
 	my $options = shift;
 	
 	my $long;
-	if (isHash($longOrOptions)) { $options = $longOrOptions; }
-	elsif (isNumber($longOrOptions)) { $long = $longOrOptions; }
+	if (is_hash($longOrOptions)) { $options = $longOrOptions; }
+	elsif (is_number($longOrOptions)) { $long = $longOrOptions; }
 	
 	my $points = toLatLongHash($coords, $long);
-	if (!isArray($points)) { $points = [$points]; }
-	if (!isArrayHash($points)) {
+	if (!is_array($points)) { $points = [$points]; }
+	if (!is_array_hash($points)) {
 		$self->warning("Invalid coordinates");
 		$self->printObject($coords, '$coords');
 		return;
@@ -1309,14 +1309,14 @@ sub mapToLeftronic {
 		$points = _cropLeftronicPoints($options->{map}, $points);
 	}
 	
-	if (!isArrayWithContent($points)) { return; }
+	if (!is_array_with_content($points)) { return; }
 	return $self->sendToLeftronic($streamName, $points, $options->{debug});
 }
 
 sub _cropLeftronicPoints {
 	my $map = shift || return;
 	my $points = shift || return;
-	if (!isArrayWithContent($points)) { return; }
+	if (!is_array_with_content($points)) { return; }
 	my $cropped = [];
 	foreach my $point (@{$points}) {
 		if (lc($map) eq 'us') {
@@ -1354,7 +1354,7 @@ sub _cropLeftronicPoints {
 			if ($isInMap) { push(@{$cropped}, $point); }
 		}
 	}
-	if (isArrayWithContent($cropped)) { return $cropped; }
+	if (is_array_with_content($cropped)) { return $cropped; }
 	return;
 }
 
@@ -1374,7 +1374,7 @@ sub mapSquareToLeftronic {
 	my $buffer = .03;
 	my $color = 'red';
 	my $map;
-	if (isHash($options)) {
+	if (is_hash($options)) {
 		$color = $options->{color} || $color;
 		$map = $options->{map};
 		$buffer = $options->{buffer} || $buffer;
@@ -1478,7 +1478,7 @@ sub new {
 	bless $self, $class;
 	
 	$self->connectToActionDB || return;
-	($self->{start_timestamp}) = $self->{actionDBH}->selectRowArray("SELECT CURRENT_TIMESTAMP");
+	($self->{start_timestamp}) = $self->{actionDBH}->selectrow_array("SELECT CURRENT_TIMESTAMP");
 	
 	return $self;
 }
@@ -1542,7 +1542,7 @@ sub end {
 	
 	$self->connectToActionDB || return;
 	
-	my $settings = $self->{actionDBH}->selectAllArrayhash("
+	my $settings = $self->{actionDBH}->selectall_arrayhash("
 		SELECT * FROM action_leftronics_thresholds ORDER BY source, source_arg
 	");
 	
@@ -1614,7 +1614,7 @@ sub logToActionDB {
 			VALUES ($qsource, $qsource_arg, $qthreat_level, $qdetails, $qstart_timestamp, CURRENT_TIMESTAMP, $qisCompleted)
 		", $debug);
 		if ($rv > 0) {
-			($self->{id}) = $self->{actionDBH}->selectRowArray("SELECT last_insert_id()");
+			($self->{id}) = $self->{actionDBH}->selectrow_array("SELECT last_insert_id()");
 			return TRUE;
 		}
 	}
@@ -1652,8 +1652,8 @@ use SitemasonPl::Common;
 sub new {
 	my ($class, %arg) = @_;
 	$class || return;
-	isObject($arg{debug}) || return;
-	isArray($arg{columns}) || return;
+	is_object($arg{debug}) || return;
+	is_array($arg{columns}) || return;
 	
 	my $self = {
 		debug		=> $arg{debug},
@@ -1889,13 +1889,13 @@ sub getRow {
 	my $line;
 	delete $self->{wasLabel};
 	
-	isHash($row) || return;
+	is_hash($row) || return;
 	my $length = 1;
 	foreach my $column (@{$self->{columns}}) {
-		if (isArrayWithContent($row->{$column->{name}})) {
+		if (is_array_with_content($row->{$column->{name}})) {
 			if (@{$row->{$column->{name}}} > $length) { $length = @{$row->{$column->{name}}}; }
 		}
-		if (isHashWithContent($row->{$column->{name}})) {
+		if (is_hash_with_content($row->{$column->{name}})) {
 			my $size = keys(%{$row->{$column->{name}}});
 			if ($size > $length) { $length = $size; }
 		}
@@ -1907,11 +1907,11 @@ sub getRow {
 		foreach my $column (@{$self->{columns}}) {
 			my $width = $column->{width};
 			my $text;
-			if (isArray($row->{$column->{name}})) {
+			if (is_array($row->{$column->{name}})) {
 				if ($i < @{$row->{$column->{name}}}) {
 					$text = "[$i]: " . $self->{debug}->toString($row->{$column->{name}}->[$i], TRUE);
 				}
-			} elsif (isHash($row->{$column->{name}})) {
+			} elsif (is_hash($row->{$column->{name}})) {
 				my @keys = sort keys(%{$row->{$column->{name}}});
 				if ($i < @keys) {
 					$text = $keys[$i] . ": " . $self->{debug}->toString($row->{$column->{name}}->{$keys[$i]}, TRUE);
@@ -1921,7 +1921,7 @@ sub getRow {
 			}
 			my ($style, $color, $format);
 			if ($column->{format}) { $format = TRUE; }
-			if (isHash($args)) {
+			if (is_hash($args)) {
 				if ($args->{style} && $self->{debug}->{term}->{$args->{style}}) { $style = $args->{style}; }
 				if ($args->{color} && $self->{debug}->{term}->{$args->{color}}) { $color = $args->{color}; }
 				if ($args->{$column->{name}}) {
@@ -2047,7 +2047,7 @@ sub get {
 	
 	$self->connectToActionDB || return;
 	
-	my ($json) = $self->{mcpDBH}->selectRowArray("
+	my ($json) = $self->{mcpDBH}->selectrow_array("
 		SELECT json FROM script_preferences WHERE script = $self->{qscript}
 	");
 	
@@ -2072,7 +2072,7 @@ sub set {
 	
 	if ($key !~ /^\w+$/) { $self->{debug}->error("Invalid key"); return; }
 	if (!$value) { delete $self->{prefs}->{$key}; }
-	elsif (!isHashWithContent($value) && !isArrayWithContent($value) && ref($value)) { $self->{debug}->error("Invalid value"); return; }
+	elsif (!is_hash_with_content($value) && !is_array_with_content($value) && ref($value)) { $self->{debug}->error("Invalid value"); return; }
 	else { $self->{prefs}->{$key} = $value; }
 	
 	$self->save;
@@ -2092,11 +2092,11 @@ sub save {
 	$self->connectToActionDB || return;
 	
 	my $qjson = 'NULL';
-	if (isHashWithContent($self->{prefs})) {
+	if (is_hash_with_content($self->{prefs})) {
 		my $json = makeJSON($self->{prefs}, { compress => 1 });
 		$qjson = $self->{mcpDBH}->quote($json);
 	}
-	my ($id) = $self->{mcpDBH}->selectRowArray("
+	my ($id) = $self->{mcpDBH}->selectrow_array("
 		SELECT id FROM script_preferences WHERE script = $self->{qscript}
 	");
 	if ($id) {

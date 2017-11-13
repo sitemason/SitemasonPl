@@ -1,5 +1,4 @@
-package SitemasonPl::Mail;
-$VERSION = '8.0';
+package SitemasonPl::Mail 8.0;
 
 =head1 NAME
 
@@ -13,6 +12,7 @@ A common system for sending mail.
 
 =cut
 
+use v5.012;
 use strict;
 use utf8;
 use constant TRUE => 1;
@@ -35,15 +35,10 @@ This uses the Database module to look up server and user settings. Send dbHost a
 
 userId is not required, but is encouraged for setting Return-Path and using user smtp settings. If writing a script that will send mail from multiple users, this may be specified at the time mail is sent.
 
- my $mail = SitemasonPl::Mail->new( userId => $userId );
-
  my $mail = SitemasonPl::Mail->new(
- 	userId	=> $userId,
- 	
- 	dbHost	=> $dbHost,
- 	dbPort	=> $dbPort,
- 	
- 	dbh		=> $dbh,
+ 	smtpHostname	=> $smtpHostname,
+	smtpUsername	=> $smtpUsername,
+	smtpPassword	=> $smtpPassword,
 	
 	# pass original script's debug to share timing and logging
 	debug		=> $debug
@@ -57,7 +52,10 @@ sub new {
 	my ($class, %arg) = @_;
 	$class || return;
 	my $self = {
-		dbh		=> $arg{dbh},	# required
+		smtpHostname	=> $arg{smtpHostname},
+		smtpUsername	=> $arg{smtpUsername},
+		smtpPassword	=> $arg{smtpPassword},
+		isSMTPSSL		=> TRUE,
 		log		=> {
 			send	=> 0,
 			db		=> 0
@@ -76,68 +74,7 @@ sub new {
 	}
 	$self->{debug}->call;
 	
-# 	unless ($self->{dbh}) { $self->{debug}->critical("No database handler available. Exiting from SitemasonPl::Mail"); return; }
-	
-	if ($self->{dbh}) {
-		my $locale = $self->{dbh}->selectallHashref("
-			select name, description from locale where name = 'local_mail' or name like 'smtp_%' or name = 'hostname'
-		", 'name', $self->{log}->{db});
-		$self->{localMail} = $locale->{localMail}->{description};
-		$self->{smtpHostname} = $locale->{smtpHostname}->{description};
-		$self->{smtpUsername} = $locale->{smtpUsername}->{description};
-		$self->{smtpPassword} = $locale->{smtpPassword}->{description};
-		$self->{isSMTPSSL} = $locale->{isSMTPSSL}->{description};
-		$self->{hostname} = $locale->{hostname}->{description};
-		my ($emailAddress, $smtpHostname, $smtpUsername, $smtpPassword, $isSMTPSSL, $hasCheckedSMTP) = $self->getUserSMTP($arg{userId});
-		$self->{userEmailAddress} = $emailAddress;
-		$self->{userId} = $arg{userId};
-		$self->{hasCheckedSMTP} = $hasCheckedSMTP;
-		if ($smtpHostname) {
-			$self->{userSMTPHostname} = $smtpHostname;
-			$self->{userSMTPUsername} = $smtpUsername;
-			$self->{userSMTPPassword} = $smtpPassword;
-			$self->{userIsSMTPSSL} = $isSMTPSSL;
-		}
-	} else {
-		$self->{smtpHostname} = 'secure.emailsrvr.com:465';
-		$self->{smtpUsername} = 'websites@sitemasonhost.com';
-		$self->{smtpPassword} = 'web-smtp';
-		$self->{isSMTPSSL} = TRUE;
-	}
-	
-	if ($self->{smtpHostname} || $self->{userSMTPHostname} || $self->{localMail}) { $self->{canSend} = 1; }
-	
 	return $self;
-}
-
-
-#=====================================================
-
-=head2 B<getUserSMTP>
-
-Returns the email address and smtp settings of the given user. Mainly for internal use.
-
- $mail->getUserSMTP($userId);
-
-=cut
-#=====================================================
-sub getUserSMTP {
-	my $self = shift || return; $self->{debug}->call;
-	my $userId = shift || return;
-	$self->{dbh} || return;
-	
-	my $quserOid = $self->{dbh}->quote($userId);
-	my ($emailAddress) = $self->{dbh}->selectrowArray("
-		select email_address
-		from user_contact
-		where user_oid = $quserOid
-	", $self->{log}->{db});
-	my ($smtpHostname, $smtpUsername, $smtpPassword, $isSMTPSSL, $hasCheckedSMTP) = $self->{dbh}->selectRowArray("
-		select smtp_hostname, smtp_username, smtp_password, is_smtp_ssl, has_checked_smtp
-		from basic_user_prefs
-		where user_oid = $quserOid
-	", $self->{log}->{db});
-	return ($emailAddress, $smtpHostname, $smtpUsername, $smtpPassword, $isSMTPSSL, $hasCheckedSMTP);
 }
 
 
@@ -170,7 +107,7 @@ sub cleanAddress {
 	foreach my $to (@to) {
 		$to =~ s/(?:^.*<|>.*$)//g;
 		$to =~ s/\s+//g;
-		if (isEmail($to)) {
+		if (is_email($to)) {
 			push(@new, $to);
 		}
 	}
@@ -198,11 +135,11 @@ sub sendTest {
 	my $self = shift || return; $self->{debug}->call;
 	my $mail = shift || return;
 	
-	$mail->{header} ||= 'Sent from Sitemason mail test';
-	$mail->{subject} ||= 'Test of SMTP settings from Sitemason';
+	$mail->{header} ||= 'Sent from mail test';
+	$mail->{subject} ||= 'Test of SMTP settings';
 	$mail->{from} ||= $mail->{testEmail};
 	$mail->{to} ||= $mail->{testEmail};
-	$mail->{body} ||= 'This is a test message from Sitemason. Since you received this, your SMTP settings in Sitemason are working properly and Sitemason will be able to send mail for you.';
+	$mail->{body} ||= 'This is a test message. Since you received this, your SMTP settings are working properly and we will be able to send mail for you.';
 	
 	my $message = $self->sendMail($mail);
 	return $message;
@@ -217,9 +154,7 @@ Sends an email to the specified SMTP server. from and to are required. Returns t
 
 from, to, cc, and bcc can be a scalar, array, or keys in a hash. fromName, toName, and ccName can also be sent and will be included if it makes sense.
 
-header - if set, will be included under the X-Sitemason header in the email.
-
-app - if set, will be included in the X-Mailer header in the email.
+x-mailer - if set, will be included under the x-mailer header.
 
 type - if set, will be included in the Content-Type header in the email.
 
@@ -233,7 +168,6 @@ userId - Can be used by scripts to specify a different user for each call of sen
 
  my $message = $mail->sendMail( {
 	header		=> "Sent from <$url>",
-	app			=> "Calendar",
 	stripHtml	=> 1,
 	from		=> $fromAddress,
 	to			=> $toAddress,
@@ -243,8 +177,7 @@ userId - Can be used by scripts to specify a different user for each call of sen
 
  my $message = $mail->sendMail( {
 	header		=> "Sent from <$url>",
-	'x-mailer'	=> "Sitemason Calendar",
-	app			=> "Calendar",
+	'x-mailer'	=> "My App",
 	precedence	=> "bulk",
 	
 	type		=> 'text/html',
@@ -285,20 +218,6 @@ sub sendMail {
 		$smtpUsername = $mail->{smtpUsername};
 		$smtpPassword = $mail->{smtpPassword};
 		$isSMTPSSL = $mail->{isSMTPSSL};
-	} elsif ($mail->{userId} && ($mail->{userId} != $self->{userId})) {
-		# Warning: This should only be used in scripts that need to mail from multiple users.
-		($userEmailAddress, $smtpHostname, $smtpUsername, $smtpPassword, $isSMTPSSL) = $self->getUserSMTP($mail->{userId});
-		unless ($smtpHostname) {
-			$smtpHostname = $self->{smtpHostname};
-			$smtpUsername = $self->{smtpUsername};
-			$smtpPassword = $self->{smtpPassword};
-			$isSMTPSSL = $self->{isSMTPSSL};
-		}
-	} elsif ($self->{userSMTPHostname}) {
-		$smtpHostname = $self->{userSMTPHostname};
-		$smtpUsername = $self->{userSMTPUsername};
-		$smtpPassword = $self->{userSMTPPassword};
-		$isSMTPSSL = $self->{userIsSMTPSSL};
 	} elsif ($self->{smtpHostname}) {
 		$smtpHostname = $self->{smtpHostname};
 		$smtpUsername = $self->{smtpUsername};
@@ -306,7 +225,7 @@ sub sendMail {
 		$isSMTPSSL = $self->{isSMTPSSL};
 	}
 	
-	unless ($smtpHostname || $self->{localMail}) { return; }
+	$smtpHostname || return;
 	if ($smtpHostname && ($smtpHostname !~ /^([a-z0-9-]+\.)+[a-z]{2,6}(?::\d+)?$/)) { return; }
 	
 	my $from = refToScalar($mail->{from}, ', ');
@@ -350,29 +269,26 @@ EOL
 Subject: $subject
 EOL
 	
-	my $sitemason = "X-Mailer: Sitemason Content Management System <http://www.sitemason.com/>\n";
+	my $addlheaders = "X-Mailer: SitemasonPL mail library <https://github.com/sitemason>\n";
 	if ($mail->{'x-mailer'}) {
-		$sitemason = "X-Mailer: " . $mail->{'x-mailer'} . "\n";
-	} elsif ($mail->{app}) {
-		$sitemason = "X-Mailer: Sitemason $mail->{app} <http://www.sitemason.com/>\n";
+		$addlheaders = "X-Mailer: " . $mail->{'x-mailer'} . "\n";
 	}
-	if ($mail->{header}) { $sitemason .= "X-Sitemason: $mail->{header}\n"; }
-	if ($userEmailAddress) { $sitemason .= "Return-Path: $userEmailAddress\n"; }
-	if ($mail->{precedence} eq 'bulk') { $sitemason .= "Precedence: bulk\n"; }
+	if ($userEmailAddress) { $addlheaders .= "Return-Path: $userEmailAddress\n"; }
+	if ($mail->{precedence} eq 'bulk') { $addlheaders .= "Precedence: bulk\n"; }
 	
 	# Catch formatted bodies
-	if (isHash($mail->{body})) {
+	if (is_hash($mail->{body})) {
 		$mail->{body} = [$mail->{body}];
 	}
-	if (isArray($mail->{body})) {
-		($mail->{mimeBoundary}, $mail->{body}) = $self->formatSitemasonMail($mail->{body});
+	if (is_array($mail->{body})) {
+		($mail->{mimeBoundary}, $mail->{body}) = $self->formatMail($mail->{body});
 	}
 	
 	if ($mail->{mimeBoundary}) {
-		$sitemason .= "MIME-Version: 1.0\n";
-		$sitemason .= 'Content-Type: multipart/alternative; boundary="' . $mail->{mimeBoundary} . "\"\n";
+		$addlheaders .= "MIME-Version: 1.0\n";
+		$addlheaders .= 'Content-Type: multipart/alternative; boundary="' . $mail->{mimeBoundary} . "\"\n";
 	}
-	elsif ($mail->{type}) { $sitemason .= "Content-Type: $mail->{type}\n"; }
+	elsif ($mail->{type}) { $addlheaders .= "Content-Type: $mail->{type}\n"; }
 	
 	my $body = "\n" . $mail->{body};
 	if ($mail->{stripHTML}) {
@@ -397,7 +313,7 @@ EOL
 		if ($debug) {
 			my $message = <<"EOL";
 Sending via Net::SMTP to $smtpHostname
-$header$sitemason$body
+$header$addlheaders$body
 EOL
 			$self->{debug}->debug($message);
 			if ($isSMTPSSL) {
@@ -461,7 +377,7 @@ EOL
 		
 		$smtp->data();
 		$smtp->datasend($header);
-		$smtp->datasend($sitemason);
+		$smtp->datasend($addlheaders);
 		$smtp->datasend($body);
 		$smtp->dataend();
 		$smtp->quit;
@@ -470,22 +386,6 @@ EOL
 		} else {
 			$self->{debug}->notice("Email sent to $to", { header => 0 });
 		}
-	} elsif ($self->{localMail}) {
-		if ($debug) {
-			my $message = <<"EOL";
-Piping to /var/qmail/bin/qmail-inject
-$header$sitemason$body
-EOL
-			$self->{debug}->notice($message);
-		}
-		unless (open(MAIL,"|/var/qmail/bin/qmail-inject")) {
-			$self->{debug}->alert("Could not open pipe to qmail-inject");
-		}
-		print MAIL <<"EOL";
-$header$sitemason$body
-EOL
-		close(MAIL);
-		unless ($debug) { $self->{debug}->notice("Email sent to $to"); }
 	}
 	
 	my $message = $header . $body;
@@ -498,7 +398,7 @@ EOL
 
 =head2 B<sendStoredEmail>
 
-Main method for sending Sitemason-formatted emails. Emails should be defined in getEmailTemplate().
+Main method for sending formatted emails. Emails should be defined in getEmailTemplate().
 
  $mail->sendStoredEmail($name, $data);
 
@@ -510,10 +410,10 @@ sub sendStoredEmail {
 	my $data = shift;
 	
 	my $template = $self->getEmailTemplate($name);
-	if (!isHash($template)) { $self->{debug}->debug('Mail template "' . $name . '" does not exist'); return; }
-	isArray($template->{body}) || return;
+	if (!is_hash($template)) { $self->{debug}->debug('Mail template "' . $name . '" does not exist'); return; }
+	is_array($template->{body}) || return;
 	
-	if (isHash($data)) {
+	if (is_hash($data)) {
 		if ($data->{app}) { $template->{app} = $data->{app}; }
 		if ($data->{fromName}) { $template->{fromName} = $data->{fromName}; }
 		if ($data->{from}) { $template->{from} = $data->{from}; }
@@ -530,17 +430,17 @@ sub sendStoredEmail {
 
 #=====================================================
 
-=head2 B<formatSitemasonMail>
+=head2 B<formatMail>
 
 =cut
 #=====================================================
-sub formatSitemasonMail {
+sub formatMail {
 	my $self = shift || return;
 	my $message = shift || return;
 	
 	my $indent = "							";
 	my $html;
-	my $plain = "SITEMASON BUILD ON US\n-----------------------\n\n";
+	my $plain = "EXAMPLE COMPANY\n-----------------------\n\n";
 	my $cnt;
 	foreach my $section (@{$message}) {
 		if (!$cnt) {
@@ -565,9 +465,9 @@ EOL
 			$plain .= $section->{title} . "\n\n";
 		}
 		if ($section->{body} && !ref($section->{body})) { $section->{body} = [$section->{body}]; }
-		if (isArrayWithContent($section->{body})) {
+		if (is_array_with_content($section->{body})) {
 			foreach my $paragraph (@{$section->{body}}) {
-				if (isHash($paragraph)) {
+				if (is_hash($paragraph)) {
 					$plain .= $paragraph->{text} . "\n\n";
 					my $align;
 					if ($paragraph->{align}) { $align = ' style="text-align:' . $paragraph->{align} . ';"'; }
@@ -593,11 +493,11 @@ EOL
 		$cnt++;
 	}
 	
-	$plain .= "-- \nSITEMASON | 110 30TH AVE NORTH, SUITE 5 | NASHVILLE, TN 37203 | 615-301-2600\n\n\n";
-	my $htmlBody = getSitemasonHTMLTemplate();
+	$plain .= "-- \nEXAMPLE, ADDRESS | PHONE\n\n\n";
+	my $htmlBody = getHTMLTemplate();
 	$htmlBody =~ s/\$\{body\}/$html/;
 	
-	my $boundary = generateKey;
+	my $boundary = generate_key;
 	my $emailBody = <<"EOL";
 --$boundary
 Content-Type: text/plain
@@ -613,31 +513,13 @@ EOL
 	return ($boundary, $emailBody);
 }
 
-sub getSitemasonHTMLTemplate {
+sub getHTMLTemplate {
 	return <<"EOL";
 <html style="margin: 0;padding: 0;">
 <head></head>
 <body style="margin: 0;padding: 0;">
 <div>
-	<table align="center" border="0" cellpadding="0" cellspacing="0" style="background:#202a2f url(http://www.sitemason.com/email/bg.gif); font-family: 'Open Sans',helvetica,arial,sans-serif; color: #333; text-align: left;" width="100%">
-		<tr>
-			<td align="center" valign="top" style="padding: 0 0 50px 0;" width="100%">
-				<table border="0" cellpadding="0" cellspacing="0" width="610" align="center">
-					<tr>
-						<td style="padding: 10px 0 0 0;">
-							<a href="http://www.sitemason.com"><img alt="Sitemason" border="0" height="100" src="http://www.sitemason.com/email/logo-large.png" width="650"/></a>
-						</td>
-					</tr>
 \${body}
-					<tr>
-						<td>
-							<p style="color: #fff;text-align: center;font-size: 12px;margin: 10px 0 0 0;letter-spacing: 1px;">SITEMASON <span style="color: #4d6571;padding: 0 5px;">|</span> 110 30TH AVE NORTH, SUITE 5 <span style="color: #4d6571;padding: 0 5px;">|</span> NASHVILLE, TN 37203 <span style="color: #4d6571;padding: 0 5px;">|</span> 615-301-2600</p>
-						</td>
-					</tr>
-				</table>
-			</td>
-		</tr>
-	</table>
 </div>
 <style>
 \@import url("http://fonts.googleapis.com/css?family=Open+Sans:400,700,900");
@@ -683,112 +565,24 @@ sub getEmailTemplate {
 	my $template = {
 		signup => {
 			app			=> "Signup",
-			from_name	=> 'Sitemason Support',
-			from		=> 'support@sitemason.com',
-			subject		=> 'Welcome to Sitemason',
+			from_name	=> 'Support',
+			from		=> 'support@example.com',
+			subject		=> 'Welcome to Example',
 			body		=> [ {
-				title		=> 'Welcome to Sitemason',
+				title		=> 'Welcome to Example',
 				body		=> 'Thanks for signing up! You can login anytime from http://${hostname}/login with your username ${username}.${emailMessage}'
 			}, {
-				title		=> 'Sitemason Resources',
 				body		=> [
-					'Get the most out of Sitemason by checking out the documentation on our <a href="http://www.sitemason.com/support">support</a> site. Join the conversation in our <a href="http://support.sitemason.com/categories/5947-Community-Forums">Community Forums</a>, or spend some time reviewing the <a href="http://www.sitemason.com/community/resources/">Resources</a> section to find helpful guides and recommendations. Developers will feel right at home with our <a href="http://www.sitemason.com/developers">Developer Documentation</a>.',
-					'Need help with development, design, or marketing services? Reach out to one of our incredible <a href="http://www.sitemason.com/community/partners">Partners</a> to find the best of the best.  Also, don\'t forget to subscribe to our <a href="http://www.sitemason.com/about/news">Blog</a> to keep up on industry best practices and the goings-on in the Sitemason community.'
-				]
-			}, {
-				body		=> [
-					'Ready to dig in? Click below to launch the Sitemason Getting Started Guide for new users.',
+					'Ready to start? Click below to launch the Getting Started Guide.',
 					{
 						align	=> 'center',
-						html	=> '<a href="http://support.sitemason.com/entries/21517824-Getting-Started-with-Sitemason-6"><img src="http://www.sitemason.com/email/getting-started.png" alt="Getting Started Guide" title="Getting Started Guide" /></a>',
-						text	=> 'Getting Started Guide - http://support.sitemason.com/entries/21517824-Getting-Started-with-Sitemason-6'
+						html	=> '<a href="http://example.com/Getting-Started">Getting Started Guide</a>',
+						text	=> 'Getting Started Guide - http://example.com/Getting-Started'
 					},
-					'<br>Thanks for choosing to Build On Us,<br>The Sitemason Team'
-				]
-			} ]
-		},
-		
-		folderSharing => {
-			app			=> "Folder Sharing",
-			from_name	=> 'Sitemason Support',
-			from		=> 'support@sitemason.com',
-			subject		=> 'Sitemason Site Sharing',
-			body		=> [ {
-				title		=> 'Site Sharing',
-				body		=> '${shareText}'
-			}, {
-				title		=> 'Instructions',
-				body		=> [
-					'To accept this invitation, click the following link:',
-					'http://${hostname}/sharing?shareKey=${key}',
-					'This invitation expires in 3 days.'
-				]
-			} ]
-		},
-		
-		forgotPassword => {
-			app			=> "Forgot Password",
-			from_name	=> 'Sitemason Support',
-			from		=> 'support@sitemason.com',
-			subject		=> 'Sitemason Password Reset',
-			body		=> [ {
-				title		=> 'Password Reset',
-				body		=> [
-					'A request was made to reset your password. If you did not make that request, there is nothing you need to do and your password will remain the same.',
-					'If you did make this request, follow the instructions below.'
-				]
-			}, {
-				title		=> 'Instructions',
-				body		=> [
-					'To reset your password, click the following link:',
-					'http://${hostname}/reset?resetKey=${key}',
-					'This link expires in 3 days.'
-				]
-			} ]
-		},
-		
-		accountChange => {
-			app			=> "Account Change",
-			from_name	=> 'Sitemason Support',
-			from		=> 'support@sitemason.com',
-			subject		=> 'Sitemason Account Change',
-			body		=> [ {
-				title		=> 'Account Change',
-				body		=> '${changeText}'
-			}, {
-				title		=> 'Instructions',
-				body		=> [
-					'If you made this change, you don\'t need to do anything else.',
-					'If you did not make this change, please contact support@sitemason.com immediately.'
-				]
-			} ]
-		},
-		
-		sslReminder => {
-			app			=> "SSL Certificate Renewal",
-			from_name	=> 'Sitemason Hostmaster',
-			from		=> 'hostmaster@sitemason.com',
-			subject		=> 'Sitemason SSL Certificate Renewal',
-			body		=> [ {
-				title		=> 'SSL Certificate Renewal',
-				body		=> 'It is time to renew the SSL certificate for the ${hostname} website.${expiration} Renewal is complex and requires many steps. However, Sitemason takes care of all but one of those steps for you. You must approve the renewal process for your SSL certificate to be generated. Follow the instructions below to approve your new SSL certificate.'
-			}, {
-				title		=> 'Instructions',
-				body		=> [
-					'Within the next day, an email will be sent to ${admin_email} from sslorders@geotrust.com asking for approval.',
-					'1) Click the link in the email to go to the appoval web page.',
-					'2) Click the &quot;I Approve&quot; button.',
-					'That\'s it!'
-				]
-			}, {
-				title		=> 'More Information',
-				body		=> [
-					'Reply to this email if you have any questions or changes.',
-					'For more information, read about <a href="http://www.sitemason.com/about/news/secure-site-hosting.693176">Sitemason Secure Site Hosting</a> on our support website.'
+					'<br>Thanks for choosing us'
 				]
 			} ]
 		}
-		
 	};
 	
 	return $template->{$name};

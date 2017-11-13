@@ -1,5 +1,4 @@
-package SitemasonPl::Normalize;
-$VERSION = '8.0';
+package SitemasonPl::Normalize 8.0;
 
 =head1 NAME
 
@@ -12,6 +11,7 @@ SitemasonPl::Normalize
 
 =cut
 
+use v5.012;
 use strict;
 use utf8;
 use constant TRUE => 1;
