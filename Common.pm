@@ -41,8 +41,8 @@ our @EXPORT = qw(get_answer read_cookie generate_password
 	is_boolean is_text is_json is_pos_int is_number is_ordinal is_array is_array_with_content is_hash is_hash_with_content is_hash_key is_array_hash is_array_hash_with_content is_object
 	isDomain isHostname isEmail isIPv4 isIPv6 getDomainName isStateCode getStateCode getRegionCode getRegionAliases getPostalCode getCountryCode getMonth
 	round significant percent max min isClose summarizeNumber summarizeBytes makeOrdinal pluralize join_text
-	arrayLength first value ref_to_scalar refToScalar array_to_list arrayToList list_to_array listToArray listToArrayAuto addToList removeFromArray to_array to_hash toList toHash
-	arrayhash_to_hashhash toHashHash array_to_hash arrayToHash unique_array uniqueArray contains by_any max_length
+	arrayLength first value ref_to_scalar refToScalar array_to_list arrayToList list_to_array listToArray list_to_array_auto add_to_list remove_from_array to_array to_list to_hash
+	arrayhash_to_hashhash to_hash_hash array_to_hash arrayToHash unique_array uniqueArray contains by_any max_length
 	unique compare compress_var compressRef merge_hashes mergeHashes newHash copyRef joinRef diff
 	check_id checkId encode_id encodeId encode6_id encode6Id decode_id decodeId unique_key uniqueKey generateKey smmd5_2008 smsha2012 makeDigest
 	normalize strip strip_extra_white_space stripExtraWhiteSpace stripControlCharacters clean_filename cleanFilename strip_html stripHTML stripHTMLLink stripOutside
@@ -3525,15 +3525,15 @@ sub listToArray {
 
 #=====================================================
 
-=head2 B<listToArrayAuto>
+=head2 B<list_to_array_auto>
 
-Given a string, listToArrayAuto guesses at a list delimiter, then returns an array of the list items with details about the parsing.
+Given a string, list_to_array_auto guesses at a list delimiter, then returns an array of the list items with details about the parsing.
 
- my ($array, $delimiter, $firstLine, $lastLine, $leadingSpace) = listToArrayAuto($string);
+ my ($array, $delimiter, $firstLine, $lastLine, $leadingSpace) = list_to_array_auto($string);
 
 =cut
 #=====================================================
-sub listToArrayAuto {
+sub list_to_array_auto {
 	my $string = shift;
 	
 	my @list;
@@ -3587,11 +3587,11 @@ sub listToArrayAuto {
 
 #=====================================================
 
-=head2 B<addToList>
+=head2 B<add_to_list>
 
 =cut
 #=====================================================
-sub addToList {
+sub add_to_list {
 	my $list = shift;
 	my $delimiter = shift;
 	my $array = to_array($list);
@@ -3604,20 +3604,20 @@ sub addToList {
 
 #=====================================================
 
-=head2 B<removeFromArray>
+=head2 B<remove_from_array>
 
 Remove a list of items from the specified list.
 
- my $newList = removeFromArray($bigList, $item, [$item, ...]);
+ my $newList = remove_from_array($bigList, $item, [$item, ...]);
 
 =cut
 #=====================================================
-sub removeFromArray {
+sub remove_from_array {
 	my $list = shift || return;
 	my @remove = @_;
 	
 	if (ref($list) eq 'ARRAY') {
-		my $remove = toHash(\@remove);
+		my $remove = to_hash(\@remove);
 		my $newArray = [];
 		foreach my $item (@{$list}) {
 			unless ($remove->{$item}) { push(@{$newArray}, $item); }
@@ -3698,23 +3698,23 @@ sub to_array {
 
 #=====================================================
 
-=head2 B<toList>
+=head2 B<to_list>
 
 Should do better at distinguishing delimiter vs. key.
 
 Wrapper for to_array to make a delimited list based on output from to_array.
 
- $array = toList($arrayhash, $key, $delimiter);
- $array = toList($hashhash, $key, $delimiter);
- $array = toList($arrayarray, $delimiter);
- $array = toList($hasharray, $delimiter);
- $array = toList($array, $delimiter);
- $array = toList($hash, $delimiter);
- $array = toList($scalar, $delimiter);
+ $array = to_list($arrayhash, $key, $delimiter);
+ $array = to_list($hashhash, $key, $delimiter);
+ $array = to_list($arrayarray, $delimiter);
+ $array = to_list($hasharray, $delimiter);
+ $array = to_list($array, $delimiter);
+ $array = to_list($hash, $delimiter);
+ $array = to_list($scalar, $delimiter);
 
 =cut
 #=====================================================
-sub toList {
+sub to_list {
 	my $list = shift || return '';
 	my $key = shift;
 	my $delimiter = shift;
@@ -3729,18 +3729,17 @@ sub toList {
 
 #=====================================================
 
-=head2 B<toHash>
+=head2 B<to_hash>
 
- $hash = toHash($hash, $keyName, $valueName);
- $hash = toHash($arrayhash, $keyName, $valueName);
- $hash = toHash($arrayarray, undef, $value);
- $hash = toHash($array, undef, $value);
- $hash = toHash($scalar, undef, $value);
+ $hash = to_hash($hash, $keyName, $valueName);
+ $hash = to_hash($arrayhash, $keyName, $valueName);
+ $hash = to_hash($arrayarray, undef, $value);
+ $hash = to_hash($array, undef, $value);
+ $hash = to_hash($scalar, undef, $value);
 
 =cut
 #=====================================================
-sub to_hash { return toHash(@_); }
-sub toHash {
+sub to_hash {
 	my $list = shift || return;
 	my $key = shift;
 	my $value = shift;
@@ -3789,16 +3788,16 @@ sub toHash {
 
 #=====================================================
 
-=head2 B<toHashHash>
+=head2 B<to_hash_hash>
 
 Given an array of hashes, this will return a hash of hashes using the value of the specified key as the key.
 
- $hash = toHashHash($arrayhash, $key);
+ $hash = to_hash_hash($arrayhash, $key);
 
 =cut
 #=====================================================
-sub arrayhash_to_hashhash { return toHashHash(@_); }
-sub toHashHash {
+sub arrayhash_to_hashhash { return to_hash_hash(@_); }
+sub to_hash_hash {
 	my $list = shift || return;
 	my $key = shift || return;
 	
@@ -3828,7 +3827,7 @@ sub arrayToHash {
 	my $array = shift || return;
 	my $value = shift || 1;
 	
-	return toHash($array, undef, $value);
+	return to_hash($array, undef, $value);
 }
 
 
@@ -4535,7 +4534,7 @@ sub makeDigest {
 # 	return newArray;
 # }
 # 
-# sub removeFromArray(_array, _item) {
+# sub remove_from_array(_array, _item) {
 # 	var newArray = new Array();
 # 	for (var i = 0; i < _array.length; i++) {
 # 		if (_array[i] != _item) { newArray.push(_array[i]); }
