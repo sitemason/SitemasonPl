@@ -26,7 +26,6 @@ use Encode qw(from_to is_utf8 decode);
 use JSON;
 use LWP::UserAgent;
 use Math::Trig qw(deg2rad pi great_circle_distance asin acos);
-use Term::ReadLine::Tiny;
 use Text::Unidecode;
 # use XML::Parser::Expat;
 use Time::gmtime;
