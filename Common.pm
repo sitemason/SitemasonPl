@@ -26,6 +26,7 @@ use Encode qw(from_to is_utf8 decode);
 use JSON;
 use LWP::UserAgent;
 use Math::Trig qw(deg2rad pi great_circle_distance asin acos);
+use Term::ReadLine::Tiny;
 use Text::Unidecode;
 # use XML::Parser::Expat;
 use Time::gmtime;
@@ -33,7 +34,7 @@ use Unicode::Collate;
 
 require Exporter;
 our @ISA = qw(Exporter);
-our @EXPORT = qw(get_answer read_cookie generate_password
+our @EXPORT = qw(read_cookie generate_password
 	get_filename_utc_minute get_filename_utc_hour get_filename_utc_date convert_arrays_to_csv read_file_list read_file write_file
 	get_url post_url parse_query_string url_decode url_encode
 	parse_json make_json make_json parse_xml make_xml jsonify xmlify
@@ -49,41 +50,8 @@ our @EXPORT = qw(get_answer read_cookie generate_password
 	insertData summarize context to_camel_case from_camel_case is_camel_case camel_case kebab_case snake_case
 	toLatLong toLatLongHash toCoordinates distanceInMiles lookUpIP identifyNIC
 	convertStringToDateTime convertStringToEpoch convertDateTimeToString getDurationSummary getEstimatedTimeRemaining
-	is_person get_term_color make_color bold print_bold say_bold mark
-	print_object convert_object_to_string
+	get_unique_name
 );
-
-
-sub get_answer {
-#=====================================================
-
-=head2 B<get_answer>
-
- defined(my $answer = get_answer) || return;
- defined(my $answer = get_answer($array_of_inputs) || return;
-
-$array_of_answers is an array of inputs that should be used before STDIN. Good for grabbing some advance answers in the original command line args.
-
-=cut
-#=====================================================
-	my $inputs = shift;
-	my $answer;
-	print scalar get_term_color('bold');
-	if (is_array_with_content($inputs)) {
-		$answer = shift(@{$inputs});
-		print "$answer\n";
-	} else {
-		$answer = <STDIN>;
-	}
-	print scalar get_term_color('reset');
-	if (ord($answer) == 0) { print "\n"; return; }
-	if ($answer =~ /^exit/) { print "\n"; return; }
-	chomp($answer);
-	$answer =~ s/(?:^\s+|\s+$)//g;
-	if (!length($answer)) { return ""; }
-	if (!$answer) { return '0'; }
-	return $answer;
-}
 
 
 sub read_cookie {
@@ -632,9 +600,9 @@ sub make_json {
 	if ($compress) { $tabs = $tabsplus = $space = $n = ''; }
 	
 	if (ref($data) eq 'HASH') {
-		foreach my $name (sort _by_hash_key (keys(%{$data}))) {
-			if ($name !~ /^\w/i) { next; }
-			if ($name =~ /\W/) { next; }
+		foreach my $name (sort { by_any($a,$b) } (keys(%{$data}))) {
+# 			if ($name !~ /^\w/i) { next; }
+			if ($name =~ /[^a-zA-Z0-9_:-]/) { next; }
 			my $value = $data->{$name};
 			if (ref($value) eq 'SCALAR') { $value = ${$value}; }
 			if (is_boolean($value)) {
@@ -1314,6 +1282,7 @@ sub _unvfileify {
 	return $icsValue;
 }
 
+sub is_boolean {
 #=====================================================
 
 =head2 B<is_boolean>
@@ -1322,7 +1291,6 @@ sub _unvfileify {
 
 =cut
 #=====================================================
-sub is_boolean {
 	my $value = shift;
 	if (ref($value) =~ /\bBoolean$/i) {
 		return TRUE;
@@ -1330,6 +1298,7 @@ sub is_boolean {
 	return undef;
 }
 
+sub is_text {
 #=====================================================
 
 =head2 B<is_text>
@@ -1338,7 +1307,6 @@ sub is_boolean {
 
 =cut
 #=====================================================
-sub is_text {
 	my $value = shift;
 	if (!ref($value) && defined($value)) {
 		if ($value =~ /\S/) {
@@ -1348,6 +1316,7 @@ sub is_text {
 	return undef;
 }
 
+sub is_json {
 #=====================================================
 
 =head2 B<is_json>
@@ -1356,7 +1325,6 @@ sub is_text {
 
 =cut
 #=====================================================
-sub is_json {
 	my $value = shift;
 	if (!ref($value) && defined($value)) {
 		if (($value =~ /^\s*\{/) && ($value =~ /\}\s*$/)) { return TRUE; }
@@ -1365,6 +1333,7 @@ sub is_json {
 	return undef;
 }
 
+sub is_pos_int {
 #=====================================================
 
 =head2 B<is_pos_int>
@@ -1374,7 +1343,6 @@ sub is_json {
 
 =cut
 #=====================================================
-sub is_pos_int {
 	my $value = shift;
 	my $min = shift;
 	my $max = shift;
@@ -1389,6 +1357,7 @@ sub is_pos_int {
 	return undef;
 }
 
+sub is_number {
 #=====================================================
 
 =head2 B<is_number>
@@ -1400,7 +1369,6 @@ Started with a simple number to text comparison, then it got out of hand. If the
 
 =cut
 #=====================================================
-sub is_number {
 	my $value = shift;
 	my $min = shift;
 	my $max = shift;
@@ -1438,6 +1406,7 @@ sub is_number {
 	return undef;
 }
 
+sub is_ordinal {
 #=====================================================
 
 =head2 B<is_ordinal>
@@ -1446,12 +1415,12 @@ sub is_number {
 
 =cut
 #=====================================================
-sub is_ordinal {
 	my $ordinal = shift;
 	
 	if ($ordinal =~ /^[1-9]\d*(?:st|n[dt]|r[dt]|th)$/i) { return TRUE; }
 }
 
+sub is_array {
 #=====================================================
 
 =head2 B<is_array>
@@ -1460,24 +1429,24 @@ Returns 1 if the argument is an array ref and has one or more elements.
 
 =cut
 #=====================================================
-sub is_array {
 	my $array = shift || return;
 	if (ref($array) eq 'ARRAY') { return TRUE; }
 	return;
 }
 
+sub is_array_with_content {
 #=====================================================
 
 =head2 B<is_array_with_content>
 
 =cut
 #=====================================================
-sub is_array_with_content {
 	my $array = shift || return;
 	if (is_array($array) && @{$array}) { return TRUE; }
 	return;
 }
 
+sub is_hash {
 #=====================================================
 
 =head2 B<is_hash>
@@ -1486,24 +1455,24 @@ Returns positive if the argument is a hash ref.
 
 =cut
 #=====================================================
-sub is_hash {
 	my $hash = shift || return;
 	if ((ref($hash) eq 'HASH') || ($hash =~ /=HASH\(/)) { return TRUE; }
 	return;
 }
 
+sub is_hash_with_content {
 #=====================================================
 
 =head2 B<is_hash_with_content>
 
 =cut
 #=====================================================
-sub is_hash_with_content {
 	my $hash = shift || return;
 	if (is_hash($hash) && keys(%{$hash})) { return TRUE; }
 	return;
 }
 
+sub is_hash_key {
 #=====================================================
 
 =head2 B<is_hash_key>
@@ -1512,7 +1481,6 @@ sub is_hash_with_content {
 
 =cut
 #=====================================================
-sub is_hash_key {
 	my $hash = shift || return;
 	my $key = shift || return;
 	if (is_hash($hash) && exists($hash->{$key})) { return TRUE; }
@@ -1520,6 +1488,7 @@ sub is_hash_key {
 }
 
 
+sub is_array_hash {
 #=====================================================
 
 =head2 B<is_array_hash>
@@ -1533,7 +1502,6 @@ Does not recurse.
 
 =cut
 #=====================================================
-sub is_array_hash {
 	my $array = shift || return;
 	my $answer;
 	if (ref($array) eq 'ARRAY') {
@@ -1548,18 +1516,19 @@ sub is_array_hash {
 	return;
 }
 
+sub is_array_hash_with_content {
 #=====================================================
 
 =head2 B<is_array_hash_with_content>
 
 =cut
 #=====================================================
-sub is_array_hash_with_content {
 	my $array = shift || return;
 	if (is_array_hash($array) && @{$array}) { return TRUE; }
 	return;
 }
 
+sub is_object {
 #=====================================================
 
 =head2 B<is_object>
@@ -1568,19 +1537,18 @@ Returns positive if the argument is an object.
 
 =cut
 #=====================================================
-sub is_object {
 	my $object = shift || return;
 	if ((ref($object) =~ /::/) && is_hash($object)) { return TRUE; }
 	return;
 }
 
+sub isDomain {
 #=====================================================
 
 =head2 B<isDomain>
 
 =cut
 #=====================================================
-sub isDomain {
 	my $domain = lc(shift) || return;
 	
 	# http://data.iana.org/TLD/tlds-alpha-by-domain.txt
@@ -5786,304 +5754,6 @@ sub getEstimatedTimeRemaining {
 	return $output;
 }
 
-sub is_person {
-	if (($ENV{TERM} && ($ENV{TERM} ne 'dumb') && ($ENV{TERM} ne 'tty')) || $ENV{SSH_AUTH_SOCK}) {
-		return TRUE;
-	}
-}
-
-sub _term_supports_colors {
-	if ($ENV{TERM} && ($ENV{TERM} ne 'dumb') && ($ENV{TERM} ne 'tty')) { return TRUE; }
-}
-
-sub _get_term_color_numbers {
-	# https://en.wikipedia.org/wiki/ANSI_escape_code
-	# https://en.wikipedia.org/wiki/Web_colors
-	my $debug = shift;
-	if (!$debug && is_hash($MonkeynessPl::Common::TermColors)) { return $MonkeynessPl::Common::TermColors; }
-	
-	my $colors = [
-		{ name => 'reset',			num => 0 },
-		{ name => 'default',		num => 39 },
-		{ name => 'defaultBg',		num => 49 },
-		
-		{ name => 'bold',			num => 1 },	# reset 21 # yes
-		{ name => 'faint',			num => 2 },	# reset 22 # yes
-		{ name => 'italic',			num => 3 },	# reset 23
-		{ name => 'underline',		num => 4 },	# reset 24 # yes
-		{ name => 'blink',			num => 5 },	# reset 25 # yes
-		{ name => 'rapid',			num => 6 },	# reset 26
-		{ name => 'inverse',		num => 7 },	# reset 27 # yes
-		{ name => 'conceal',		num => 8 },	# reset 28 # yes
-		{ name => 'crossed',		num => 9 },	# reset 29
-		
-		{ name => 'white',			num => 97 },
-		{ name => 'silver',			num => 37 },
-		{ name => 'gray',			num => 90 },
-		{ name => 'black',			num => 30 },
-		
-		{ name => 'red',			num => 91 },
-		{ name => 'maroon',			num => 31 },
-		{ name => 'yellow',			num => 93 },
-		{ name => 'olive',			num => 33 },
-		{ name => 'lime',			num => 92 },
-		{ name => 'green',			num => 32 },
-		{ name => 'cyan',			num => 96 },
-		{ name => 'teal',			num => 36 },
-		{ name => 'blue',			num => 94 },
-		{ name => 'azure',			num => 34 },
-		{ name => 'pink',			num => 95 },
-		{ name => 'magenta',		num => 35 },
-		
-		{ name => 'whiteBg',		num => 107 },
-		{ name => 'silverBg',		num => 47 },
-		{ name => 'grayBg',			num => 100 },
-		{ name => 'blackBg',		num => 40 },
-		
-		{ name => 'redBg',			num => 101 },
-		{ name => 'maroonBg',		num => 41 },
-		{ name => 'yellowBg',		num => 103 },
-		{ name => 'oliveBg',		num => 43 },
-		{ name => 'limeBg',			num => 102 },
-		{ name => 'greenBg',		num => 42 },
-		{ name => 'cyanBg',			num => 106 },
-		{ name => 'tealBg',			num => 46 },
-		{ name => 'blueBg',			num => 104 },
-		{ name => 'azureBg',		num => 44 },
-		{ name => 'pinkBg',			num => 105 },
-		{ name => 'magentaBg',		num => 45 }
-	];
-	my $colorRef = {};
-	for (my $color = 0; $color < @{$colors}; $color++) {
-		my $item = $colors->[$color];
-		$colorRef->{$item->{name}} = $item->{num};
-		if ($debug) {
-			my $s = "\e[$item->{num}"; my $e = "\e[0m";
-			if ($color < 12) {
-				printf("%14s: ${s}m%s$e\n", $item->{name}, $item->{name});
-			} else {
-				if ($color == 12) {
-					my $header = sprintf("%14s  %-14s %-14s %-14s %-14s", '', 'default', 'bold', 'faint', 'inverse');
-					print "\n" . make_color($header, ['bold', 'underline']) . "\n";
-					printf("%14s: \e[39m%-14s$e \e[39;1m%-14s$e \e[39;2m%-14s$e \e[39;7m%-14s$e\n", 'default', 'default', 'default', 'default', 'default');
-				} elsif ($color == 28) {
-					print "\n";
-				}
-				my $name = $item->{name};
-				$name =~ s/Bg$//;
-				printf("%14s: ${s}m%-14s$e ${s};1m%-14s$e ${s};2m%-14s$e ${s};7m%-14s$e\n", $name, $name, $name, $name, $name);
-			}
-		}
-	}
-	if ($debug) { print "\n"; }
-	$MonkeynessPl::Common::TermColors = $colorRef;
-	return $colorRef;
-}
-sub get_term_color {
-	# my $colorCode = get_term_color($colorName);
-	my $name = shift;
-	if ($name && _term_supports_colors()) {
-		my $colors = _get_term_color_numbers;
-		if (defined($colors->{$name})) {
-			return sprintf("\e[%dm", $colors->{$name});
-		}
-	}
-	return '';
-}
-
-sub make_color {
-	my $text = shift;
-	my $color = shift || 'bold';
-	my $bg = shift;
-	_term_supports_colors() || return $text;
-	my $debug = shift;
-	
-	if ($bg) {
-		if (is_array($color)) { push(@{$color}, "${bg}Bg"); }
-		else { $color = [$color, "${bg}Bg"]; }
-	}
-	
-	my $colorNumbers = _get_term_color_numbers($debug);
-	if (is_array($color)) {
-		my @colorList;
-		foreach my $item (@{$color}) {
-			if ($colorNumbers->{$item}) { push(@colorList, $colorNumbers->{$item}); }
-		}
-		@colorList || return $text;
-		return sprintf("\e[%sm%s\e[0m", join(';', @colorList), $text);
-	} elsif ($colorNumbers->{$color}) {
-		return sprintf("\e[%dm%s\e[0m", $colorNumbers->{$color}, $text);
-	}
-	return $text;
-}
-
-sub resetColor {
-	my $colors = get_term_color();
-	if (exists($colors->{reset})) { return $colors->{reset}; }
-	return '';
-}
-
-sub bold {
-	return make_color(shift, 'bold');
-}
-
-sub print_bold {
-	print make_color(shift, 'bold');
-}
-
-sub say_bold {
-	print make_color(shift, 'bold') . "\n";
-}
-
-sub mark {
-	my $label = shift;
-	if ($label) { $label .= ' '; }
-	
-	my @returns = caller(1);
-	my $location = "$returns[3] - Line $returns[2]";
-	if (!@returns) { @returns = caller(0); $location = "$returns[1] - Line $returns[2]"; }
-	
-	state $counter = 0;
-	print make_color(' ' . $counter++ . ' ', ['bold', 'inverse']) . 
-		bold(" ${label}===> $location") . "\n";
-}
-
-sub print_object {
-#=====================================================
-
-=head2 B<print_object>
-
-	my $string = 'string';
-	my $function = sub { print "Lambda\n"; };
-	my $function2 = \&readCustomerConfig;
-	my $object = {
-		test => 'sdflkj',
-		very_extra_long_key_name => 1,
-		a => TRUE,
-		an_array => [1, 'blue', undef, "Something with a\nnewline", { a => 0, b => 1, longer => 2 }, 6, 7, 8, [], 9, 10, 11],
-		undefined => undef,
-		scalarref => \$string,
-		function => $function,
-		function2 => $function2,
-		object => $self,
-		emptyHash => {},
-		emptyArray => []
-	};
-	
-	print_object($object, 'My Object', 5);
-	print_object('test', 'My String', 5);
-	print_object('test', undef, 5);
-	print_object([], undef, 5);
-	print_object($function2, undef, 5);
-
-=cut
-#=====================================================
-	my $object = shift;
-	my $label = shift || '';
-	my $indent = shift || 0;
-	
-	if ($label) { $label = make_color($label, 'bold'); }
-	my $string = convert_object_to_string($object);
-	my $indentString = ' ' x $indent;
-	$string =~ s/\n/\n$indentString/gs;
-	$string =~ s/$indentString$//;
-	if ($label) {
-		print "$indentString$label: $string";
-	} else {
-		print "$indentString$string";
-	}
-}
-
-sub _convert_object_to_string_key {
-	my $key = shift;
-	my $value = shift;
-	my $printKey = $key;
-	if (is_hash($value)) { $printKey = make_color($key, ['green', 'bold']); }
-	elsif (is_array($value)) { $printKey = make_color($key, ['azure', 'bold']); }
-	else { $printKey = make_color($key, ['gray', 'bold']); }
-	return $printKey;
-}
-sub convert_object_to_string {
-	my $object = shift;
-	my $level = shift || 0;
-	
-	my $string = '';
-	my $spacing = '.   ';
-	if (_term_supports_colors()) { $spacing = make_color('+---', 'silver'); }
-	my $indent = $spacing x $level;
-	
-	if (is_hash($object)) {
-		if (is_hash_with_content($object)) {
-			my $opening = make_color('{', ['green', 'bold']);
-			my $closing = make_color('}', ['green', 'bold']);
-			
-			if ($object =~ /^(.*?)=HASH/) {
-				my $printObject = make_color($1, 'teal');
-				$string .= "$printObject $opening\n";
-			} else {
-				$string .= "$opening\n";
-			}
-			my $max = 0;
-			while (my($key, $value) = each(%{$object})) {
-				if ((length($key) > $max) && (length($key) <= 20)) { $max = length($key); }
-			}
-			foreach my $key (sort { by_any($a,$b) } keys %{$object}) {
-				my $value = $object->{$key};
-				my $printKey = _convert_object_to_string_key($key, $value);
-				my $tempMax = $max + length($printKey) - length($key) ;
-				$string .= sprintf("%s%s%-${tempMax}s => ", $indent, $spacing, $printKey);
-				$string .= convert_object_to_string($value, $level + 1);
-			}
-			$string .= "$indent$closing\n";
-		} else {
-			$string .= "{}\n";
-		}
-	} elsif (is_array($object)) {
-		if (is_array_with_content($object)) {
-			my $opening = make_color('[', ['blue', 'bold']);
-			my $closing = make_color(']', ['blue', 'bold']);
-			$string .= "$opening\n";
-			my $arrayLength = @{$object};
-			my $max = length($arrayLength);
-			if ($max > 20) { $max = 20; }
-			my $key = 0;
-			foreach my $value (@{$object}) {
-				my $fullKey = sprintf("[%${max}s]", $key);
-				my $printKey = _convert_object_to_string_key($fullKey, $value);
-				$string .= sprintf("%s%s%s => ", $indent, $spacing, $printKey);
-				$string .= convert_object_to_string($value, $level + 1);
-				$key++;
-			}
-			$string .= "$indent$closing\n";
-		} else {
-			$string .= "[]\n";
-		}
-	} elsif (ref($object) eq 'CODE') {
-		my $cv = svref_2object ( $object );
-		my $gv = $cv->GV;
-		my $printObject = make_color("sub " . $gv->NAME, 'blue');
-		$string .= "$printObject\n";
-	} elsif (ref($object) eq 'SCALAR') {
-		${$object} =~ s/\n/\\n/gm;
-		${$object} =~ s/\r/\\r/gm;
-		my $printObject = make_color('"' . ${$object} . '"', 'maroon');
-		$string .= "scalar $printObject\n";
-	} elsif (ref($object)) {
-		my $printObject = make_color($object, 'olive');
-		$string .= "$printObject\n";
-	} elsif (!defined($object)) {
-		my $printObject = make_color('undef', 'line');
-		$string .= "$printObject\n";
-	} else {
-		$object =~ s/\n/\\n/gm;
-		$object =~ s/\r/\\r/gm;
-		my $printObject = make_color('"' . $object . '"', 'maroon');
-		$string .= "$printObject\n";
-	}
-	return $string;
-}
-
-
 
 
 #=====================================================
@@ -6393,7 +6063,78 @@ sub convert_object_to_string {
 # 	return $valueList;
 # }
 
+#=====================================================
 
+=head2 B<New functions>
+
+=cut
+#=====================================================
+
+sub _get_list_of_names {
+	state $names = [
+		{ short => 'Bilbo',			long => 'Bilbo Baggins',				tags => ['hobbit'],		source => 'The Hobbit' },
+		{ short => 'Baggins',		long => 'Bilbo Baggins',				tags => ['hobbit'],		source => 'The Hobbit' },
+		{ short => 'Baggins',		long => 'Bungo Baggins',				tags => ['hobbit'],		source => 'The Hobbit' },
+		{ short => 'Belladonna',	long => 'Belladonna Took',				tags => ['hobbit'],		source => 'The Hobbit' },
+		{ short => 'Took',			long => 'The Old Took',					tags => ['hobbit'],		source => 'The Hobbit' },
+		{ short => 'Chubb',			long => 'Chubb, Chubb, and Burrowes',	tags => ['hobbit'],		source => 'The Hobbit' },
+		{ short => 'Burrowes',		long => 'Chubb, Chubb, and Burrowes',	tags => ['hobbit'],		source => 'The Hobbit' },
+		{ short => 'Bullroarer',	long => 'Bullroarer Took',				tags => ['hobbit'],		source => 'The Hobbit' },
+		{ short => 'Gandalf',		long => 'Gandalf, the Grey',			tags => ['wizard'],		source => 'The Hobbit' },
+		{ short => 'Radagast',		long => 'Radagast, the Brown',			tags => ['wizard'],		source => 'The Hobbit' },
+		{ short => 'Dain',			long => 'Dain Ironfoot',				tags => ['dwarf'],		source => 'The Hobbit' },
+		{ short => 'Náin',			long => 'Náin',							tags => ['dwarf'],		source => 'The Hobbit' },
+		{ short => 'Thorin',		long => 'Thorin Oakenshield',			tags => ['dwarf'],		source => 'The Hobbit' },
+		{ short => 'Thráin',		long => 'Thráin',						tags => ['dwarf'],		source => 'The Hobbit' },
+		{ short => 'Thrór',			long => 'Thrór',						tags => ['dwarf'],		source => 'The Hobbit' },
+		{ short => 'Fíli',			long => 'Fíli',							tags => ['dwarf'],		source => 'The Hobbit' },
+		{ short => 'Kíli',			long => 'Kíli',							tags => ['dwarf'],		source => 'The Hobbit' },
+		{ short => 'Balin',			long => 'Balin',						tags => ['dwarf'],		source => 'The Hobbit' },
+		{ short => 'Dwalin',		long => 'Dwalin',						tags => ['dwarf'],		source => 'The Hobbit' },
+		{ short => 'Óin',			long => 'Óin',							tags => ['dwarf'],		source => 'The Hobbit' },
+		{ short => 'Glóin',			long => 'Glóin',						tags => ['dwarf'],		source => 'The Hobbit' },
+		{ short => 'Dori',			long => 'Dori',							tags => ['dwarf'],		source => 'The Hobbit' },
+		{ short => 'Nori',			long => 'Nori',							tags => ['dwarf'],		source => 'The Hobbit' },
+		{ short => 'Ori',			long => 'Ori',							tags => ['dwarf'],		source => 'The Hobbit' },
+		{ short => 'Bifur',			long => 'Bifur',						tags => ['dwarf'],		source => 'The Hobbit' },
+		{ short => 'Bofur',			long => 'Bofur',						tags => ['dwarf'],		source => 'The Hobbit' },
+		{ short => 'Bombur',		long => 'Bombur',						tags => ['dwarf'],		source => 'The Hobbit' },
+		{ short => 'Elrond',		long => 'Elrond',						tags => ['elf'],		source => 'The Hobbit' },
+		{ short => 'Thranduil',		long => 'Thranduil',					tags => ['elf'],		source => 'The Hobbit' },
+		{ short => 'Galion',		long => 'Galion',						tags => ['elf'],		source => 'The Hobbit' },
+		{ short => 'Bard',			long => 'Bard the Bowman',				tags => ['man'],		source => 'The Hobbit' },
+		{ short => 'Beorn',			long => 'Beorn',						tags => ['man'],		source => 'The Hobbit' },
+		{ short => 'Tom',			long => 'Tom',							tags => ['troll'],		source => 'The Hobbit' },
+		{ short => 'Bert',			long => 'Bert',							tags => ['troll'],		source => 'The Hobbit' },
+		{ short => 'William',		long => 'Bill Huggins',					tags => ['troll'],		source => 'The Hobbit' },
+		{ short => 'Gollum',		long => 'Gollum',						tags => ['other'],		source => 'The Hobbit' },
+		{ short => 'Sauron',		long => 'Sauron',						tags => ['other'],		source => 'The Hobbit' },
+		{ short => 'Smaug',			long => 'Smaug',						tags => ['dragon'],		source => 'The Hobbit' },
+		{ 							long => 'Lord of the Eagles',			tags => ['eagle,bird'],	source => 'The Hobbit' },
+		{ short => 'Carc',			long => 'Carc',							tags => ['raven,bird'],	source => 'The Hobbit' },
+		{ short => 'Roäc',			long => 'Roäc',							tags => ['raven,bird'],	source => 'The Hobbit' },
+		{ 							long => 'Great Goblin',					tags => ['goblin,orc'],	source => 'The Hobbit' },
+		{ short => 'Bolg',			long => 'Bolg',							tags => ['goblin,orc'],	source => 'The Hobbit' },
+		{ short => 'Golfimbul',		long => 'Golfimbul',					tags => ['goblin,orc'],	source => 'The Hobbit' },
+	];
+	return $names;
+}
+sub get_unique_name {
+	my $type = shift || 'short';
+	if ($type !~ /^(short|long)$/) { $type = 'short'; }
+	state $name_list = [];
+	if (!is_array_with_content($name_list)) {
+		my $names = _get_list_of_names;
+		my $name_map = {};
+		foreach my $name (@{$names}) {
+			$name->{$type} || next;
+			my $clean_name = kebab_case(normalize($name->{$type}, TRUE));
+			$name_map->{$clean_name} = TRUE;
+		}
+		@{$name_list} = keys(%{$name_map});
+	}
+	return $name_list->[int(rand(@{$name_list}))];
+}
 
 
 
