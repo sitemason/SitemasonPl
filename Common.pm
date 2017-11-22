@@ -40,7 +40,7 @@ our @EXPORT = qw(read_cookie generate_password
 	html_entities_to_text to_html_entities from_html_entities convert_to_utf8 read_vfile
 	is_boolean is_text is_json is_pos_int is_number is_ordinal is_array is_array_with_content is_hash is_hash_with_content is_hash_key is_array_hash is_array_hash_with_content is_object
 	isDomain isHostname isEmail isIPv4 isIPv6 getDomainName isStateCode getStateCode getRegionCode getRegionAliases getPostalCode getCountryCode getMonth
-	round significant percent max min isClose summarizeNumber summarizeBytes makeOrdinal pluralize join_text
+	round significant percent max min is_close summarizeNumber summarizeBytes makeOrdinal pluralize join_text
 	arrayLength first value ref_to_scalar refToScalar array_to_list arrayToList list_to_array listToArray list_to_array_auto add_to_list remove_from_array to_array to_list to_hash
 	arrayhash_to_hashhash to_hash_hash array_to_hash arrayToHash unique_array uniqueArray contains by_any max_length
 	unique compare compress_var compressRef merge_hashes mergeHashes newHash copyRef joinRef diff
@@ -1428,9 +1428,16 @@ Returns 1 if the argument is an array ref and has one or more elements.
 
 =cut
 #=====================================================
-	my $array = shift || return;
-	if (ref($array) eq 'ARRAY') { return TRUE; }
-	return;
+	my $ref = shift || return;
+	my $keys = shift;
+	
+	if (!defined($keys)) {
+		if (ref($ref) eq 'ARRAY') { return TRUE; }
+		return;
+	}
+	
+	my $value = value($ref, $keys);
+	return is_array($value);
 }
 
 sub is_array_with_content {
@@ -1440,9 +1447,16 @@ sub is_array_with_content {
 
 =cut
 #=====================================================
-	my $array = shift || return;
-	if (is_array($array) && @{$array}) { return TRUE; }
-	return;
+	my $ref = shift || return;
+	my $keys = shift;
+	
+	if (!defined($keys)) {
+		if ((ref($ref) eq 'ARRAY') && @{$ref}) { return TRUE; }
+		return;
+	}
+	
+	my $value = value($ref, $keys);
+	return is_array_with_content($value);
 }
 
 sub is_hash {
@@ -1454,9 +1468,16 @@ Returns positive if the argument is a hash ref.
 
 =cut
 #=====================================================
-	my $hash = shift || return;
-	if ((ref($hash) eq 'HASH') || ($hash =~ /=HASH\(/)) { return TRUE; }
-	return;
+	my $ref = shift || return;
+	my $keys = shift;
+	
+	if (!defined($keys)) {
+		if ((ref($ref) eq 'HASH') || ($ref =~ m/=HASH\(/)) { return TRUE; }
+		return;
+	}
+	
+	my $value = value($ref, $keys);
+	return is_hash($value);
 }
 
 sub is_hash_with_content {
@@ -1466,9 +1487,16 @@ sub is_hash_with_content {
 
 =cut
 #=====================================================
-	my $hash = shift || return;
-	if (is_hash($hash) && keys(%{$hash})) { return TRUE; }
-	return;
+	my $ref = shift || return;
+	my $keys = shift;
+	
+	if (!defined($keys)) {
+		if (((ref($ref) eq 'HASH') || ($ref =~ m/=HASH\(/)) && keys(%{$ref})) { return TRUE; }
+		return;
+	}
+	
+	my $value = value($ref, $keys);
+	return is_hash_with_content($value);
 }
 
 sub is_hash_key {
@@ -1540,6 +1568,7 @@ Returns positive if the argument is an object.
 	if ((ref($object) =~ /::/) && is_hash($object)) { return TRUE; }
 	return;
 }
+
 
 sub isDomain {
 #=====================================================
@@ -3204,15 +3233,15 @@ sub min {
 }
 
 
+sub is_close {
 #=====================================================
 
-=head2 B<isClose>
+=head2 B<is_close>
 
- if (isClose($numberA, $numberB, $distance))
+ if (is_close($numberA, $numberB, $distance))
 
 =cut
 #=====================================================
-sub isClose {
 	my $a = shift || return;
 	my $b = shift || return;
 	my $distance = shift || 0;
@@ -3366,6 +3395,7 @@ sub arrayLength {
 	return;
 }
 
+sub first {
 #=====================================================
 
 =head2 B<first>
@@ -3377,7 +3407,6 @@ See is_array, is_array_with_content, or arrayLength.
 
 =cut
 #=====================================================
-sub first {
 	my $array = shift || return;
 	if (is_array_with_content($array)) {
 		return $array->[0];
@@ -3389,34 +3418,101 @@ sub first {
 	return;
 }
 
+sub value {
 #=====================================================
 
 =head2 B<value>
 
-Returns a single scalar value from a scalar, array, hash, or arrayHash.
-A hash or arrayHash requires a key to be specified as the second argument.
+Returns the requested value from a deep array or hash without modifying the source.
 
- my $value = value($ref);
- my $value = value($hash, $key);
- my $value = value($arrayHash, $key);
+ my $answer = value($object, $array_of_keys);
+
+Without the second argument, a scalar ref returns its dereferenced value, an array returns its first element, and anything else returns itself.
+
+ my $ref = 'text';
+ value($ref);			# Returns 'text';
+ value(\$ref);			# Returns 'text';
+ 
+ my $ref = ['text'];
+ value($ref);			# Returns 'text';
+
+When specifying one or more keys in the second argument, the specified value is returned.
+ 
+ my $ref = ['some', 'text'];
+ value($ref, 1);		# Returns 'text';
+ my $ref = { key1 => 'text' };
+ value($ref, 'key1');	# Returns 'text';
+ 
+ my $ref = {
+ 	first => {
+		second => [{}, {}, 
+			{
+				fourth => 'text'
+			}
+		]
+	}
+ };
+ value($ref, [first', 'second', 2, 'fourth']);	# Returns 'text';
+
+Most importantly, if the requested value or containing objects don't exist, the source isn't modified as would happen by just calling it directly.
+
+ my $ref = {};
+ my $answer = $ref->{first}->{second}->[2]->{fourth};
+
+	$ref: {
+		first => {
+			second => [
+				[0] => {}
+				[1] => {}
+				[2] => {}
+			]
+		}
+	}
+
+On the other hand, the following leaves the source as is.
+
+ my $ref = {};
+ my $answer = value($ref, [qw(first second 0 fourth)]);
+
+	$ref: {}
 
 =cut
 #=====================================================
-sub value {
-	my $ref = shift || return;
-	my $key = shift;
-	if (ref($ref) eq 'SCALAR') {
-		return ${$ref};
-	} elsif (is_array_hash($ref)) {
-		if ($key && $ref->[0]->{$key}) { return $ref->[0]->{$key}; }
-	} elsif (ref($ref) eq 'ARRAY') {
-		if ($ref->[0]) { return $ref->[0]; }
-	} elsif (is_hash($ref)) {
-		if ($key) { return $ref->{$key}; }
+	my $ref = shift;
+	my $keys = shift;
+	
+	if (!defined($keys)) {
+		if (ref($ref) eq 'SCALAR') {
+			return ${$ref};
+		} elsif (ref($ref) eq 'ARRAY') {
+			if ($ref->[0]) { return $ref->[0]; }
+		} else {
+			return $ref;
+		}
+		return;
+	}
+	
+	if (is_text($keys)) { $keys = [$keys]; }
+	is_array_with_content($keys) || return;
+	
+	my $key = shift(@{$keys});
+	my $value;
+	if (is_hash($ref)) {
+		exists($ref->{$key}) || return;
+		$value = $ref->{$key};
+	} elsif (is_array($ref)) {
+		is_pos_int($key, 0, @{$ref}-1) || return;
+		$value = $ref->[$key];
+	}
+	
+	if (is_array_with_content($keys)) {
+		if (is_hash($value) || is_array($value)) { return value($value, $keys); }
 	} else {
-		return $ref;
+		return $value;
 	}
 }
+
+
 
 
 #=====================================================
