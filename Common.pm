@@ -61,28 +61,28 @@ sub read_cookie {
 Why? Because Apache2::Cookie chokes on cookies with commas.
 
  read_cookie($req);
- read_cookie($req, $cookieName);
+ read_cookie($req, $cookie_name);
 
 =cut
 #=====================================================
 	my $req = shift || return;
 	my $name = shift;
-	my $cookieString = $req->headers_in->{Cookie} || return;
+	my $cookie_string = $req->headers_in->{Cookie} || return;
 	
-	my @cookies = split(/;\s*/, $cookieString);
-	my $cookieHash;
+	my @cookies = split(/;\s*/, $cookie_string);
+	my $cookie_hash;
 	foreach my $cookie (@cookies) {
 		my ($key, $value) = $cookie =~ /^(.*?)=(.*)$/;
 		if ($key) {
 			$key = url_decode($key);
 			$value = url_decode($value);
 			if ($name && ($key eq $name)) { return $value; }
-			$cookieHash->{$key} = $value;
+			$cookie_hash->{$key} = $value;
 		}
 	}
 	$name && return;
 	
-	return $cookieHash;
+	return $cookie_hash;
 }
 
 
@@ -94,18 +94,18 @@ sub generate_password {
  my $password = generate_password($options);
  $options = {
  	charset	=> 'default' || 'alpha' || 'letters' || 'numeric' || 'lower' || 'upper' || 'blank',	# defaults to 'default'
- 	length	=> $lengthOfPassword	# defaults to 32
+ 	length	=> $length_of_password	# defaults to 32
  }
  
 =cut
 #=====================================================
-	my $defaultOption = shift;
+	my $default_option = shift;
 	my $options = shift;
-	if (is_hash($defaultOption)) { $options = $defaultOption; }
+	if (is_hash($default_option)) { $options = $default_option; }
 	if (!is_hash($options)) { $options = {}; }
 	
-	if (is_pos_int($defaultOption)) { $options->{length} = $defaultOption; }
-	elsif (is_text($defaultOption)) { $options->{charset} = $defaultOption; }
+	if (is_pos_int($default_option)) { $options->{length} = $default_option; }
+	elsif (is_text($default_option)) { $options->{charset} = $default_option; }
 	$options->{length} ||= 32;
 	$options->{charset} ||= 'default';
 	if ($options->{charset} eq 'blank') { return; }
@@ -157,13 +157,13 @@ sub convert_arrays_to_csv {
 	my $csv;
 	my $cnt;
 	foreach my $row (@{$data}) {
-		my @csvRow;
+		my @csv_row;
 		foreach my $value (@{$row}) {
 			$value =~ s/"/""/g;
 			if ($value =~ /[",\n\r]/) { $value = "\"$value\""; }
-			push(@csvRow, $value);
+			push(@csv_row, $value);
 		}
-		my $line = join(',',@csvRow);
+		my $line = join(',',@csv_row);
 		$csv .=  "$line\r\n";
 		if (($cnt <= 2) && $debug) { print "convert_arrays_to_csv: $line\n"; }
 		elsif (($cnt == 3) && $debug) { print "convert_arrays_to_csv: ...\n"; }
@@ -173,7 +173,7 @@ sub convert_arrays_to_csv {
 }
 
 sub read_file_list {
-# my $array = read_file_list($basePath);
+# my $array = read_file_list($base_path);
 	my $base = shift || return;
 	my $path = shift;
 	my $array = shift || [];
@@ -188,8 +188,8 @@ sub read_file_list {
 		my $output = $file;
 		if ($path) { $output = "$path/$file"; }
 		if (-d "$filepath/$file") {
-			my $innerArray = read_file_list($base, $output);
-			push(@{$array}, @{$innerArray});
+			my $inner_array = read_file_list($base, $output);
+			push(@{$array}, @{$inner_array});
 		}
 		elsif (-f "$filepath/$file") {
 			push(@{$array}, $output);
@@ -229,10 +229,10 @@ sub write_file {
 =head2 B<write_file>
 
  my $newpath = write_file($path, $content, {
- 	addDate		=> TRUE || FALSE,
- 	makeDirs	=> TRUE || FALSE,
- 	overwrite	=> TRUE || FALSE,
- 	printErrors	=> TRUE || FALSE,
+ 	add_date		=> TRUE || FALSE,
+ 	make_dirs		=> TRUE || FALSE,
+ 	overwrite		=> TRUE || FALSE,
+ 	print_errors	=> TRUE || FALSE,
  }, $debug);
 
 =cut
@@ -242,20 +242,20 @@ sub write_file {
 	my $options = shift;
 	my $debug = shift;
 	if (!is_hash($options)) { $options = {}; }
-	if ($debug) { $options->{printErrors} = TRUE; }
+	if ($debug) { $options->{print_errors} = TRUE; }
 	
 	my ($path, $filename) = $fullpath =~ /(?:(.*)\/)?(.*?)$/;
 	
 	# Make dir, if needed
 	if ($path && !-d $path) {
-		if ($options->{makeDirs}) { system("mkdir -p $path"); }
+		if ($options->{make_dirs}) { system("mkdir -p $path"); }
 		else {
-			$options->{printErrors} && print STDERR "ERROR: Directory doesn't exist: $path\n";
+			$options->{print_errors} && print STDERR "ERROR: Directory doesn't exist: $path\n";
 			return;
 		}
 	}
 	
-	if ($options->{addDate}) {
+	if ($options->{add_date}) {
 		my $time = get_filename_utc_date;
 		my ($name, $ext) = $filename =~ /(.*)\.(.*?)$/;
 		if ($name && $ext) {
@@ -267,12 +267,12 @@ sub write_file {
 	}
 	
 	if (!$options->{overwrite} && -s $fullpath) {
-		$options->{printErrors} && print STDERR "ERROR: File already exists: $fullpath\n";
+		$options->{print_errors} && print STDERR "ERROR: File already exists: $fullpath\n";
 		return;
 	}
 	
 	unless (open(FILE, ">$fullpath")) {
-		$options->{printErrors} && print STDERR "ERROR: Can't open file for writing: $fullpath\n";
+		$options->{print_errors} && print STDERR "ERROR: Can't open file for writing: $fullpath\n";
 		return;
 	}
 	print FILE $content;
@@ -290,8 +290,8 @@ sub get_url {
 =head2 B<get_url>
 
  my $content, $status = get_url($url);
- my $content = get_url($url, $userAgentString);
- my $content = get_url($url, $userAgentString, $serverIp);
+ my $content = get_url($url, $user_agent_string);
+ my $content = get_url($url, $user_agent_string, $server_ip);
 
 =cut
 #=====================================================
@@ -342,8 +342,8 @@ sub post_url {
 =head2 B<post_url>
 
  my $content, $status = post_url($url, $data, $headers);
- my $content = postURL($url, $data, $headers);
- my $content = postURL($url, $data, $headers, $serverIp);
+ my $content = post_url($url, $data, $headers);
+ my $content = post_url($url, $data, $headers, $server_ip);
 
 =cut
 #=====================================================
@@ -406,22 +406,22 @@ sub parse_query_string {
 
 =cut
 #=====================================================
-	my $queryString = shift || return '';
-	my @pairs = split('&', $queryString);
-	my $queryHash;
+	my $query_string = shift || return '';
+	my @pairs = split('&', $query_string);
+	my $query_hash;
 	foreach my $pair (@pairs) {
 		my ($name, $value) = split('=', $pair);
-		my $newName = url_decode($name);
-		my $newValue = url_decode($value);
-		if (ref($queryHash->{$newName}) eq 'ARRAY') {
-			push(@{$queryHash->{$newName}}, $newValue);
-		} elsif ($queryHash->{$newName}) {
-			$queryHash->{$newName} = [$queryHash->{$newName}, $newValue];
+		my $new_name = url_decode($name);
+		my $new_value = url_decode($value);
+		if (ref($query_hash->{$new_name}) eq 'ARRAY') {
+			push(@{$query_hash->{$new_name}}, $new_value);
+		} elsif ($query_hash->{$new_name}) {
+			$query_hash->{$new_name} = [$query_hash->{$new_name}, $new_value];
 		} else {
-			$queryHash->{$name} = $value;
+			$query_hash->{$name} = $value;
 		}
 	}
-	return $queryHash;
+	return $query_hash;
 }
 
 
@@ -437,22 +437,22 @@ Does not recurse.
 #=====================================================
 	my $input = shift;
 	if (is_hash($input)) {
-		my $newHash;
+		my $new_hash;
 		while (my($name, $value) = each(%{$input})) {
-			my $newName = _url_decode_scalar($name);
-			$newHash->{$newName} = _url_decode_scalar($value);
+			my $new_name = _url_decode_scalar($name);
+			$new_hash->{$new_name} = _url_decode_scalar($value);
 		}
-		return $newHash;
+		return $new_hash;
 	} elsif (ref($input) eq 'ARRAY') {
-		my $newArray = [];
+		my $new_array = [];
 		foreach my $value (@{$input}) {
-			my $newValue = _url_decode_scalar($value);
-			push(@{$newArray}, $newValue);
+			my $new_value = _url_decode_scalar($value);
+			push(@{$new_array}, $new_value);
 		}
-		return $newArray;
+		return $new_array;
 	} elsif (ref($input) eq 'SCALAR') {
-		my $newScalar = _url_decode_scalar(${$input});
-		return _url_decode_scalar(\$newScalar);
+		my $new_scalar = _url_decode_scalar(${$input});
+		return _url_decode_scalar(\$new_scalar);
 	} elsif (!ref($input)) {
 		return _url_decode_scalar($input);
 	}
@@ -481,22 +481,22 @@ Does not recurse.
 #=====================================================
 	my $input = shift;
 	if (is_hash($input)) {
-		my $newHash;
+		my $new_hash;
 		while (my($name, $value) = each(%{$input})) {
-			my $newName = _url_encode_scalar($name);
-			$newHash->{$newName} = _url_encode_scalar($value);
+			my $new_name = _url_encode_scalar($name);
+			$new_hash->{$new_name} = _url_encode_scalar($value);
 		}
-		return $newHash;
+		return $new_hash;
 	} elsif (ref($input) eq 'ARRAY') {
-		my $newArray = [];
+		my $new_array = [];
 		foreach my $value (@{$input}) {
-			my $newValue = _url_encode_scalar($value);
-			push(@{$newArray}, $newValue);
+			my $new_value = _url_encode_scalar($value);
+			push(@{$new_array}, $new_value);
 		}
-		return $newArray;
+		return $new_array;
 	} elsif (ref($input) eq 'SCALAR') {
-		my $newScalar = _url_encode_scalar(${$input});
-		return _url_encode_scalar(\$newScalar);
+		my $new_scalar = _url_encode_scalar(${$input});
+		return _url_encode_scalar(\$new_scalar);
 	} elsif (!ref($input)) {
 		return _url_encode_scalar($input);
 	}
@@ -520,18 +520,18 @@ sub parse_json {
 
 Returns a reference matching the given JSON if successful or scalar error message, if not.
 
- my $ref = parse_json($jsonString);
+ my $ref = parse_json($json_string);
 
 =cut
 #=====================================================
-	my $jsonString = shift || return;
+	my $json_string = shift || return;
 	
 	# Newer JSON code
 	my $json = JSON->new;
 	$json = $json->utf8(0);
 	my $perl;
 	
-	eval { $perl = $json->decode($jsonString); };
+	eval { $perl = $json->decode($json_string); };
 	if ($@) {
 		print "Error parsing JSON: $@";
 		return;
@@ -601,35 +601,34 @@ sub make_json {
 	if (ref($data) eq 'HASH') {
 		foreach my $name (sort { by_any($a,$b) } (keys(%{$data}))) {
 # 			if ($name !~ /^\w/i) { next; }
-			if ($name =~ /[^a-zA-Z0-9_:-]/) { next; }
+# 			if ($name =~ /[^a-zA-Z0-9#_:-]/) { next; }
+			my $jname = jsonify($name, undef, $options->{unidecode});
 			my $value = $data->{$name};
 			if (ref($value) eq 'SCALAR') { $value = ${$value}; }
 			if (is_boolean($value)) {
 				# booleans
-				if ($value) { push(@subJSON, "${tabsplus}${ls}\"$name\"${se}:${space}true"); }
-				elsif ($includeNulls) { push(@subJSON, "${tabsplus}${ls}\"$name\"${se}:${space}false"); }
+				if ($value) { push(@subJSON, "${tabsplus}${ls}\"$jname\"${se}:${space}true"); }
+				elsif ($includeNulls) { push(@subJSON, "${tabsplus}${ls}\"$jname\"${se}:${space}false"); }
 			} elsif ((ref($value) eq 'HASH') || (ref($value) eq 'ARRAY')) {
 				my $subJSON = make_json($value,$options,$depth+1);
-				if ($subJSON) { push(@subJSON, "${tabsplus}${ls}\"$name\"${se}:${space}$subJSON"); }
+				if ($subJSON) { push(@subJSON, "${tabsplus}${ls}\"$jname\"${se}:${space}$subJSON"); }
 			} elsif (!ref($value)) {
 				if (defined($value) || $includeNulls) {
 					if (!defined($value) && $includeNulls) {
 						# nulls
-						push(@subJSON, "${tabsplus}${ls}\"$name\"${se}:${space}${vs}null${se}");
-					} elsif (($name =~ /^(?:is|does|should|supports|use|include|allow|can|has|require|show|track|display_developer)(?:_|[A-Z])/)) {
+						push(@subJSON, "${tabsplus}${ls}\"$jname\"${se}:${space}${vs}null${se}");
+					} elsif (($name =~ /^(?:is|has)(?:_|[A-Z])/)) {
 						# booleans
-						if ($value) { push(@subJSON, "${tabsplus}${ls}\"$name\"${se}:${space}${vs}true${se}"); }
-						elsif ($includeNulls) { push(@subJSON, "${tabsplus}${ls}\"$name\"${se}:${space}${vs}false${se}"); }
-					} elsif (($name =~ /^display(?:_|[A-Z])/) && !$value && !$includeNulls) {
-						# probably booleans
+						if ($value) { push(@subJSON, "${tabsplus}${ls}\"$jname\"${se}:${space}${vs}true${se}"); }
+						elsif ($includeNulls) { push(@subJSON, "${tabsplus}${ls}\"$jname\"${se}:${space}${vs}false${se}"); }
 					} elsif ($value || is_number($value)) {
 						if (is_number($value) && !$value) { $value = '0'; }
 						else { $value = jsonify($value, $options->{outputHTML}, $options->{unidecode}); }
-						push(@subJSON, "${tabsplus}${ls}\"$name\"${se}:${space}${qs}\"$value\"${se}");
+						push(@subJSON, "${tabsplus}${ls}\"$jname\"${se}:${space}${qs}\"$value\"${se}");
 					} elsif ($includeNulls) {
 						# blanks
 						$value = jsonify($value, $options->{outputHTML}, $options->{unidecode});
-						push(@subJSON, "${tabsplus}${ls}\"$name\"${se}:${space}${qs}\"$value\"${se}");
+						push(@subJSON, "${tabsplus}${ls}\"$jname\"${se}:${space}${qs}\"$value\"${se}");
 					}
 				}
 			}
@@ -714,6 +713,7 @@ Escape text values for JSON.
 		$value =~ s/\\/\\\\/g;
 		$value =~ s/\//\\\//g;
 		$value =~ s/"/\\"/g;
+		$value =~ s/'/\\'/g;
 		$value =~ s/\r/\\r/g;
 		$value =~ s/\n/\\n/g;
 		$value =~ s/\t/\\t/g;

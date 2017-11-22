@@ -21,6 +21,9 @@ use lib qw( /opt/lib/site_perl );
 use SitemasonPl::Common;
 use SitemasonPl::CLI::Table;
 
+require Exporter;
+our @ISA = qw(Exporter);
+our @EXPORT_OK = qw(mark print_object);
 
 #=====================================================
 
@@ -51,19 +54,33 @@ sub info {
 sub body {
 	my $self = shift || return;
 	my $text = shift;
-	say($text);
+	my $suppress_newline = shift;
+	print $text;
+	$suppress_newline || print "\n";
 }
 
 sub header {
 	my $self = shift || return;
 	my $text = shift;
-	$self->say_bold($text);
+	my $suppress_newline = shift;
+	$self->print_bold($text);
+	$suppress_newline || print "\n";
+}
+
+sub warning {
+	my $self = shift || return;
+	my $text = shift;
+	my $suppress_newline = shift;
+	$self->print_bold($text);
+	$suppress_newline || print "\n";
 }
 
 sub error {
 	my $self = shift || return;
 	my $text = shift;
-	$self->say_bold("ERROR: $text");
+	my $suppress_newline = shift;
+	$self->print_bold("ERROR: $text");
+	$suppress_newline || print "\n";
 }
 
 
@@ -90,7 +107,7 @@ $array_of_answers is an array of inputs that should be used before STDIN. Good f
 		$answer = <STDIN>;
 	}
 	print scalar $self->get_term_color('reset');
-	if (ord($answer) == 0) { print "\n"; return; }
+	if (!defined($answer) || ord($answer) == 0) { print "\n"; return; }
 	if ($answer =~ /^exit/) { print "\n"; return; }
 	chomp($answer);
 	$answer =~ s/(?:^\s+|\s+$)//g;
@@ -98,6 +115,52 @@ $array_of_answers is an array of inputs that should be used before STDIN. Good f
 	if (!$answer) { return '0'; }
 	return $answer;
 }
+
+sub get_menu_answer {
+#=====================================================
+
+=head2 B<get_menu_answer>
+
+=cut
+#=====================================================
+	my $self = shift || return;
+	my $choices = shift || return;
+	my $label = shift;
+	my $inputs = shift;
+	my $key_name = shift;
+	my $value_name = shift;
+	is_array_with_content($choices) || return;
+	
+	my $input;
+	if (is_array_with_content($inputs)) { $input = shift(@{$inputs}); }
+	
+	my $array_length = @{$choices};
+	my $index_width = length($array_length);
+	for (my $i = 0; $i < $array_length; $i++) {
+		my $key = $choices->[$i];
+		my $value = $choices->[$i];
+		if (is_hash($key)) { $key = $key->{$key_name}; $value = $value->{$value_name}; }
+		if ($input && (lc($value) eq lc($input))) { $input = $i + 1; }
+		my $index_label = $self->make_color('[', ['gray', 'bold']) . $self->make_color(sprintf("%${index_width}d", $i+1), ['azure', 'bold']) . $self->make_color(']', ['gray', 'bold']);
+		printf("  %s %s\n", $index_label, $self->make_color($choices->[$i], 'maroon'));
+	}
+	
+	my $answer;
+	my $pre_input;
+	if ($input) { $pre_input = [$input]; }
+	while (1) {
+		print "$label [1 - " . ($array_length + 1) . "]: ";
+		defined($answer = $self->get_answer($pre_input)) || return;
+		if (is_pos_int($answer, 1, $array_length + 1)) { last; }
+		if (is_text($answer)) { $self->warning("The answer must be a number from 1 to " . ($array_length + 1)); }
+		else { $self->warning("An answer is required (CTRL-D to exit)"); }
+	}
+	
+	my $value = $choices->[$answer - 1];
+	if (is_hash($value)) { $value = $value->{$value_name}; }
+	return $value;
+}
+
 
 
 sub is_person {
@@ -258,9 +321,15 @@ sub say_bold {
 
 
 sub mark {
-	my $self = shift || return;
-	my $label = shift;
-	if ($label) { $label .= ' '; }
+	my $self = shift;
+	my $label;
+	if (is_object($self)) {
+		$label = shift;
+	} else {
+		$label = $self;
+		$self = SitemasonPl::CLI->new();
+	}
+	if ($label) { $label .= ' '; } else { $label = ''; }
 	
 	my @returns = caller(1);
 	my $location = "$returns[3] - Line $returns[2]";
@@ -301,8 +370,14 @@ sub print_object {
 
 =cut
 #=====================================================
-	my $self = shift || return;
-	my $object = shift;
+	my $self = shift;
+	my $object;
+	if (is_object($self)) {
+		$object = shift;
+	} else {
+		$object = $self;
+		$self = SitemasonPl::CLI->new();
+	}
 	my $label = shift || '';
 	my $indent = shift || 0;
 	
