@@ -36,7 +36,7 @@ our @ISA = qw(Exporter);
 our @EXPORT = qw(read_cookie generate_password
 	get_filename_utc_minute get_filename_utc_hour get_filename_utc_date convert_arrays_to_csv read_file_list read_file write_file
 	get_url post_url parse_query_string url_decode url_encode
-	parse_json make_json make_json parse_xml make_xml jsonify xmlify
+	parse_json make_json jsonify xmlify
 	html_entities_to_text to_html_entities from_html_entities convert_to_utf8 read_vfile
 	is_boolean is_text is_json is_pos_int is_number is_ordinal is_array is_array_with_content is_hash is_hash_with_content is_hash_key is_array_hash is_array_hash_with_content is_object
 	isDomain isHostname isEmail isIPv4 isIPv6 getDomainName isStateCode getStateCode getRegionCode getRegionAliases getPostalCode getCountryCode getMonth
@@ -46,7 +46,7 @@ our @EXPORT = qw(read_cookie generate_password
 	unique compare compress_var compressRef merge_hashes mergeHashes newHash copyRef joinRef diff
 	check_id checkId encode_id encodeId encode6_id encode6Id decode_id decodeId unique_key uniqueKey generateKey smmd5_2008 smsha2012 makeDigest
 	normalize strip strip_extra_white_space stripExtraWhiteSpace stripControlCharacters clean_filename cleanFilename strip_html stripHTML stripHTMLLink stripOutside
-	insertData summarize context to_camel_case from_camel_case is_camel_case camel_case kebab_case snake_case
+	insertData summarize context to_camel_case from_camel_case is_camel_case camel_case is_kebab_case kebab_case is_snake_case snake_case
 	toLatLong toLatLongHash toCoordinates distanceInMiles lookUpIP identifyNIC
 	convertStringToDateTime convertStringToEpoch convertDateTimeToString getDurationSummary getEstimatedTimeRemaining
 	get_unique_name
@@ -711,7 +711,7 @@ Escape text values for JSON.
 		$value =~ s/\t/&nbsp; &nbsp; /g;
 	} else {
 		$value =~ s/\\/\\\\/g;
-		$value =~ s/\//\\\//g;
+# 		$value =~ s/\//\\\//g;
 		$value =~ s/"/\\"/g;
 		$value =~ s/'/\\'/g;
 		$value =~ s/\r/\\r/g;
@@ -5261,6 +5261,11 @@ sub camel_case {
 	return $text;
 }
 
+sub is_kebab_case {
+	my $text = shift;
+	if ($text =~ /^[a-z0-9-]+$/) { return TRUE; }
+}
+
 sub kebab_case {
 	my $text = lc(shift);
 	if (is_camel_case($text)) {
@@ -5271,6 +5276,11 @@ sub kebab_case {
 		$text =~ s/--+/-/g;
 	}
 	return $text;
+}
+
+sub is_snake_case {
+	my $text = shift;
+	if ($text =~ /^[a-z0-9_]+$/) { return TRUE; }
 }
 
 sub snake_case {
