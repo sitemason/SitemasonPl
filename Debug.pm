@@ -1,5 +1,4 @@
-package SitemasonPl::Debug;
-$VERSION = '8.0';
+package SitemasonPl::Debug 8.0;
 
 =head1 NAME
 
@@ -14,6 +13,7 @@ Debug contains timer, logging, and Leftronic dashboard functions.
 =cut
 
 
+use v5.012;
 use strict;
 use utf8;
 use constant TRUE => 1;
@@ -48,7 +48,7 @@ sub new {
 		client		=> $arg{client},
 		errors		=> []
 	};
-	if (!isArray($arg{logTags})) { $self->{logTags} = [$arg{logTags}]; }
+	if (!is_array($arg{logTags})) { $self->{logTags} = [$arg{logTags}]; }
 	if ($arg{indent}) { $self->{indent} = '    '; }
 	if ($arg{label}) { $self->{timerArgs}->{label} = $arg{label}; }
 	if (defined($arg{header}) && !$arg{header}) { $self->{header} = FALSE; }
@@ -265,7 +265,7 @@ sub timerResults {
 	my $self = shift || return;
 	my $message = shift;
 	my $req;
-	if (isObject($message)) { $req = $message; undef $message; }
+	if (is_object($message)) { $req = $message; undef $message; }
 	$self->{timer} || return;
 	my $threshold = $self->{locale}->{timer_threshold} || 4;
 	my $testThreshold = $self->{locale}->{test_threshold};
@@ -438,7 +438,7 @@ sub post {
 	
 	$error->{levelNum} = $self->_convertToErrorNum($error->{level});
 	
-	if ($error->{tags} && !isArray($error->{tags})) { $error->{tags} = [$error->{tags}]; }
+	if ($error->{tags} && !is_array($error->{tags})) { $error->{tags} = [$error->{tags}]; }
 	
 	my ($line) = (caller($start))[2]; $start++;
 	my ($package, $parentLine) = (caller($start))[3,2]; $start++;
@@ -577,7 +577,7 @@ sub printList {
 	my $array = shift;
 	my $header = shift;
 	my $args = shift;
-	isArray($array) || return;
+	is_array($array) || return;
 	
 	my $max = $header;
 	foreach my $item (@{$array}) {
@@ -660,12 +660,12 @@ sub _includeStatus {
 	my $errorTagList = shift;
 	my $searchTagList = shift;
 	
-	if (isArrayWithContent($searchTagList)) {
+	if (is_array_with_content($searchTagList)) {
 		foreach my $searchTag (@{$searchTagList}) {
 			my $testTag = $searchTag; my $isPos = 1; my $found;
 			if ($searchTag =~ /^\!(.+)$/) { $testTag = $1; $isPos = 0; $found = 1; }
 			
-			if (isArrayWithContent($errorTagList)) {
+			if (is_array_with_content($errorTagList)) {
 				foreach my $errorTag (@{$errorTagList}) {
 					if (!$isPos && ($1 eq $errorTag)) { undef($found); last; }
 					elsif ($isPos && ($searchTag eq $errorTag)) { $found = 1; }
@@ -878,7 +878,7 @@ EOM
 			my $value = $data->{$name};
 			if (ref($value) eq 'DateTime') {
 				printf STDERR ("$indent${tabs}%-20s DateTime: %s %s %s\n", $name, $value->ymd, $value->hms, $value->time_zone_long_name);
-			} elsif (isBoolean($value)) {
+			} elsif (is_boolean($value)) {
 				printf STDERR ("$indent${tabs}%-20s Boolean: %s\n", $name, $value);
 			} elsif (ref($value)) {
 				printf STDERR ("$indent${tabs}%-20s REF: %s\n", $name, $value);
@@ -905,17 +905,17 @@ sub toString {
 	my $value = shift;
 	my $shouldQuote = shift;
 	my $string;
-	if (isHash($value)) {
+	if (is_hash($value)) {
 		my @keys = keys(%{$value});
 		my @out;
 		foreach my $key (sort @keys) { push(@out, "$key: '$value->{$key}'"); }
 		$string = '{ ' . join(', ', @out) . ' }';
 	}
-	elsif (isArray($value)) {
+	elsif (is_array($value)) {
 		$string .= "['" . join("', '", @{$value}) . "']";
 	}
 	elsif (!defined($value)) { $string = '<N>'; }
-	elsif (($value eq ($value+0)) && isPosInt($value)) { $string = $value + 0; }
+	elsif (($value eq ($value+0)) && is_pos_int($value)) { $string = $value + 0; }
 	elsif ($value) {
 		if ($shouldQuote) { $string = "'$value'"; }
 		else { $string = "$value"; }
@@ -968,7 +968,7 @@ sub pause {
 	my $self = shift || return;
 	my $seconds = shift || return;
 	my $displayStart = shift;
-	isPosInt($seconds) || return;
+	is_pos_int($seconds) || return;
 	
 	if (!$self->{isPerson}) { sleep $seconds; return; }
 	
@@ -1065,7 +1065,7 @@ sub truncate {
 	my $self = shift || return;
 	my $text = shift || return '';
 	my $width = shift || return $text;
-	isPosInt($width) || return $text;
+	is_pos_int($width) || return $text;
 	
 	if (length($text) > $width) {
 		return substr($text, 0, $width - 1) . '…';
@@ -1163,20 +1163,20 @@ sub sendToLeftronic {
 	my $apiKey = 'leftronic_api_key';
 	my $json = { accessKey => $apiKey };
 	
-	if (isText($streams)) {
+	if (is_text($streams)) {
 		$json->{streamName} = $streams;
-		if (isText($points) && ($points eq 'clear')) {
+		if (is_text($points) && ($points eq 'clear')) {
 			$json->{command} = 'clear';
-		} elsif (isHash($points) || isArray($points)) {
+		} elsif (is_hash($points) || is_array($points)) {
 			$json->{point} = $points;
 		}
-	} elsif (isHash($streams)) {
+	} elsif (is_hash($streams)) {
 		$json->{streams} = [];
 		while (my($streamName, $points) = each(%{$streams})) {
 			my $stream = { streamName => $streamName };
-			if (isText($stream->{command}) && ($stream->{command} eq 'clear')) {
+			if (is_text($stream->{command}) && ($stream->{command} eq 'clear')) {
 				$stream->{command} = 'clear';
-			} elsif (isHash($points) || isArray($points)) {
+			} elsif (is_hash($points) || is_array($points)) {
 				$stream->{point} = $points;
 			} else {
 				$self->warning("Invalid hash stream");
@@ -1185,15 +1185,15 @@ sub sendToLeftronic {
 			}
 			push(@{$json->{streams}}, $stream);
 		}
-	} elsif (isArray($streams)) {
+	} elsif (is_array($streams)) {
 		$json->{streams} = [];
 		foreach my $stream (@{$streams}) {
-			if (isText($stream->{streamName})) {
-				if (isText($stream->{command}) && ($stream->{command} eq 'clear')) {
+			if (is_text($stream->{streamName})) {
+				if (is_text($stream->{command}) && ($stream->{command} eq 'clear')) {
 					push(@{$json->{streams}}, $stream);
-				} elsif (isHash($stream->{point}) || isArray($stream->{point})) {
+				} elsif (is_hash($stream->{point}) || is_array($stream->{point})) {
 					push(@{$json->{streams}}, $stream);
-				} elsif (isText($stream->{point})) {
+				} elsif (is_text($stream->{point})) {
 					push(@{$json->{streams}}, $stream);
 				} else {
 					$self->warning("Invalid array stream");
@@ -1242,8 +1242,8 @@ sub sendToLeftronicNotice {
 	my $streamName = shift || return;
 	my $messages = shift;
 	my $debug = shift;
-	if (isText($messages)) { $messages = [$messages]; }
-	if (!isArray($messages)) { return; }
+	if (is_text($messages)) { $messages = [$messages]; }
+	if (!is_array($messages)) { return; }
 	
 	my $displayTime = localtime();
 	$displayTime =~ s/(^\w+\s+|:\d+\s+\d+$)//g;
@@ -1289,12 +1289,12 @@ sub mapToLeftronic {
 	my $options = shift;
 	
 	my $long;
-	if (isHash($longOrOptions)) { $options = $longOrOptions; }
-	elsif (isNumber($longOrOptions)) { $long = $longOrOptions; }
+	if (is_hash($longOrOptions)) { $options = $longOrOptions; }
+	elsif (is_number($longOrOptions)) { $long = $longOrOptions; }
 	
 	my $points = toLatLongHash($coords, $long);
-	if (!isArray($points)) { $points = [$points]; }
-	if (!isArrayHash($points)) {
+	if (!is_array($points)) { $points = [$points]; }
+	if (!is_array_hash($points)) {
 		$self->warning("Invalid coordinates");
 		$self->printObject($coords, '$coords');
 		return;
@@ -1309,14 +1309,14 @@ sub mapToLeftronic {
 		$points = _cropLeftronicPoints($options->{map}, $points);
 	}
 	
-	if (!isArrayWithContent($points)) { return; }
+	if (!is_array_with_content($points)) { return; }
 	return $self->sendToLeftronic($streamName, $points, $options->{debug});
 }
 
 sub _cropLeftronicPoints {
 	my $map = shift || return;
 	my $points = shift || return;
-	if (!isArrayWithContent($points)) { return; }
+	if (!is_array_with_content($points)) { return; }
 	my $cropped = [];
 	foreach my $point (@{$points}) {
 		if (lc($map) eq 'us') {
@@ -1354,7 +1354,7 @@ sub _cropLeftronicPoints {
 			if ($isInMap) { push(@{$cropped}, $point); }
 		}
 	}
-	if (isArrayWithContent($cropped)) { return $cropped; }
+	if (is_array_with_content($cropped)) { return $cropped; }
 	return;
 }
 
@@ -1374,7 +1374,7 @@ sub mapSquareToLeftronic {
 	my $buffer = .03;
 	my $color = 'red';
 	my $map;
-	if (isHash($options)) {
+	if (is_hash($options)) {
 		$color = $options->{color} || $color;
 		$map = $options->{map};
 		$buffer = $options->{buffer} || $buffer;
@@ -1397,718 +1397,8 @@ sub mapSquareToLeftronic {
 }
 
 
-#=====================================================
 
-=head2 B<LogAction>
 
- $self->{debug}->logAction($source, $source_arg, $threat_level, $details);
-
-=cut
-#=====================================================
-sub logAction {
-	my $self = shift || return;
-	my $source = shift || return;
-	my $source_arg = shift;
-	my $threat_level = shift || 0;
-	my $details = shift;
-	my $debug = shift;
-	my $logAction = SitemasonPl::Debug::LogAction->new(debug => $self, source => $source, source_arg => $source_arg);
-	$logAction->end($threat_level, $details);
-}
-
-
-#=====================================================
-
-=head2 B<Table>
-
- my $table = $self->{debug}->Table([ {
-		name	=> 'v',
-		width	=> 2
-	}, {
-		name	=> 'id',
-		width	=> 7,
-		format	=> '%7d'
-	}, {
-		name	=> 'title',
-		width	=> 30
- } ], $label);
-
-=cut
-#=====================================================
-sub Table {
-	my $self = shift || return;
-	my $columns = shift;
-	my $label = shift;
-	return SitemasonPl::Debug::Table->new(debug => $self, columns => $columns, label => $label);
-}
-
-
-
-
-
-package SitemasonPl::Debug::LogAction;
-
-use strict;
-use utf8;
-use constant TRUE => 1;
-use constant FALSE => 0;
-
-use SitemasonPl::Common;
-use SitemasonPl::Database;
-
-#=====================================================
-
-=head2 B<new>
-
- $self->{logAction} = SitemasonPl::Debug::LogAction->new(debug => $self->{debug}, source => $source, source_arg => $source_arg);
-
-=cut
-#=====================================================
-sub new {
-	my ($class, %arg) = @_;
-	$class || return;
-	
-	my $self = {
-		debug		=> $arg{debug},
-		source		=> $arg{source},
-		source_arg	=> $arg{source_arg}
-	};
-	if (!$self->{source}) { $self->{debug}->error("LogAction requires a source"); return; }
-	
-	bless $self, $class;
-	
-	$self->connectToActionDB || return;
-	($self->{start_timestamp}) = $self->{actionDBH}->selectRowArray("SELECT CURRENT_TIMESTAMP");
-	
-	return $self;
-}
-
-
-#=====================================================
-
-=head2 B<connectToActionDB>
-
-=cut
-#=====================================================
-sub connectToActionDB {
-	my $self = shift || return;
-	$self->{actionDBH} ||= SitemasonPl::Database->new(
-		dbType		=> 'mysql',
-		dbHost		=> 'db_host',
-		dbPort		=> 3306,
-		dbName		=> 'db_name',
-		dbUsername	=> 'db_user',
-		dbPassword	=> 'db_pass',
-		debug		=> $self->{debug}
-	);
-	unless ($self->{actionDBH}) { $self->{debug}->error("Can't connect to action database"); return; }
-	return TRUE;
-}
-
-
-#=====================================================
-
-=head2 B<update>
-
- $self->{logAction}->update($threat_level, $details);
-
-=cut
-#=====================================================
-sub update {
-	my $self = shift || return;
-	my $threat_level = shift || 0;
-	my $details = shift;
-	my $debug = shift;
-	
-	$self->logToActionDB($threat_level, $details, undef, $debug);
-}
-
-
-#=====================================================
-
-=head2 B<end>
-
- $self->{logAction}->end($threat_level, $details);
-
-=cut
-#=====================================================
-sub end {
-	my $self = shift || return;
-	my $threat_level = shift || 0;
-	my $details = shift;
-	my $debug = shift;
-	
-	$self->logToActionDB($threat_level, $details, TRUE, $debug);
-	
-	$self->connectToActionDB || return;
-	
-	my $settings = $self->{actionDBH}->selectAllArrayhash("
-		SELECT * FROM action_leftronics_thresholds ORDER BY source, source_arg
-	");
-	
-	my $streamName;
-	my $default;
-	my $threshold;
-	foreach my $set (@{$settings}) {
-		if ($set->{source} eq 'default') { $default = $set->{threat_level}; }
-		elsif (($set->{source} eq $self->{source}) && (!$set->{source_arg} || ($set->{source_arg} eq $self->{source_arg}))) {
-			$threshold = $set->{threat_level};
-			if ($set->{stream_name}) { $streamName = $set->{stream_name}; }
-		}
-	}
-	$threshold ||= $default;
-	
-	if ($threat_level >= $threshold) {
-		my $message;
-		if ($streamName) { $message = $details; }
-		else {
-			$message = $self->{source};
-			if ($self->{source_arg}) { $message .= ' ' . $self->{source_arg}; }
-			if ($threat_level) { $message .= ' (' . $threat_level . ')'; }
-			else { $message .= ' (0)'; }
-			if ($details) { $message .= ' - ' . $self->{debug}->adjustPlurals($details); }
-			$streamName = 'server-notices';
-		}
-		$self->{debug}->sendToLeftronicNotice($streamName, $message);
-	}
-}
-
-
-#=====================================================
-
-=head2 B<logToActionDB>
-
- $self->{logAction}->logToActionDB($threat_level, $details, $is_completed);
-
-=cut
-#=====================================================
-sub logToActionDB {
-	my $self = shift || return;
-	my $threat_level = shift || 0;
-	my $details = shift;
-	my $isCompleted = shift;
-	my $debug = shift;
-	if (!$self->{source}) { $self->{debug}->error("logToActionDB requires a source"); return; }
-	
-	$self->connectToActionDB || return;
-	
-	my $qthreat_level = $self->{actionDBH}->quote($threat_level);
-	my $qdetails = $self->{actionDBH}->quote($self->{debug}->adjustPlurals($details));
-	my $qisCompleted = 0;
-	if ($isCompleted) { $qisCompleted = 1; }
-	if ($self->{id}) {
-		my $qid = $self->{actionDBH}->quote($self->{id});
-		my $rv = $self->{actionDBH}->do("
-			UPDATE action_log
-			SET threat_level = $qthreat_level, details = $qdetails, end_timestamp = CURRENT_TIMESTAMP, is_completed = $qisCompleted
-			WHERE id = $qid
-		", $debug);
-		if ($rv > 0) { return TRUE; }
-	} else {
-		my $qsource = $self->{actionDBH}->quote($self->{source});
-		my $qsource_arg = $self->{actionDBH}->quote($self->{source_arg});
-		my $qstart_timestamp = 'CURRENT_TIMESTAMP';
-		if ($self->{start_timestamp}) { $qstart_timestamp = $self->{actionDBH}->quote($self->{start_timestamp}); }
-		my $rv = $self->{actionDBH}->do("
-			INSERT INTO action_log (source, source_arg, threat_level, details, start_timestamp, end_timestamp, is_completed)
-			VALUES ($qsource, $qsource_arg, $qthreat_level, $qdetails, $qstart_timestamp, CURRENT_TIMESTAMP, $qisCompleted)
-		", $debug);
-		if ($rv > 0) {
-			($self->{id}) = $self->{actionDBH}->selectRowArray("SELECT last_insert_id()");
-			return TRUE;
-		}
-	}
-}
-
-
-#=====================================================
-
-=head2 B<isStarted>
-
-=cut
-#=====================================================
-sub isStarted {
-	my $self = shift || return;
-	$self->{id} && return TRUE;
-}
-
-
-
-package SitemasonPl::Debug::Table;
-
-use strict;
-use utf8;
-use constant TRUE => 1;
-use constant FALSE => 0;
-
-use SitemasonPl::Common;
-
-#=====================================================
-
-=head2 B<new>
-
-=cut
-#=====================================================
-sub new {
-	my ($class, %arg) = @_;
-	$class || return;
-	isObject($arg{debug}) || return;
-	isArray($arg{columns}) || return;
-	
-	my $self = {
-		debug		=> $arg{debug},
-		columns		=> $arg{columns},
-		postArgs	=> { header => FALSE, output => 'stdout' }
-	};
-	
-	$self->{width} = 0;
-	my $first = TRUE;
-	foreach my $column (@{$self->{columns}}) {
-		if (length($column->{name}) > $column->{width}) {
-			$column->{width} = length($column->{name});
-		}
-		if ($first) { undef $first; }
-		else { $self->{width}++; }
-		$self->{width} += $column->{width} + 2;
-	}
-	
-	if ($self->{debug}->{isPerson}) { $arg{unicode} = TRUE; }
-# 	if ($ENV{TERM} eq 'screen') { $arg{unicode} = FALSE; }
-	
-	if ($arg{unicode} && ($ENV{TERM} ne 'screen')) {
-		$self->{char} = {
-			ul		=> sprintf("%c", 0x250c),
-			ut		=> sprintf("%c", 0x252c),
-			ur		=> sprintf("%c", 0x2510),
-			dul		=> sprintf("%c", 0x2552),
-			dut		=> sprintf("%c", 0x2564),
-			dur		=> sprintf("%c", 0x2555),
-			lt		=> sprintf("%c", 0x251c),
-			plus	=> sprintf("%c", 0x253c),
-			rt		=> sprintf("%c", 0x2524),
-			dlt		=> sprintf("%c", 0x255e),
-			dplus	=> sprintf("%c", 0x256a),
-			drt		=> sprintf("%c", 0x2561),
-			bl		=> sprintf("%c", 0x2514),
-			bt		=> sprintf("%c", 0x2534),
-			br		=> sprintf("%c", 0x2518),
-			
-			hor		=> sprintf("%c", 0x2500),
-			dhor	=> sprintf("%c", 0x2550),
-			vert	=> sprintf("%c", 0x2502),
-		};
-	} else {
-		$self->{char} = {
-			ul		=> '+',
-			ut		=> '+',
-			ur		=> '+',
-			lt		=> '+',
-			plus	=> '+',
-			rt		=> '+',
-			dlt		=> '+',
-			dplus	=> '+',
-			drt		=> '+',
-			bl		=> '+',
-			bt		=> '+',
-			br		=> '+',
-			
-			hor		=> '-',
-			dhor	=> '=',
-			vert	=> '|',
-		};
-	}
-	
-	bless $self, $class;
-	
-	if ($arg{label}) {
-		$self->printLabel($arg{label});
-	}
-	
-	return $self;
-}
-
-sub printTop {
-	my $self = shift || return;
-	$self->{debug}->info($self->getTop(@_), $self->{postArgs});
-	return $self;
-}
-
-sub getTop {
-	my $self = shift || return;
-	my $type = shift;
-	my $hor = $self->{char}->{hor};
-	my $ut = $self->{char}->{ut};
-	my $ul = $self->{char}->{ul};
-	my $ur = $self->{char}->{ur};
-	if ($type eq '=') {
-		$hor = $self->{char}->{dhor};
-		$ut = $self->{char}->{dut};
-		$ul = $self->{char}->{dul};
-		$ur = $self->{char}->{dur};
-	}
-	delete $self->{wasLabel};
-	
-	my $line;
-	my $first = TRUE;
-	foreach my $column (@{$self->{columns}}) {
-		if ($first) { $line .= $ul; undef $first; }
-		else { $line .= $ut; }
-		$line .= $hor x ($column->{width} + 2);
-	}
-	$line .= $ur;
-	$self->{wasTop} = TRUE;
-	return $line;
-}
-
-sub printBottom {
-	my $self = shift || return;
-	$self->{wasTop} || return;
-	$self->{debug}->info($self->getBottom(), $self->{postArgs});
-	return $self;
-}
-
-sub getBottom {
-	my $self = shift || return;
-	
-	$self->{wasTop} || return;
-	delete $self->{wasLabel};
-	
-	my $line;
-	my $first = TRUE;
-	foreach my $column (@{$self->{columns}}) {
-		if ($first) { $line .= $self->{char}->{bl}; undef $first; }
-		else { $line .= $self->{char}->{bt}; }
-		$line .= $self->{char}->{hor} x ($column->{width} + 2);
-	}
-	$line .= $self->{char}->{br};
-	delete $self->{wasTop};
-	return $line;
-}
-
-sub printLine {
-	my $self = shift || return;
-	my $type = shift;
-	$self->{wasTop} || return $self->printTop($type);
-	$self->{debug}->info($self->getLine($type), $self->{postArgs});
-	return $self;
-}
-
-sub getLine {
-	my $self = shift || return;
-	my $type = shift;
-	
-	my $hor = $self->{char}->{hor};
-	my $plus = $self->{char}->{plus};
-	my $lt = $self->{char}->{lt};
-	my $rt = $self->{char}->{rt};
-	if ($self->{wasLabel}) {
-		$plus = $self->{char}->{ut};
-	}
-	if ($type eq '=') {
-		$hor = $self->{char}->{dhor};
-		$plus = $self->{char}->{dplus};
-		$lt = $self->{char}->{dlt};
-		$rt = $self->{char}->{drt};
-		if ($self->{wasLabel}) {
-			$plus = $self->{char}->{dut};
-		}
-	}
-	delete $self->{wasLabel};
-	
-	my $line;
-	my $first = TRUE;
-	foreach my $column (@{$self->{columns}}) {
-		if ($first) { $line .= $lt; undef $first; }
-		else { $line .= $plus; }
-		$line .= $hor x ($column->{width} + 2);
-	}
-	$line .= $rt;
-	return $line;
-}
-
-sub printLabel {
-	my $self = shift || return;
-	if (!$self->{wasTop}) {
-		$self->{debug}->info($self->{char}->{ul} . $self->{char}->{hor} x $self->{width} . $self->{char}->{ur}, $self->{postArgs});
-		$self->{wasTop} = TRUE;
-	}
-	
-	$self->{debug}->info($self->getLabel(@_), $self->{postArgs});
-	return $self;
-}
-
-sub getLabel {
-	my $self = shift || return;
-	my $header = shift;
-	
-	my $line;
-	if ($header) {
-		my $width = $self->{width} - length($header) - 1;
-		$line .= $self->{char}->{vert} . " $self->{debug}->{term}->{bold}$header$self->{debug}->{term}->{reset}" . ' ' x $width . $self->{char}->{vert};
-		$self->{wasLabel} = TRUE;
-	}
-	return $line;
-}
-
-sub printHeader {
-	my $self = shift || return;
-	if (!$self->{wasTop}) { $self->{debug}->info($self->getTop, $self->{postArgs}); }
-	$self->{debug}->info($self->getHeader(@_), $self->{postArgs});
-	return $self;
-}
-
-sub getHeader {
-	my $self = shift || return;
-	
-	my $line;
-	delete $self->{wasLabel};
-	
-	my $row = {};
-	my $args = {};
-	foreach my $column (@{$self->{columns}}) {
-		$row->{$column->{name}} = $column->{label} || $column->{name};
-		$args->{$column->{name}}->{bold} = TRUE;
-		$args->{$column->{name}}->{format} = FALSE;
-	}
-	$line .= $self->getRow($row, $args);
-	return $line;
-}
-
-sub printRow {
-	my $self = shift || return;
-	if (!$self->{wasTop}) { $self->{debug}->info($self->getTop, $self->{postArgs}); }
-	$self->{debug}->info($self->getRow(@_), $self->{postArgs});
-	return $self;
-}
-
-sub getRow {
-	my $self = shift || return;
-	my $row = shift;
-	my $args = shift;
-	
-	my $line;
-	delete $self->{wasLabel};
-	
-	isHash($row) || return;
-	my $length = 1;
-	foreach my $column (@{$self->{columns}}) {
-		if (isArrayWithContent($row->{$column->{name}})) {
-			if (@{$row->{$column->{name}}} > $length) { $length = @{$row->{$column->{name}}}; }
-		}
-		if (isHashWithContent($row->{$column->{name}})) {
-			my $size = keys(%{$row->{$column->{name}}});
-			if ($size > $length) { $length = $size; }
-		}
-	}
-	for (my $i = 0; $i < $length; $i++) {
-		if ($i > 0) { $line .= "\n"; }
-		if ($length > 1) { $line .= '  '; }
-		$line .= $self->{char}->{vert};
-		foreach my $column (@{$self->{columns}}) {
-			my $width = $column->{width};
-			my $text;
-			if (isArray($row->{$column->{name}})) {
-				if ($i < @{$row->{$column->{name}}}) {
-					$text = "[$i]: " . $self->{debug}->toString($row->{$column->{name}}->[$i], TRUE);
-				}
-			} elsif (isHash($row->{$column->{name}})) {
-				my @keys = sort keys(%{$row->{$column->{name}}});
-				if ($i < @keys) {
-					$text = $keys[$i] . ": " . $self->{debug}->toString($row->{$column->{name}}->{$keys[$i]}, TRUE);
-				}
-			} elsif (($i < 1) && exists($row->{$column->{name}})) {
-				$text = $self->{debug}->toString($row->{$column->{name}});
-			}
-			my ($style, $color, $format);
-			if ($column->{format}) { $format = TRUE; }
-			if (isHash($args)) {
-				if ($args->{style} && $self->{debug}->{term}->{$args->{style}}) { $style = $args->{style}; }
-				if ($args->{color} && $self->{debug}->{term}->{$args->{color}}) { $color = $args->{color}; }
-				if ($args->{$column->{name}}) {
-					if (exists($args->{$column->{name}}->{format})) { $format = $args->{$column->{name}}->{format}; }
-					
-					if ($args->{$column->{name}}->{style} && $self->{debug}->{term}->{$args->{$column->{name}}->{style}}) {
-						$style = $args->{$column->{name}}->{style};
-					}
-					elsif (exists($args->{$column->{name}}->{bold})) { $style = 'bold'; }
-					
-					if ($args->{$column->{name}}->{color} && $self->{debug}->{term}->{$args->{$column->{name}}->{color}}) {
-						$color = $args->{$column->{name}}->{color};
-					}
-				}
-			}
-			if ($format) {
-				$text = sprintf($column->{format}, $text);
-			} elsif (length($text) > $width) {
-				$text = substr($text, 0, $column->{width} - 1) . '…';
-			}
-			my $usesStyle;
-			if ($style) {
-				$width += 4;
-				$text = $self->{debug}->{term}->{$style} . $text;
-				$usesStyle = TRUE;
-			}
-			if ($color) {
-				$width += 5;
-				if (($color =~ /^on/i) && ($color =~ /high$/i)) { $width += 1; }
-				$text = $self->{debug}->{term}->{$color} . $text;
-				$usesStyle = TRUE;
-			}
-			if ($usesStyle) {
-				$width += 3;
-				$text .= $self->{debug}->{term}->{reset};
-			}
-			$line .= ' ' . $text . ' ' x ($width - length($text)) . ' ' . $self->{char}->{vert};
-		}
-	}
-	return $line;
-}
-
-sub close {
-	my $self = shift || return;
-	$self->printBottom;
-}
-
-
-package SitemasonPl::Debug::ScriptPreferences;
-
-use strict;
-use utf8;
-use constant TRUE => 1;
-use constant FALSE => 0;
-
-use SitemasonPl::Common;
-use SitemasonPl::Database;
-
-#=====================================================
-
-=head2 B<new>
-
- $self->{prefs} = SitemasonPl::Debug::ScriptPreferences->new(debug => $self->{debug}, script => $script);
-
-=cut
-#=====================================================
-sub new {
-	my ($class, %arg) = @_;
-	$class || return;
-	
-	my $self = {
-		debug		=> $arg{debug},
-		script		=> $arg{script}
-	};
-	if (!$self->{script}) {
-		$self->{script} = $0;
-		$self->{script} =~ s/^.*\///;
-	}
-	
-	bless $self, $class;
-	
-	$self->connectToActionDB || return;
-	$self->{qscript} = $self->{mcpDBH}->quote($self->{script});
-	return $self;
-}
-
-
-#=====================================================
-
-=head2 B<connectToActionDB>
-
-=cut
-#=====================================================
-sub connectToActionDB {
-	my $self = shift || return;
-	$self->{mcpDBH} ||= SitemasonPl::Database->new(
-		dbType		=> 'mysql',
-		dbHost		=> 'db_host',
-		dbPort		=> 3306,
-		dbName		=> 'db_name',
-		dbUsername	=> 'db_user',
-		dbPassword	=> 'db_pass',
-		debug		=> $self->{debug}
-	);
-	unless ($self->{mcpDBH}) { $self->{debug}->error("Can't connect to action database"); return; }
-	return TRUE;
-}
-
-
-#=====================================================
-
-=head2 B<get>
-
- my $value = $self->{prefs}->get($key);
-
-=cut
-#=====================================================
-sub get {
-	my $self = shift || return;
-	my $key = shift || return;
-	
-	if ($key !~ /^\w+$/) { $self->{debug}->error("Invalid key"); return; }
-	
-	$self->connectToActionDB || return;
-	
-	my ($json) = $self->{mcpDBH}->selectRowArray("
-		SELECT json FROM script_preferences WHERE script = $self->{qscript}
-	");
-	
-	if ($json) { $self->{prefs} = parseJSON($json); }
-	else { $self->{prefs} = {}; }
-	return $self->{prefs}->{$key};
-}
-
-
-#=====================================================
-
-=head2 B<set>
-
- $self->{prefs}->set($key, $value);
-
-=cut
-#=====================================================
-sub set {
-	my $self = shift || return;
-	my $key = shift || return;
-	my $value = shift;
-	
-	if ($key !~ /^\w+$/) { $self->{debug}->error("Invalid key"); return; }
-	if (!$value) { delete $self->{prefs}->{$key}; }
-	elsif (!isHashWithContent($value) && !isArrayWithContent($value) && ref($value)) { $self->{debug}->error("Invalid value"); return; }
-	else { $self->{prefs}->{$key} = $value; }
-	
-	$self->save;
-}
-
-
-#=====================================================
-
-=head2 B<save>
-
- $self->{prefs}->save;
-
-=cut
-#=====================================================
-sub save {
-	my $self = shift || return;
-	$self->connectToActionDB || return;
-	
-	my $qjson = 'NULL';
-	if (isHashWithContent($self->{prefs})) {
-		my $json = makeJSON($self->{prefs}, { compress => 1 });
-		$qjson = $self->{mcpDBH}->quote($json);
-	}
-	my ($id) = $self->{mcpDBH}->selectRowArray("
-		SELECT id FROM script_preferences WHERE script = $self->{qscript}
-	");
-	if ($id) {
-		my $rv = $self->{mcpDBH}->do("
-			UPDATE script_preferences SET json = $qjson, last_modified = CURRENT_TIMESTAMP WHERE script = $self->{qscript}
-		");
-	} else {
-		my $rv = $self->{mcpDBH}->do("
-			INSERT INTO script_preferences (script, json, last_modified) VALUES ($self->{qscript}, $qjson, CURRENT_TIMESTAMP)
-		");
-	}
-}
 
 
 

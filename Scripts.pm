@@ -1,5 +1,6 @@
-package SitemasonPl::Scripts;
+package SitemasonPl::Scripts 8.0;
 
+use v5.012;
 use strict;
 use utf8;
 use constant TRUE => 1;

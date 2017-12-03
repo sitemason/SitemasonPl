@@ -1,5 +1,4 @@
-package SitemasonPl::Date;
-$VERSION = '8.0';
+package SitemasonPl::Date 8.0;
 
 =head1 NAME
 
@@ -12,6 +11,7 @@ SitemasonPl::Date
 
 =cut
 
+use v5.012;
 use strict;
 use DateTime;
 
