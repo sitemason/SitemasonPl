@@ -40,17 +40,17 @@ our @EXPORT = qw(read_cookie generate_password
 	parse_json make_json jsonify xmlify
 	html_entities_to_text to_html_entities from_html_entities convert_to_utf8 read_vfile
 	is_boolean is_text is_json is_pos_int is_number is_ordinal is_array is_array_with_content is_hash is_hash_with_content is_hash_key is_arrayhash is_arrayhash_with_content is_object
-	isDomain isHostname isEmail isIPv4 isIPv6 getDomainName isStateCode getStateCode getRegionCode getRegionAliases getPostalCode getCountryCode getMonth
+	is_domain is_hostname is_email is_ipv4 is_ipv6 get_domain_name is_state_code get_state_code get_region_code get_region_aliases get_postal_code get_country_code get_month
 	round significant percent max min is_close summarize_number summarize_bytes make_ordinal pluralize join_text
-	array_length first value ref_to_scalar refToScalar array_to_list arrayToList list_to_array listToArray list_to_array_auto add_to_list remove_from_array to_array to_list to_hash
+	array_length first value ref_to_scalar array_to_list list_to_array list_to_array_auto add_to_list remove_from_array to_array to_list to_hash
 	arrayhash_to_hashhash to_hash_hash arrays_to_arrayhash unique_array contains by_any max_length
 	unique compare compress_ref merge_hashes new_hash copy_ref join_ref diff
-	check_id checkId encode_id encodeId encode6_id encode6Id decode_id decodeId unique_key uniqueKey generateKey smmd5_2008 smsha2012 makeDigest
-	normalize strip strip_extra_white_space stripExtraWhiteSpace stripControlCharacters clean_filename cleanFilename strip_html stripHTML stripHTMLLink stripOutside
+	check_id encode_id encode6_id decode_id unique_key generate_key smmd5_2008 smsha2012 make_digest
+	normalize strip strip_extra_white_space strip_control_characters clean_filename strip_html strip_html_link strip_outside
 	insert_data summarize context to_camel_case from_camel_case is_camel_case camel_case is_kebab_case kebab_case is_snake_case snake_case
-	toLatLong toLatLongHash toCoordinates distanceInMiles lookUpIP identifyNIC
-	convertStringToDateTime convertStringToEpoch convertDateTimeToString getDurationSummary getEstimatedTimeRemaining
-	get_unique_name getFilenameUTCMinute getFilenameUTCHour getFilenameUTCDate
+	to_lat_long to_lat_long_hash to_coordinates distance_in_miles look_up_ip identify_nic
+	convert_string_to_date_time convert_string_to_epoch convert_date_time_to_string get_duration_summary get_estimated_time_remaining
+	get_unique_name get_filename_utc_minute get_filename_utc_hour get_filename_utc_date
 );
 
 
@@ -1607,10 +1607,10 @@ Returns positive if the argument is an object.
 }
 
 
-sub isDomain {
+sub is_domain {
 #=====================================================
 
-=head2 B<isDomain>
+=head2 B<is_domain>
 
 =cut
 #=====================================================
@@ -1748,46 +1748,46 @@ sub isDomain {
 
 #=====================================================
 
-=head2 B<isHostname>
+=head2 B<is_hostname>
 
 LDH (letter-digit-hyphen), no hyphen at start or end of label, labels are from 1 to 63 characters, top-level is 2 or more letters or numbers.
 
 =cut
 #=====================================================
-sub isHostname {
+sub is_hostname {
 	my $hostname = shift || return;
 	
 	if ($hostname =~ /((^|\.)\-|\-(\.|$))/) { return; }
 	if ($hostname =~ /^(?:[a-z0-9][a-z0-9-]{0,62}\.)*([a-z0-9][a-z0-9-]{0,62}\.[a-z]{2,})\.?$/) {
-		return isDomain($1);
+		return is_domain($1);
 	}
 	return;
 }
 
 #=====================================================
 
-=head2 B<isEmail>
+=head2 B<is_email>
 
 =cut
 #=====================================================
-sub isEmail {
+sub is_email {
 	my $email = shift || return;
 	
 #	if ($email =~ /^[a-z0-9][a-z0-9\!\$\^\*\(\)_\-\+~`\\\[\]\{\}",\.]*\@(.+)$/) {
 	# From http://www.regular-expressions.info/email.html
 	if ($email =~ /^[a-z0-9!#$%&'*+\/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+\/=?^_`{|}~-]+)*\@(.+)$/i) {
-		return isHostname($1);
+		return is_hostname($1);
 	}
 	return;
 }
 
 #=====================================================
 
-=head2 B<isIPv4>
+=head2 B<is_ipv4>
 
 =cut
 #=====================================================
-sub isIPv4 {
+sub is_ipv4 {
 	my $ipv4 = shift || return;
 	if ($ipv4 =~ /^((25[0-5]|2[0-4]\d|[0-1]\d\d|\d\d?)\.){3}(25[0-5]|2[0-4]\d|[0-1]\d\d|\d\d?)$/) {
 		return TRUE;
@@ -1796,11 +1796,11 @@ sub isIPv4 {
 
 #=====================================================
 
-=head2 B<isIPv6>
+=head2 B<is_ipv6>
 
 =cut
 #=====================================================
-sub isIPv6 {
+sub is_ipv6 {
 	my $ipv6 = shift || return;
 	# ---
 	# IPv6 Validator courtesy of Dartware, LLC (http://intermapper.com)
@@ -1813,40 +1813,40 @@ sub isIPv6 {
 
 #=====================================================
 
-=head2 B<getDomainName>
+=head2 B<get_domain_name>
 
- my $domain = getDomainName($domain || $hostname || $emailAddress);
+ my $domain = get_domain_name($domain || $hostname || $emailAddress);
 
 =cut
 #=====================================================
-sub getDomainName {
+sub get_domain_name {
 	my $address = shift || return;
 	my ($domain) = $address =~ /([a-z0-9-]+\.[a-z0-9]+)$/;
-	if (isDomain($domain)) { return $domain; }
+	if (is_domain($domain)) { return $domain; }
 	return;
 }
 
 #=====================================================
 
-=head2 B<isStateCode>
+=head2 B<is_state_code>
 
 =cut
 #=====================================================
-sub isStateCode {
+sub is_state_code {
 	my $state = shift || return;
-	my $code = getRegionCode($state, 'US');
+	my $code = get_region_code($state, 'US');
 	if (lc($state) eq lc($code)) { return TRUE; }
 }
 
 #=====================================================
 
-=head2 B<getStateCode>
+=head2 B<get_state_code>
 
 =cut
 #=====================================================
-sub getStateCode {
+sub get_state_code {
 	my $string = shift || return;
-	return getRegionCode($string, 'US');
+	return get_region_code($string, 'US');
 }
 
 #=====================================================
@@ -2723,16 +2723,16 @@ sub _getRegions {
 
 #=====================================================
 
-=head2 B<getRegionCode>
+=head2 B<get_region_code>
 
 Given a string, returns a region code and country code or give it a string and country code and it will only return a region code for that country.
 
- my ($code, @cc) = getRegionCode($string);
- my $code = getRegionCode($string, $cc);
+ my ($code, @cc) = get_region_code($string);
+ my $code = get_region_code($string, $cc);
 
 =cut
 #=====================================================
-sub getRegionCode {
+sub get_region_code {
 	my $string = shift || return;
 	my $cc = shift;
 	
@@ -2776,13 +2776,13 @@ sub getRegionCode {
 
 #=====================================================
 
-=head2 B<getRegionAliases>
+=head2 B<get_region_aliases>
 
- my $aliasList = getRegionAliases($cc, $region);
+ my $aliasList = get_region_aliases($cc, $region);
 
 =cut
 #=====================================================
-sub getRegionAliases {
+sub get_region_aliases {
 	my $cc = uc(shift) || return;
 	my $region = uc(shift) || return;
 	
@@ -2809,18 +2809,18 @@ sub getRegionAliases {
 
 #=====================================================
 
-=head2 B<getPostalCode>
+=head2 B<get_postal_code>
 
 Given a string, returns a postal code and country code.
   http://en.wikipedia.org/wiki/List_of_postal_codes
 
- my ($code, @cc) = getPostalCode($string);
+ my ($code, @cc) = get_postal_code($string);
 
  (\d{2,5}[- ]?\d{2,4}|[a-z][a-z0-9]{1,3}[- ]?[0-9][a-z0-9]{0,3}|[a-z][a-z0-9]{1,3})
 
 =cut
 #=====================================================
-sub getPostalCode {
+sub get_postal_code {
 	my $string = shift || return;
 	$string = normalize($string, TRUE);
 	
@@ -2859,17 +2859,17 @@ sub getPostalCode {
 
 #=====================================================
 
-=head2 B<getCountryCode>
+=head2 B<get_country_code>
 
 Given a string, returns a country code.
   http://en.wikipedia.org/wiki/ISO_3166
   http://en.wikipedia.org/wiki/ISO_3166-1_alpha-2
 
- my $code = getCountryCode($string);
+ my $code = get_country_code($string);
 
 =cut
 #=====================================================
-sub getCountryCode {
+sub get_country_code {
 	my $string = shift || return;
 	my $countries = {
 		AD => ['andorra', 'and'],
@@ -3131,17 +3131,17 @@ sub getCountryCode {
 
 #=====================================================
 
-=head2 B<getMonth>
+=head2 B<get_month>
 
 Given a month number, abbreviation, or name, returns the month as the format in the second argument. Defaults to the month number (1-12). It is case-insensitive.
 
- my $num = getMonth('October');
- my $abbr = getMonth('oct', 'abbr');
- my $name = getMonth(10, 'name');
+ my $num = get_month('October');
+ my $abbr = get_month('oct', 'abbr');
+ my $name = get_month(10, 'name');
 
 =cut
 #=====================================================
-sub getMonth {
+sub get_month {
 	my $name = lc(shift) || return;
 	my $format = shift;
 	my @months = qw(January February March April May June July August September October November December);
@@ -3567,14 +3567,13 @@ On the other hand, the following leaves the source as is.
 
 #=====================================================
 
-=head2 B<refToScalar>
+=head2 B<ref_to_scalar>
 
- my $text = refToScalar($ref, $delimiter);
+ my $text = ref_to_scalar($ref, $delimiter);
 
 =cut
 #=====================================================
-sub ref_to_scalar { return refToScalar(@_); }
-sub refToScalar {
+sub ref_to_scalar {
 	my $reference = shift || return;
 	my $delimiter = shift || ',';
 	
@@ -3589,17 +3588,16 @@ sub refToScalar {
 
 #=====================================================
 
-=head2 B<arrayToList>
+=head2 B<array_to_list>
 
 This will return a comma-delimited string of unique values from the given array ref. An optional second argument can be passed for the delimiter.
 
- $string = arrayToList($array);
- $string = arrayToList($array, $delimiter);
+ $string = array_to_list($array);
+ $string = array_to_list($array, $delimiter);
 
 =cut
 #=====================================================
-sub array_to_list { return arrayToList(@_); }
-sub arrayToList {
+sub array_to_list {
 	my $array = shift || return;
 	my $delimiter = shift || ',';
 	
@@ -3613,17 +3611,16 @@ sub arrayToList {
 
 #=====================================================
 
-=head2 B<listToArray>
+=head2 B<list_to_array>
 
 This will return an array ref of unique values from the given comma-delimited string. An optional second argument can be passed for the delimiter.
 
- $array = listToArray($string);
- $array = listToArray($string, $delimiter);
+ $array = list_to_array($string);
+ $array = list_to_array($string, $delimiter);
 
 =cut
 #=====================================================
-sub list_to_array { return listToArray(@_); }
-sub listToArray {
+sub list_to_array {
 	my $list = shift || return [];
 	my $delimiter = shift || ',';
 	
@@ -3711,7 +3708,7 @@ sub add_to_list {
 	foreach my $item (@_) {
 		if (!contains($array, $item)) { push(@{$array}, $item); }
 	}
-	return arrayToList($array, $delimiter);
+	return array_to_list($array, $delimiter);
 }
 
 
@@ -3835,7 +3832,7 @@ Wrapper for to_array to make a delimited list based on output from to_array.
 	if (is_arrayhash($list)) { }
 	elsif (!$delimiter && ($key !~ /[a-zA-Z0-9]/)) { $delimiter = $key; undef $key; }
 	my $array = to_array($list, $key);
-	return arrayToList($array, $delimiter);
+	return array_to_list($array, $delimiter);
 	
 }
 
@@ -4083,7 +4080,7 @@ Sorts on one or more fields in an array of arrays, hashes, or values.
 	if (is_text($fieldList)) { $fieldList = [$fieldList]; }
 	if (!is_array($fieldList)) { $fieldList = [0]; }
 	
-	sub isNothing {
+	sub is_nothing {
 		my $input = shift;
 		if (!is_number($input) && !$input) { return TRUE; }
 	}
@@ -4105,11 +4102,11 @@ Sorts on one or more fields in an array of arrays, hashes, or values.
 		
 		# Handle undefined or blank vs. something
 		if ($options->{nullsLast}) {
-			if (isNothing($a1) && !isNothing($b1)) { return 1; }
-			elsif (!isNothing($a1) && isNothing($b1)) { return -1; }
+			if (is_nothing($a1) && !is_nothing($b1)) { return 1; }
+			elsif (!is_nothing($a1) && is_nothing($b1)) { return -1; }
 		} else {
-			if (isNothing($a1) && !isNothing($b1)) { return -1; }
-			elsif (!isNothing($a1) && isNothing($b1)) { return 1; }
+			if (is_nothing($a1) && !is_nothing($b1)) { return -1; }
+			elsif (!is_nothing($a1) && is_nothing($b1)) { return 1; }
 		}
 		# Handle numbers vs. non-numbers
 		if ($options->{numbersLast}) {
@@ -4169,7 +4166,7 @@ This will return an array of unique values from the given array. Values can be a
 	
 	my $map;
 	foreach my $item (@{$array}) {
-		my $value = makeDigest($item);
+		my $value = make_digest($item);
 		$map->{$value} = $item;
 	}
 	my $newArray = [];
@@ -4388,24 +4385,23 @@ Returns a hash with the key value pairs from the second hash.
 
 #=====================================================
 
-=head2 B<checkId>
+=head2 B<check_id>
 
 Filters out bogus input for ids. Pass it any input and it will return a number only if the input is a valid number or can be decoded.
 
- my $id = checkId($encId || $id);
- checkId($id) || return;
+ my $id = check_id($encId || $id);
+ check_id($id) || return;
 
 =cut
 #=====================================================
-sub check_id { return checkId(@_); }
-sub checkId {
+sub check_id {
 	my $identifier = shift || return;
 	
 	my $id;
 	if ($identifier =~ /^[02-9a-km-z]{7}$/) {
-		$id = decodeId($identifier);
+		$id = decode_id($identifier);
 	} elsif ($identifier =~ /^[0-9a-zA-Z]{6}$/) {
-		$id = decodeId($identifier);
+		$id = decode_id($identifier);
 	} elsif ($identifier =~ /^\d+$/) {
 		if ($id < 2147483647) { $id = $identifier; }
 	}
@@ -4416,16 +4412,15 @@ sub checkId {
 
 #=====================================================
 
-=head2 B<encodeId>
+=head2 B<encode_id>
 
 Encode a seven character base-36 id.
 
- $idEnc = encodeId($id);
+ $idEnc = encode_id($id);
 
 =cut
 #=====================================================
-sub encode_id { return encodeId(@_); }
-sub encodeId {
+sub encode_id {
     my $num = shift;
 	# pad with zeros and reverse
 	$num = reverse(sprintf("%010d1",$num));
@@ -4443,16 +4438,15 @@ sub encodeId {
 
 #=====================================================
 
-=head2 B<encode6Id>
+=head2 B<encode6_id>
 
 Encode a six character base-62 id.
 
- $idEnc = encode6Id($id);
+ $idEnc = encode6_id($id);
 
 =cut
 #=====================================================
-sub encode6_id { return encode6Id(@_); }
-sub encode6Id {
+sub encode6_id {
     my $num = shift;
 	# pad with zeros and reverse
 	$num = reverse(sprintf("%010d1",$num));
@@ -4470,16 +4464,15 @@ sub encode6Id {
 
 #=====================================================
 
-=head2 B<decodeId>
+=head2 B<decode_id>
 
 Decode a seven character base-36 id or the older six character base-62 id.
 
- $id = decodeId($idEnc);
+ $id = decode_id($idEnc);
  
 =cut
 #=====================================================
-sub decode_id { return decodeId(@_); }
-sub decodeId {
+sub decode_id {
     my $str = reverse shift;
     my $output;
     
@@ -4521,12 +4514,11 @@ sub decodeId {
 
 #=====================================================
 
-=head2 B<uniqueKey>
+=head2 B<unique_key>
 
 =cut
 #=====================================================
-sub unique_key { return uniqueKey(@_); }
-sub uniqueKey {
+sub unique_key {
 	my $time = time;
 	my $num = sprintf("%s%04d", substr($time, -5), int(rand(10000)));
 	my $ascii = $num % 52 + 65;
@@ -4546,11 +4538,11 @@ sub uniqueKey {
 
 #=====================================================
 
-=head2 B<generateKey>
+=head2 B<generate_key>
 
 =cut
 #=====================================================
-sub generateKey {
+sub generate_key {
 	my $time = time;
 	my $source = sprintf("%s%06d", substr($time, -5), int(rand(1000000)));
 	my $type = shift || 'b64';
@@ -4622,13 +4614,13 @@ sub smsha2012 {
 
 #=====================================================
 
-=head2 B<makeDigest>
+=head2 B<make_digest>
 
 Make a B64 digest out of a string, array, or hash.
 
 =cut
 #=====================================================
-sub makeDigest {
+sub make_digest {
 	my $input = shift || return;
 	if (is_hash($input) || is_array($input)) {
 		$input = make_json($input, { compress => 1 });
@@ -4661,13 +4653,13 @@ sub makeDigest {
 # 	return newArray;
 # }
 # 
-# sub arrayToList(_array) {
+# sub array_to_list(_array) {
 # 	var newArray = unique_array(_array);
 # 	var list = newArray.join(', ');
 # 	return list;
 # }
 # 
-# sub listToArray(_list) {
+# sub list_to_array(_list) {
 # 	var newArray = new Array();
 # 	if (_list) {
 # 		var _array = _list.split(/\s*,\s*/);
@@ -4678,7 +4670,7 @@ sub makeDigest {
 # 	return newArray;
 # }
 # 
-# sub arrayContains(_array, _string) {
+# sub array_contains(_array, _string) {
 # 	if (_array && _string) {
 # 		for (var i = 0; i < _array.length; i++) {
 # 			if (_array[i] == _string) { return true; }
@@ -4687,7 +4679,7 @@ sub makeDigest {
 # 	return false;
 # }
 # 
-# sub combineArrays(_array1, _array2) {
+# sub combine_arrays(_array1, _array2) {
 # 	if (_array1 && _array2) {
 # 		for (var i = 0; i < _array2.length; i++) {
 # 			_array1.push(_array2[i]);
@@ -4777,16 +4769,15 @@ sub strip {
 
 #=====================================================
 
-=head2 B<stripExtraWhiteSpace>
+=head2 B<strip_extra_white_space>
 
 Removes leading and trailing white space and reduces contiguous white space characters to a single space in scalars, arrays, and hashes.
 
- $ref = stripExtraWhiteSpace($ref);
+ $ref = strip_extra_white_space($ref);
 
 =cut
 #=====================================================
-sub strip_extra_white_space { return stripExtraWhiteSpace(@_); }
-sub stripExtraWhiteSpace {
+sub strip_extra_white_space {
 	my $input = shift || return;
 	
 	if (!ref($input)) {
@@ -4818,30 +4809,30 @@ sub stripExtraWhiteSpace {
 
 #=====================================================
 
-=head2 B<stripControlCharacters>
+=head2 B<strip_control_characters>
 
 Removes control characters except for Tab, LF, and CR. Pass a second argument to strip all control characters, even Tab, LF, and CR.
 
 =cut
 #=====================================================
-sub stripControlCharacters {
+sub strip_control_characters {
 	my $input = shift || return;
 	my $all = shift;
 	
 	if (!ref($input)) {
-		$input = _stripControlCharacters($input, $all);
+		$input = _strip_control_characters($input, $all);
 	} elsif (ref($input) eq 'SCALAR') {
-		${$input} = _stripControlCharacters(${$input}, $all);
+		${$input} = _strip_control_characters(${$input}, $all);
 	} elsif (ref($input) eq 'ARRAY') {
 		foreach my $value (@{$input}) {
 			if (!ref($value)) {
-				$value = _stripControlCharacters($value, $all);
+				$value = _strip_control_characters($value, $all);
 			}
 		}
 	} elsif (is_hash($input)) {
 		while (my($name, $value) = each(%{$input})) {
 			if (!ref($value)) {
-				$input->{$name} = _stripControlCharacters($value, $all);
+				$input->{$name} = _strip_control_characters($value, $all);
 			}
 		}
 	}
@@ -4849,7 +4840,7 @@ sub stripControlCharacters {
 	return $input;
 }
 
-sub _stripControlCharacters {
+sub _strip_control_characters {
 	my $input = shift || return;
 	my $all = shift;
 	if ($all) {
@@ -4862,30 +4853,29 @@ sub _stripControlCharacters {
 
 #=====================================================
 
-=head2 B<cleanFilename>
+=head2 B<clean_filename>
 
- $ref = cleanFilename($ref);
+ $ref = clean_filename($ref);
 
 =cut
 #=====================================================
-sub clean_filename { return cleanFilename(@_); }
-sub cleanFilename {
+sub clean_filename {
 	my $input = shift || return;
 	
 	if (!ref($input)) {
-		$input = _cleanFilename($input);
+		$input = _clean_filename($input);
 	} elsif (ref($input) eq 'SCALAR') {
-		${$input} = _cleanFilename(${$input});
+		${$input} = _clean_filename(${$input});
 	} elsif (ref($input) eq 'ARRAY') {
 		foreach my $value (@{$input}) {
 			if (!ref($value)) {
-				$value = _cleanFilename($value);
+				$value = _clean_filename($value);
 			}
 		}
 	} elsif (is_hash($input)) {
 		while (my($name, $value) = each(%{$input})) {
 			if (!ref($value)) {
-				$input->{$name} = _cleanFilename($value);
+				$input->{$name} = _clean_filename($value);
 			}
 		}
 	}
@@ -4893,7 +4883,7 @@ sub cleanFilename {
 	return $input;
 }
 
-sub _cleanFilename {
+sub _clean_filename {
 	my $input = shift || return;
 	$input =~ s/(?:^[.-_ ]+|[^\w.-_ ]| +$)//ig;
 	$input =~ s/[ _]+/_/g;
@@ -4902,9 +4892,9 @@ sub _cleanFilename {
 
 #=====================================================
 
-=head2 B<stripHTML>
+=head2 B<strip_html>
 
- my $text = stripHTML($html, {
+ my $text = strip_html($html, {
 	useNewlines			=> 1,
 	convertLinks		=> 1,
 	preserveLinks		=> 1,
@@ -4915,8 +4905,7 @@ sub _cleanFilename {
 
 =cut
 #=====================================================
-sub strip_html { return stripHTML(@_); }
-sub stripHTML {
+sub strip_html {
 	my $html = shift || return;
 	my $settings = shift;
 	
@@ -4944,15 +4933,15 @@ sub stripHTML {
 	}
 	
 	if ($settings->{convertLinks} || $settings->{convert_links}) {
-		$html =~ s/<a .*?href="(.+?)".*?>(.*?)<\/a>/stripHTMLLink($1, $2)/eig;
+		$html =~ s/<a .*?href="(.+?)".*?>(.*?)<\/a>/strip_html_link($1, $2)/eig;
 	}
 	if ($settings->{preserveLinks}) {
-		$html =~ s/<a .*?href="((?:https?:\/\/|mailto:).+?)".*?>(.*?)<\/a>/\[stripHTML::preservedTag\]a href="$1">$2\[stripHTML::preservedTag\]\/a>/ig;
+		$html =~ s/<a .*?href="((?:https?:\/\/|mailto:).+?)".*?>(.*?)<\/a>/\[strip_html::preservedTag\]a href="$1">$2\[strip_html::preservedTag\]\/a>/ig;
 	}
 	
 	$html =~ s/(?:<br\b.*?\/?>|<\/div>|<\/p>)/$break/ig;
 	$html =~ s/<.*?>//g;
-	$html =~ s/\[stripHTML::preservedTag\]/</g;
+	$html =~ s/\[strip_html::preservedTag\]/</g;
 	
 	if ($settings->{convertEntities} || $settings->{convert_entities}) {
 		$html = html_entities_to_text($html);
@@ -4964,7 +4953,7 @@ sub stripHTML {
 	
 	return $html;
 }
-sub stripHTMLLink {
+sub strip_html_link {
 	my $url = shift;
 	my $title = shift;
 	if ($url && !$title) { return $url; }
@@ -4982,7 +4971,7 @@ sub stripHTMLLink {
 		my $temp = $title;
 		$temp =~ s/^(https?|file|ftp|feed|mms|news|rtsp|webcal):\/+//i;
 		$temp =~ s/\/.*//;
-		if (($url =~ /$title/i) && isHostname($temp)) { return $url; }
+		if (($url =~ /$title/i) && is_hostname($temp)) { return $url; }
 		else { return "$title [ $url ]"; }
 	}
 	# Unknown link - Could be Javascript or something else
@@ -4991,7 +4980,7 @@ sub stripHTMLLink {
 
 #=====================================================
 
-=head2 B<stripOutside>
+=head2 B<strip_outside>
 
  * Converts and strips HTML
  * Converts HTML entities
@@ -4999,20 +4988,20 @@ sub stripHTMLLink {
  * Strips content in parentheses, brackets, and braces
  * Strips outside punctuation and whitespace
 
- my $field = stripOutside($field);
- my $field = stripOutside($field, 'title');	# Leaves starting # $. Leaves trailing ! % . ?
- my $field = stripOutside($field, 'period');	# Leaves trailing .
- my $field = stripOutside($field, 'colon');	# Leaves leading or trailing :
+ my $field = strip_outside($field);
+ my $field = strip_outside($field, 'title');	# Leaves starting # $. Leaves trailing ! % . ?
+ my $field = strip_outside($field, 'period');	# Leaves trailing .
+ my $field = strip_outside($field, 'colon');	# Leaves leading or trailing :
 
 =cut
 #=====================================================
-sub stripOutside {
+sub strip_outside {
 	my $string = shift || return;
 	my $mode = shift;
 	
-	$string = stripHTML($string);
+	$string = strip_html($string);
 	$string = from_html_entities($string);
-	$string = stripControlCharacters($string);
+	$string = strip_control_characters($string);
 	$string =~ s/\(.*?\)//g;
 	$string =~ s/\[.*?\]//g;
 	$string =~ s/\{.*?\}//g;
@@ -5100,7 +5089,7 @@ sub summarize {
 	my $useNewlines = 1;
 	if ($oneLine) { undef($useNewlines); }
 	
-	my $text = stripHTML($html, { useNewlines => 1 });
+	my $text = strip_html($html, { useNewlines => 1 });
 	
 	my $answer;
 	my $cnt = 0;
@@ -5354,19 +5343,19 @@ sub snake_case {
 
 #=====================================================
 
-=head2 B<toLatLong>
+=head2 B<to_lat_long>
 
- my ($lat, $long) = toLatLong( 36.1443, -86.8144 );
- my ($lat, $long) = toLatLong( '36.1443, -86.8144' );
- my ($lat, $long) = toLatLong( '(-86.8144,36.1443)' );	# PostgreSQL point
- my ($lat, $long) = toLatLong( [36.1443, -86.8144] );
- my ($lat, $long) = toLatLong( { lat => 36.1443, long => -86.8144 } );
- my ($lat, $long) = toLatLong( { latitude => 36.1443, longitude => -86.8144 } );
- my ($lat, $long) = toLatLong( { coordinates => '(-86.8144,36.1443)' } );
+ my ($lat, $long) = to_lat_long( 36.1443, -86.8144 );
+ my ($lat, $long) = to_lat_long( '36.1443, -86.8144' );
+ my ($lat, $long) = to_lat_long( '(-86.8144,36.1443)' );	# PostgreSQL point
+ my ($lat, $long) = to_lat_long( [36.1443, -86.8144] );
+ my ($lat, $long) = to_lat_long( { lat => 36.1443, long => -86.8144 } );
+ my ($lat, $long) = to_lat_long( { latitude => 36.1443, longitude => -86.8144 } );
+ my ($lat, $long) = to_lat_long( { coordinates => '(-86.8144,36.1443)' } );
 
 =cut
 #=====================================================
-sub toLatLong {
+sub to_lat_long {
 	my $coords = shift || return;
 	my $long = shift;
 	my $latitude;
@@ -5392,7 +5381,7 @@ sub toLatLong {
 		$latitude = $coords->{latitude};
 		$longitude = $coords->{longitude};
 	} elsif (is_hash_key($coords, 'coordinates')) {
-		($latitude, $longitude) = toLatLong($coords->{coordinates});
+		($latitude, $longitude) = to_lat_long($coords->{coordinates});
 	} elsif (is_array($coords) && is_number($coords->[0]) && is_number($coords->[1])) {
 		$latitude = $coords->[0];
 		$longitude =  $coords->[1];
@@ -5407,28 +5396,28 @@ sub toLatLong {
 
 #=====================================================
 
-=head2 B<toLatLongHash>
+=head2 B<to_lat_long_hash>
 
- my $latLongHash = toLatLongHash(36.1443, -86.8144);
- my $latLongHash = toLatLongHash('36.1443,-86.8144');
- my $latLongHash = toLatLongHash('(36.1443,-86.8144)');	# PostgreSQL point
- my $latLongHash = toLatLongHash( [36.1443, -86.8144] );
- my $latLongHash = toLatLongHash( { lat => 36.1443, long => -86.8144 } );
- my $latLongHash = toLatLongHash( { latitude => 36.1443, longitude => -86.8144 } );	# Preserves hash
+ my $latLongHash = to_lat_long_hash(36.1443, -86.8144);
+ my $latLongHash = to_lat_long_hash('36.1443,-86.8144');
+ my $latLongHash = to_lat_long_hash('(36.1443,-86.8144)');	# PostgreSQL point
+ my $latLongHash = to_lat_long_hash( [36.1443, -86.8144] );
+ my $latLongHash = to_lat_long_hash( { lat => 36.1443, long => -86.8144 } );
+ my $latLongHash = to_lat_long_hash( { latitude => 36.1443, longitude => -86.8144 } );	# Preserves hash
 
 Returns:
  { latitude => 36.1443, longitude => -86.8144 }
 
- my $latLongArrayHash = toLatLongHash( ['36.1443,-86.8144', '(36.137,-86.8307)'] );
- my $latLongArrayHash = toLatLongHash( [ { lat => 36.1443, long => -86.8144 }, { lat => 36.137, long => -86.8307 } ] );
- my $latLongArrayHash = toLatLongHash( [ { latitude => 36.1443, longitude => -86.8144 }, ... ] );	# Preserves hash
+ my $latLongArrayHash = to_lat_long_hash( ['36.1443,-86.8144', '(36.137,-86.8307)'] );
+ my $latLongArrayHash = to_lat_long_hash( [ { lat => 36.1443, long => -86.8144 }, { lat => 36.137, long => -86.8307 } ] );
+ my $latLongArrayHash = to_lat_long_hash( [ { latitude => 36.1443, longitude => -86.8144 }, ... ] );	# Preserves hash
 
 Returns:
  [ { latitude => 36.1443, longitude => -86.8144 }, { latitude => 36.137, longitude => -86.8307 } ]
 
 =cut
 #=====================================================
-sub toLatLongHash {
+sub to_lat_long_hash {
 	my $coords = shift || return;
 	my $long = shift;
 	if (is_number($coords) && is_number($long)) {
@@ -5437,7 +5426,7 @@ sub toLatLongHash {
 			longitude	=> $long
 		};
 	} elsif (is_text($coords)) {
-		my ($lat, $long) = toLatLong($coords);
+		my ($lat, $long) = to_lat_long($coords);
 		return {
 			latitude	=> $lat,
 			longitude	=> $long
@@ -5450,7 +5439,7 @@ sub toLatLongHash {
 	} elsif (is_array($coords) && is_text($coords->[0])) {
 		my $newCoords = [];
 		foreach my $coord (@{$coords}) {
-			my ($lat, $long) = toLatLong($coord);
+			my ($lat, $long) = to_lat_long($coord);
 			push(@{$newCoords}, {
 				latitude	=> $lat,
 				longitude	=> $long
@@ -5481,14 +5470,14 @@ sub toLatLongHash {
 
 #=====================================================
 
-=head2 B<toCoordinates>
+=head2 B<to_coordinates>
 
-Takes the same input as toLatLong but returns the lat/long as a PostgreSQL point.
+Takes the same input as to_lat_long but returns the lat/long as a PostgreSQL point.
 
 =cut
 #=====================================================
-sub toCoordinates {
-	my ($lat, $long) = toLatLong(@_);
+sub to_coordinates {
+	my ($lat, $long) = to_lat_long(@_);
 	if (is_number($lat) && is_number($long)) {
 		return '(' . $long . ',' . $lat . ')';
 	}
@@ -5496,24 +5485,24 @@ sub toCoordinates {
 
 #=====================================================
 
-=head2 B<distanceInMiles>
+=head2 B<distance_in_miles>
 
- my $miles = distanceInMiles($coordinates1, $coordinates2);
- my $miles = distanceInMiles($lat1, $long1, $lat2, $long2);
+ my $miles = distance_in_miles($coordinates1, $coordinates2);
+ my $miles = distance_in_miles($lat1, $long1, $lat2, $long2);
 
 =cut
 #=====================================================
-sub distanceInMiles {
+sub distance_in_miles {
 	my ($coord1, $coord2, $coord3, $coord4) = @_;
 	if (is_number($coord1) && is_number($coord2) && is_number($coord3) && is_number($coord4)) {
-		return _distanceInMiles($coord1, $coord2, $coord3, $coord4);
+		return _distance_in_miles($coord1, $coord2, $coord3, $coord4);
 	} elsif (is_text($coord1) && is_text($coord2)) {
-		my ($lat1, $long1) = toLatLong($coord1);
-		my ($lat2, $long2) = toLatLong($coord2);
-		return _distanceInMiles($lat1, $long1, $lat2, $long2);
+		my ($lat1, $long1) = to_lat_long($coord1);
+		my ($lat2, $long2) = to_lat_long($coord2);
+		return _distance_in_miles($lat1, $long1, $lat2, $long2);
 	}
 }
-sub _distanceInMiles {
+sub _distance_in_miles {
 	my ($lat1, $long1, $lat2, $long2) = @_;
 	my $r = 3956;
 	
@@ -5528,18 +5517,18 @@ sub _distanceInMiles {
 
 #=====================================================
 
-=head2 B<lookUpIP>
+=head2 B<look_up_ip>
 
 =cut
 #=====================================================
-sub lookUpIP {
+sub look_up_ip {
 	my $ip = shift || return;
-	isIPv4($ip) || return;
+	is_ipv4($ip) || return;
 # 	my $apiKey = 'b6e5cd50ec721a27aac617c5f3742ddb45acf1c9db5625e7a7dc5c5b592904d7';
 # 	my $url = 'http://api.ipinfodb.com/v3/ip-city/?format=json&key=' . $apiKey . '&ip=' . $ip;
 # 	my $jsonText = get_url($url);
 # 	my $json = parse_json($jsonText);
-# 	$json->{NIC} = identifyNIC($ip);
+# 	$json->{NIC} = identify_nic($ip);
 # 	sleep 1;
 # 	return $json;
 	
@@ -5558,7 +5547,7 @@ sub lookUpIP {
 				($geo->{cityName}, $geo->{regionName}, $geo->{countryName}) = split(/\s*,\s*/, $geo->{location});
 				if (!$geo->{countryName} && $geo->{regionName}) { $geo->{countryName} = $geo->{regionName}; delete $geo->{regionName}; }
 				else {
-					my $regionCode = getStateCode($geo->{regionName});
+					my $regionCode = get_state_code($geo->{regionName});
 					if ($regionCode) { $geo->{regionCode} = $regionCode; }
 				}
 				$geo->{url} = $pod->{infos}->{info}->[0]->{link_attr}->{url};
@@ -5575,11 +5564,11 @@ sub lookUpIP {
 
 #=====================================================
 
-=head2 B<identifyNIC>
+=head2 B<identify_nic>
 
 =cut
 #=====================================================
-sub identifyNIC {
+sub identify_nic {
 	my $ip = shift || return;
 	my ($classA) = $ip =~ /^(\d+)/;
 	$classA || return;
@@ -5631,15 +5620,15 @@ sub identifyNIC {
 
 #=====================================================
 
-=head2 B<convertStringToDateTime>
+=head2 B<convert_string_to_date_time>
 
 Given a date/time as a string, returns a UTC DateTime object.
 
- my $dateTimeObject = convertStringToDateTime($timeAsString, [ $defaultTimeZone ]);
+ my $dateTimeObject = convert_string_to_date_time($timeAsString, [ $defaultTimeZone ]);
 
 =cut
 #=====================================================
-sub convertStringToDateTime {
+sub convert_string_to_date_time {
 	my $timeString = shift || return;
 	my $timeZone = shift || 'UTC';
 	
@@ -5741,7 +5730,7 @@ sub convertStringToDateTime {
 	
 	if ($year < 70) { $year += 2000; }
 	elsif ($year < 100) { $year += 1900; }
-	if ($month =~ /[A-Za-z]/) { $month = getMonth($month); }
+	if ($month =~ /[A-Za-z]/) { $month = get_month($month); }
 	if ($meridian) {
 		$meridian =~ s/\W+//g;
 		if ((lc($meridian) eq 'pm') && ($hour < 12)) { $hour += 12; }
@@ -5789,28 +5778,28 @@ sub convertStringToDateTime {
 
 #=====================================================
 
-=head2 B<convertStringToEpoch>
+=head2 B<convert_string_to_epoch>
 
 =cut
 #=====================================================
-sub convertStringToEpoch {
-	my $dt = convertStringToDateTime(@_);
+sub convert_string_to_epoch {
+	my $dt = convert_string_to_date_time(@_);
 	return $dt->epoch();
 }
 
 
 #=====================================================
 
-=head2 B<convertDateTimeToString>
+=head2 B<convert_date_time_to_string>
 
 Given a DateTime object, returns the given format as a string. Formats: iso, ics, rfc, display. Defaults to readable ISO, good for PostgreSQL.
 
- my $dateString = convertDateTimeToString($dateTimeObject);
- my $dateString = convertDateTimeToString($dateTimeObject, $format, $timeZone);
+ my $dateString = convert_date_time_to_string($dateTimeObject);
+ my $dateString = convert_date_time_to_string($dateTimeObject, $format, $timeZone);
 
 =cut
 #=====================================================
-sub convertDateTimeToString {
+sub convert_date_time_to_string {
 	my $dt = shift || return;
 	my $format = shift;
 	my $timeZone = shift || 'UTC';
@@ -5867,15 +5856,15 @@ sub convertDateTimeToString {
 
 #=====================================================
 
-=head2 B<getDurationSummary>
+=head2 B<get_duration_summary>
 
 Given a DateTime::Duration, returns a text output of the duration only including the two most significant units.
 
- my $output = getDurationSummary($duration);
+ my $output = get_duration_summary($duration);
 
 =cut
 #=====================================================
-sub getDurationSummary {
+sub get_duration_summary {
 	my $dur = shift || return;
 	my @output;
 	my $cnt;
@@ -5894,24 +5883,24 @@ sub getDurationSummary {
 
 #=====================================================
 
-=head2 B<getEstimatedTimeRemaining>
+=head2 B<get_estimated_time_remaining>
 
- my $startDateTimeObject = convertStringToDateTime('now');
- my $output = getEstimatedTimeRemaining($startDateTimeObject, $fractionOfCompletion);
+ my $startDateTimeObject = convert_string_to_date_time('now');
+ my $output = get_estimated_time_remaining($startDateTimeObject, $fractionOfCompletion);
 
 =cut
 #=====================================================
-sub getEstimatedTimeRemaining {
+sub get_estimated_time_remaining {
 	my $startTime = shift || return;
 	my $fraction = shift;
-	my $currentTime = convertStringToDateTime('now');
+	my $currentTime = convert_string_to_date_time('now');
 	my $secondsElapsed = $currentTime->epoch - $startTime->epoch;
 	if ($secondsElapsed < 5) { return 'Estimating...'; }
 	my $secondsRemaining = int($secondsElapsed / $fraction) - $secondsElapsed;
 	my $durEpoch = $secondsRemaining + $startTime->epoch;
 	my $durTime = DateTime->from_epoch( epoch => $durEpoch );
 	my $duration = $durTime->subtract_datetime($startTime);
-	my $output = getDurationSummary($duration);
+	my $output = get_duration_summary($duration);
 	return $output;
 }
 
@@ -6298,19 +6287,19 @@ sub get_unique_name {
 }
 
 
-sub getFilenameUTCMinute {
+sub get_filename_utc_minute {
 	my $gm = gmtime();
 	my $year = $gm->year + 1900; my $mon = $gm->mon + 1;
 	return sprintf("%04d-%02d-%02d_%02d-%02d", $year, $mon, $gm->mday, $gm->hour, $gm->min);
 }
 
-sub getFilenameUTCHour {
+sub get_filename_utc_hour {
 	my $gm = gmtime();
 	my $year = $gm->year + 1900; my $mon = $gm->mon + 1;
 	return sprintf("%04d-%02d-%02d_%02d", $year, $mon, $gm->mday, $gm->hour);
 }
 
-sub getFilenameUTCDate {
+sub get_filename_utc_date {
 	my $gm = gmtime();
 	my $year = $gm->year + 1900; my $mon = $gm->mon + 1;
 	return sprintf("%04d-%02d-%02d", $year, $mon, $gm->mday);
