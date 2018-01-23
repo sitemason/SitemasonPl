@@ -528,42 +528,42 @@ sub adjustPlurals {
 
 sub emergency {
 	my $self = shift || return; my $message = shift || return; my $args = shift;
-	$self->post( newHash({ level => 'emergency', message => $message, start => 1 }, $args) );
+	$self->post( new_hash({ level => 'emergency', message => $message, start => 1 }, $args) );
 }
 
 sub alert {
 	my $self = shift || return; my $message = shift || return; my $args = shift;
-	$self->post( newHash({ level => 'alert', message => $message, start => 1 }, $args) );
+	$self->post( new_hash({ level => 'alert', message => $message, start => 1 }, $args) );
 }
 
 sub critical {
 	my $self = shift || return; my $message = shift || return; my $args = shift;
-	$self->post( newHash({ level => 'critical', message => $message, start => 1 }, $args) );
+	$self->post( new_hash({ level => 'critical', message => $message, start => 1 }, $args) );
 }
 
 sub error {
 	my $self = shift || return; my $message = shift || return; my $args = shift;
-	$self->post( newHash({ level => 'error', message => $message, start => 1 }, $args) );
+	$self->post( new_hash({ level => 'error', message => $message, start => 1 }, $args) );
 }
 
 sub warning {
 	my $self = shift || return; my $message = shift || return; my $args = shift;
-	$self->post( newHash({ level => 'warning', message => $message, start => 1 }, $args) );
+	$self->post( new_hash({ level => 'warning', message => $message, start => 1 }, $args) );
 }
 
 sub notice {
 	my $self = shift || return; my $message = shift || return; my $args = shift;
-	$self->post( newHash({ level => 'notice', message => $message, start => 1 }, $args) );
+	$self->post( new_hash({ level => 'notice', message => $message, start => 1 }, $args) );
 }
 
 sub info {
 	my $self = shift || return; my $message = shift || return; my $args = shift;
-	$self->post( newHash({ level => 'info', message => $message, start => 1 }, $args) );
+	$self->post( new_hash({ level => 'info', message => $message, start => 1 }, $args) );
 }
 
 sub debug {
 	my $self = shift || return; my $message = shift || return; my $args = shift;
-	$self->post( newHash({ level => 'debug', message => $message, start => 1 }, $args) );
+	$self->post( new_hash({ level => 'debug', message => $message, start => 1 }, $args) );
 }
 
 #=====================================================
@@ -590,7 +590,7 @@ sub printList {
 	}
 	$content .= '  ' . join("\n  ", @{$array}) . "\n";
 	$content .= '=' x $width;
-	$self->post( newHash({ level => 'info', message => $content, start => 1 }, $args) );
+	$self->post( new_hash({ level => 'info', message => $content, start => 1 }, $args) );
 }
 
 
@@ -1410,7 +1410,7 @@ sub mapSquareToLeftronic {
   20120105 TJM - v6.0 mostly the same
   20140124 TJM - v2.00 added Leftronic calls
   20140320 TJM - v7.0 merged 2.00 and 6.0
-  20171109 TJM - v8.0 Moved to SitemasonPL open source project and merged with updates
+  20171109 TJM - v8.0 Moved to SitemasonPl open source project and merged with updates
 
 =head1 AUTHOR
 

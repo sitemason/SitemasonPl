@@ -40,7 +40,8 @@ Errors:
 	command:	summary of every sql call
 	{sql cmd}:	each sql command has a tag, like 'select', 'insert', 'update', 'delete'
 
- my $dbh = SitemasonPl::Database->new(
+ use SitemasonPl::Database::SQL;
+ my $dbh = SitemasonPl::Database::SQL->new(
 	db_type		=> 'pg' || 'mysql' || 'sqlite',
 	db_host		=> $db_host,
 	db_port		=> $db_port,
@@ -277,6 +278,14 @@ sub _modify_quote {
 	return $quoted;
 }
 
+sub quote_list {
+	my $self = shift || return;
+	my $inputList = shift || return;
+	my $qlist = $self->quote($inputList);
+	my $qstring = join(', ', @{$qlist});
+	return $qstring;
+}
+
 sub uncommit {
 #=====================================================
 
@@ -418,7 +427,7 @@ sub do {
 		elsif ($command eq 'update') { $message = 'Nothing to update.'; }
 		elsif ($command eq 'alter') { return $rv; }
 		if ($message) {
-#			$self->{debug}->debug($message, newHash({ tags => 'results' }, $log));
+#			$self->{debug}->debug($message, new_hash({ tags => 'results' }, $log));
 		} else {
 			$self->{debug}->critical("Failed $command", $log);
 		}
@@ -429,7 +438,7 @@ sub do {
 		elsif ($command eq 'update') { $message = 'Updated ' . $message; }
 		elsif ($command eq 'insert') { $message = 'Inserted ' . $message; }
 		if ($message) {
-#			$self->{debug}->debug($message, newHash({ tags => 'results' }, $log));
+#			$self->{debug}->debug($message, new_hash({ tags => 'results' }, $log));
 		} else {
 			$self->{debug}->critical("Unrecognized command, $command on " . $message, $log);
 		}
@@ -874,7 +883,7 @@ In commands, a position of 'a' stands for above and 'b' is below. Do not confuse
 	return ($changeLog, \@affectedGroupIds);
 }
 
-
+sub do_insert { do_update_insert(@_); }
 sub do_update_insert {
 #=====================================================
 
@@ -1067,7 +1076,7 @@ sub copy {
 	my $records = shift || return;
 	my $log = shift;
 	
-	if (!is_array_hash($records)) { return; }
+	if (!is_arrayhash($records)) { return; }
 	
 	my $columns = $self->get_column_info($table);
 	
@@ -1283,7 +1292,7 @@ sub _log_sql {
 		my ($tabs) = $statement =~ /^(\s+)/;
 		$statement =~ s/^$tabs/  /mg;
 		$statement =~ s/\t/  /g;
-		$self->{debug}->post( newHash({
+		$self->{debug}->post( new_hash({
 			caller	=> $caller,
 			level	=> $level,
 			message	=> $statement,
@@ -1323,7 +1332,7 @@ sub _log_transaction {
 		if ($duration) {
 			$message .= " ($duration ms)";
 		}
-		$self->{debug}->post( newHash({
+		$self->{debug}->post( new_hash({
 			caller		=> $caller,
 			level		=> 'debug',
 			message		=> $message,
@@ -2173,7 +2182,7 @@ sub get_table_info {
 	my $table = shift || return;
 	
 	my $tableInfo = $self->get_server_info('tableInfo');
-	if (is_array_hash($tableInfo->{$table})) {
+	if (is_arrayhash($tableInfo->{$table})) {
 		return $tableInfo->{$table};
 	} else {
 		my $sth = $self->{dbh}->table_info(undef, '%', $table, 'TABLE');
@@ -2196,7 +2205,7 @@ sub get_column_info {
 	my $table = shift || return;
 	
 	my $columnInfo = $self->get_server_info('columnInfo');
-	if (is_array_hash($columnInfo->{$table})) {
+	if (is_arrayhash($columnInfo->{$table})) {
 		return $columnInfo->{$table};
 	} else {
 		my $sth = $self->{dbh}->column_info(undef, '%', $table, '%');
@@ -2594,7 +2603,7 @@ sub get_server_info {
 	$self->{db_name} || return;
 	
 	if (exists($SitemasonPl::serverInfo->{$self->{db_name}}->{$key})) {
-		return copyRef($SitemasonPl::serverInfo->{$self->{db_name}}->{$key});
+		return copy_ref($SitemasonPl::serverInfo->{$self->{db_name}}->{$key});
 	}
 	return;
 }
@@ -2613,7 +2622,7 @@ sub set_server_info {
 	my $value = shift;
 	$self->{db_name} || return;
 	
-	$SitemasonPl::serverInfo->{$self->{db_name}}->{$key} = copyRef($value);
+	$SitemasonPl::serverInfo->{$self->{db_name}}->{$key} = copy_ref($value);
 	return TRUE;
 }
 

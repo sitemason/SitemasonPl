@@ -1,4 +1,4 @@
-package SitemasonPL::Batch 8.0;
+package SitemasonPl::Batch 8.0;
 
 =head1 NAME
 
@@ -10,9 +10,9 @@ Mainly a placeholder until I get the old code in here.
 
 With $container:
 
- use SitemasonPL::Batch;
+ use SitemasonPl::Batch;
  
- my $batch = SitemasonPL::Batch->new(
+ my $batch = SitemasonPl::Batch->new(
   	batchSize => 3,
   	process => sub {
  		my $payload = shift;
@@ -30,9 +30,9 @@ With $container:
 
 Without $container:
 
- use SitemasonPL::Batch;
+ use SitemasonPl::Batch;
  
- my $batch = SitemasonPL::Batch->new(
+ my $batch = SitemasonPl::Batch->new(
   	batchSize => 3,
   	process => sub {
  		my $payload = shift;
@@ -54,7 +54,7 @@ use utf8;
 use constant TRUE => 1;
 use constant FALSE => 0;
 
-use SitemasonPL::Common;
+use SitemasonPl::Common;
 
 
 sub new {
@@ -62,7 +62,7 @@ sub new {
 
 =head2 B<new>
 
- my $batch = SitemasonPL::Batch->new(
+ my $batch = SitemasonPl::Batch->new(
   	batchSize => 3,
   	process => sub {
  		my $payload = shift;
@@ -157,7 +157,7 @@ sub end {
 
   ???????? TJM - v1.0 copied from various places
   20171011 TJM - v2.0 Open sourced
-  20171109 TJM - v8.0 Merged with SitemasonPL open source project
+  20171109 TJM - v8.0 Merged with SitemasonPl open source project
 
 =head1 AUTHOR
 

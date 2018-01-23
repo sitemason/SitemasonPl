@@ -26,6 +26,7 @@ use Encode qw(from_to is_utf8 decode);
 use JSON;
 use LWP::UserAgent;
 use Math::Trig qw(deg2rad pi great_circle_distance asin acos);
+use Text::ParseWords;
 use Text::Unidecode;
 # use XML::Parser::Expat;
 use Time::gmtime;
@@ -34,22 +35,22 @@ use Unicode::Collate;
 require Exporter;
 our @ISA = qw(Exporter);
 our @EXPORT = qw(read_cookie generate_password
-	get_filename_utc_minute get_filename_utc_hour get_filename_utc_date convert_arrays_to_csv read_file_list read_file write_file
+	get_filename_utc_minute get_filename_utc_hour get_filename_utc_date convert_arrays_to_csv convert_csv_to_arrays read_file_list read_file write_file
 	get_url post_url parse_query_string url_decode url_encode
 	parse_json make_json jsonify xmlify
 	html_entities_to_text to_html_entities from_html_entities convert_to_utf8 read_vfile
-	is_boolean is_text is_json is_pos_int is_number is_ordinal is_array is_array_with_content is_hash is_hash_with_content is_hash_key is_array_hash is_array_hash_with_content is_object
+	is_boolean is_text is_json is_pos_int is_number is_ordinal is_array is_array_with_content is_hash is_hash_with_content is_hash_key is_arrayhash is_arrayhash_with_content is_object
 	isDomain isHostname isEmail isIPv4 isIPv6 getDomainName isStateCode getStateCode getRegionCode getRegionAliases getPostalCode getCountryCode getMonth
-	round significant percent max min is_close summarizeNumber summarizeBytes makeOrdinal pluralize join_text
-	arrayLength first value ref_to_scalar refToScalar array_to_list arrayToList list_to_array listToArray list_to_array_auto add_to_list remove_from_array to_array to_list to_hash
-	arrayhash_to_hashhash to_hash_hash array_to_hash arrayToHash unique_array uniqueArray contains by_any max_length
-	unique compare compress_var compressRef merge_hashes mergeHashes newHash copyRef joinRef diff
+	round significant percent max min is_close summarize_number summarize_bytes make_ordinal pluralize join_text
+	array_length first value ref_to_scalar refToScalar array_to_list arrayToList list_to_array listToArray list_to_array_auto add_to_list remove_from_array to_array to_list to_hash
+	arrayhash_to_hashhash to_hash_hash arrays_to_arrayhash unique_array contains by_any max_length
+	unique compare compress_ref merge_hashes new_hash copy_ref join_ref diff
 	check_id checkId encode_id encodeId encode6_id encode6Id decode_id decodeId unique_key uniqueKey generateKey smmd5_2008 smsha2012 makeDigest
 	normalize strip strip_extra_white_space stripExtraWhiteSpace stripControlCharacters clean_filename cleanFilename strip_html stripHTML stripHTMLLink stripOutside
-	insertData summarize context to_camel_case from_camel_case is_camel_case camel_case is_kebab_case kebab_case is_snake_case snake_case
+	insert_data summarize context to_camel_case from_camel_case is_camel_case camel_case is_kebab_case kebab_case is_snake_case snake_case
 	toLatLong toLatLongHash toCoordinates distanceInMiles lookUpIP identifyNIC
 	convertStringToDateTime convertStringToEpoch convertDateTimeToString getDurationSummary getEstimatedTimeRemaining
-	get_unique_name
+	get_unique_name getFilenameUTCMinute getFilenameUTCHour getFilenameUTCDate
 );
 
 
@@ -170,6 +171,31 @@ sub convert_arrays_to_csv {
 		$cnt++
 	}
 	return $csv;
+}
+
+sub convert_csv_to_arrays {
+#=====================================================
+
+=head2 B<convert_csv_to_arrays>
+
+ my $table = convert_csv_to_arrays($csv, $debug);
+
+=cut
+#=====================================================
+	my $csv = shift || return;
+	my $debug = shift;
+	my $cnt;
+	my @lines = split("\r\n", $csv);
+	my $data = [];
+	foreach my $line (@lines) {
+		chomp($line);
+		my @columns = Text::ParseWords::parse_line(',', 0, $line);
+		push(@{$data}, \@columns);
+		if (($cnt <= 2) && $debug) { print 'convert_csv_to_arrays: ["' . join('", "', @columns) . "\"]\n"; }
+		elsif (($cnt == 3) && $debug) { print "convert_csv_to_arrays: ...\n"; }
+		$cnt++
+	}
+	return $data;
 }
 
 sub read_file_list {
@@ -548,9 +574,10 @@ sub make_json {
 
  my $json = make_json($jsonRef);
  my $jsonToPrint = make_json($jsonRef, {
- 	splitValues	=> 1,		# Split values greater than 32k
+ 	splitValues		=> 1,		# Split values greater than 32k
  	includeNulls	=> 1,		# Includes all entries, even those with blank, false, or null values
  	compress		=> 1,		# Don't include unnecessary tabs, spaces, or CRs
+ 	escape_for_bash	=> 1,		# Escape single quotes as '"'"';
  	outputHTML		=> 1,
  	unidecode		=> 1,		# Convert unicode characters to standard ASCII
  	jsonp			=> $callbackFunction	# Return as jsonp using the specified callback function
@@ -623,11 +650,15 @@ sub make_json {
 						elsif ($includeNulls) { push(@subJSON, "${tabsplus}${ls}\"$jname\"${se}:${space}${vs}false${se}"); }
 					} elsif ($value || is_number($value)) {
 						if (is_number($value) && !$value) { $value = '0'; }
-						else { $value = jsonify($value, $options->{outputHTML}, $options->{unidecode}); }
+						else {
+							$value = jsonify($value, $options->{outputHTML}, $options->{unidecode});
+							if ($options->{escape_for_bash}) { $value = escape_for_bash($value); }
+						}
 						push(@subJSON, "${tabsplus}${ls}\"$jname\"${se}:${space}${qs}\"$value\"${se}");
 					} elsif ($includeNulls) {
 						# blanks
 						$value = jsonify($value, $options->{outputHTML}, $options->{unidecode});
+						if ($options->{escape_for_bash}) { $value = escape_for_bash($value); }
 						push(@subJSON, "${tabsplus}${ls}\"$jname\"${se}:${space}${qs}\"$value\"${se}");
 					}
 				}
@@ -655,6 +686,7 @@ sub make_json {
 				if (defined($value)) {
 					# non nulls
 					$value = jsonify($value, $options->{outputHTML}, $options->{unidecode});
+					if ($options->{escape_for_bash}) { $value = escape_for_bash($value); }
 					push(@subJSON, "${tabsplus}${qs}\"$value\"${se}");
 				} else {
 					# nulls
@@ -689,6 +721,11 @@ sub make_json {
 	return $json;
 }
 
+sub escape_for_bash {
+	my $text = shift;
+	$text =~ s/\\'/'"'"'/g;
+	return $text;
+}
 
 sub jsonify {
 #=====================================================
@@ -1515,17 +1552,17 @@ sub is_hash_key {
 }
 
 
-sub is_array_hash {
+sub is_arrayhash {
 #=====================================================
 
-=head2 B<is_array_hash>
+=head2 B<is_arrayhash>
 
 Returns positive if argument is an array containing only one or more hash refs.
 Returns defined if argument is an array containing only zero or more hash refs.
 Does not recurse.
 
- if (is_array_hash($arrayHash))			# array with only hashes
- if (defined(is_array_hash($arrayHash)))	# empty array or array with only hashes
+ if (is_arrayhash($arrayHash))			# array with only hashes
+ if (defined(is_arrayhash($arrayHash)))	# empty array or array with only hashes
 
 =cut
 #=====================================================
@@ -1543,15 +1580,15 @@ Does not recurse.
 	return;
 }
 
-sub is_array_hash_with_content {
+sub is_arrayhash_with_content {
 #=====================================================
 
-=head2 B<is_array_hash_with_content>
+=head2 B<is_arrayhash_with_content>
 
 =cut
 #=====================================================
 	my $array = shift || return;
-	if (is_array_hash($array) && @{$array}) { return TRUE; }
+	if (is_arrayhash($array) && @{$array}) { return TRUE; }
 	return;
 }
 
@@ -3248,18 +3285,18 @@ sub is_close {
 	if (($a >= ($b - $distance)) && ($a <= ($b + $distance))) { return TRUE; }
 }
 
+sub summarize_number {
 #=====================================================
 
-=head2 B<summarizeNumber>
+=head2 B<summarize_number>
 
- my $summarizedBytes = summarizeNumber($number);
- my $summarizedBytes = summarizeNumber($number, $precision);
+ my $summarizedBytes = summarize_number($number);
+ my $summarizedBytes = summarize_number($number, $precision);
 
- summarizeNumber(16384, 3); # Returns "16.4 K"
+ summarize_number(16384, 3); # Returns "16.4 K"
 
 =cut
 #=====================================================
-sub summarizeNumber {
 	my $number = shift || return 0;
 	my $precision = shift;
 	my $base = 1000;
@@ -3275,16 +3312,16 @@ sub summarizeNumber {
 	return $label;
 }
 
+sub summarize_bytes {
 #=====================================================
 
-=head2 B<summarizeBytes>
+=head2 B<summarize_bytes>
 
- my $summarizedBytes = summarizeBytes($number);
- my $summarizedBytes = summarizeBytes($number, $precision);
+ my $summarizedBytes = summarize_bytes($number);
+ my $summarizedBytes = summarize_bytes($number, $precision);
 
 =cut
 #=====================================================
-sub summarizeBytes {
 	my $number = shift || return 0;
 	my $precision = shift;
 	my $base = 1024;
@@ -3300,15 +3337,15 @@ sub summarizeBytes {
 	return $label;
 }
 
+sub make_ordinal {
 #=====================================================
 
-=head2 B<makeOrdinal>
+=head2 B<make_ordinal>
 
- my $ordinal = makeOrdinal($number);
+ my $ordinal = make_ordinal($number);
 
 =cut
 #=====================================================
-sub makeOrdinal {
 	my $number = shift || return;
 	is_pos_int($number) || return $number;
 	if ($number =~ /1$/) { return $number . 'st'; }
@@ -3318,6 +3355,7 @@ sub makeOrdinal {
 }
 
 
+sub pluralize {
 #=====================================================
 
 =head2 B<pluralize>
@@ -3327,7 +3365,6 @@ sub makeOrdinal {
 
 =cut
 #=====================================================
-sub pluralize {
 	my $text = shift || return;
 	my $number = shift;
 	if (defined($number) && ($number == 1)) { return $text; }
@@ -3378,15 +3415,15 @@ sub join_text {
 }
 
 
+sub array_length {
 #=====================================================
 
-=head2 B<arrayLength>
+=head2 B<array_length>
 
 Returns the number of elements in an array ref.
 
 =cut
 #=====================================================
-sub arrayLength {
 	my $array = shift || return;
 	if ((ref($array) eq 'ARRAY')) {
 		my $size = @{$array};
@@ -3403,7 +3440,7 @@ sub first {
 Returns the first element of an array or if a string is given, it returns a string.
 It used to return a null, if not an array. That was probably for using it with if statements. I removed it from all ifs.
 Be careful using in if statements as a first element of 0 will return a negative.
-See is_array, is_array_with_content, or arrayLength.
+See is_array, is_array_with_content, or array_length.
 
 =cut
 #=====================================================
@@ -3501,8 +3538,21 @@ On the other hand, the following leaves the source as is.
 		exists($ref->{$key}) || return;
 		$value = $ref->{$key};
 	} elsif (is_array($ref)) {
-		is_pos_int($key, 0, @{$ref}-1) || return;
-		$value = $ref->[$key];
+		if (is_pos_int($key, 0, @{$ref}-1)) {
+			$value = $ref->[$key];
+		} elsif ($key =~ /^(\S+?):(.*)$/) {
+			my $key_name = $1;
+			my $key_value = $2;
+			my $found = FALSE;
+			foreach my $item (@{$ref}) {
+				if (is_hash($item) && exists($item->{$key_name}) && ($item->{$key_name} eq $key_value)) {
+					$found = TRUE;
+					$value = $item;
+					last;
+				}
+			}
+			$found || return;
+		} else { return; }
 	}
 	
 	if (is_array_with_content($keys)) {
@@ -3553,7 +3603,7 @@ sub arrayToList {
 	my $array = shift || return;
 	my $delimiter = shift || ',';
 	
-	my $new_array = uniqueArray($array);
+	my $new_array = unique_array($array);
 	if ($new_array && @{$new_array}) {
 		return join($delimiter, @{$new_array});
 	}
@@ -3579,13 +3629,14 @@ sub listToArray {
 	
 	my @new_array = split(/\s*$delimiter\s*/, $list);
 	if (@new_array) {
-		my $clean_array = uniqueArray(\@new_array);
+		my $clean_array = unique_array(\@new_array);
 		return $clean_array;
 	}
 	return [];
 }
 
 
+sub list_to_array_auto {
 #=====================================================
 
 =head2 B<list_to_array_auto>
@@ -3596,7 +3647,6 @@ Given a string, list_to_array_auto guesses at a list delimiter, then returns an 
 
 =cut
 #=====================================================
-sub list_to_array_auto {
 	my $string = shift;
 	
 	my @list;
@@ -3648,13 +3698,13 @@ sub list_to_array_auto {
 }
 
 
+sub add_to_list {
 #=====================================================
 
 =head2 B<add_to_list>
 
 =cut
 #=====================================================
-sub add_to_list {
 	my $list = shift;
 	my $delimiter = shift;
 	my $array = to_array($list);
@@ -3665,6 +3715,7 @@ sub add_to_list {
 }
 
 
+sub remove_from_array {
 #=====================================================
 
 =head2 B<remove_from_array>
@@ -3675,7 +3726,6 @@ Remove a list of items from the specified list.
 
 =cut
 #=====================================================
-sub remove_from_array {
 	my $list = shift || return;
 	my @remove = @_;
 	
@@ -3692,6 +3742,7 @@ sub remove_from_array {
 }
 
 
+sub to_array {
 #=====================================================
 
 =head2 B<to_array>
@@ -3708,7 +3759,6 @@ Given an array of hashes and a key, this will return an array of the values of t
 
 =cut
 #=====================================================
-sub to_array {
 	my $list = shift || return [];
 	my $key = shift;
 	
@@ -3755,10 +3805,11 @@ sub to_array {
 		}
 	}
 	
-	return uniqueArray($newList);
+	return unique_array($newList);
 }
 
 
+sub to_list {
 #=====================================================
 
 =head2 B<to_list>
@@ -3777,12 +3828,11 @@ Wrapper for to_array to make a delimited list based on output from to_array.
 
 =cut
 #=====================================================
-sub to_list {
 	my $list = shift || return '';
 	my $key = shift;
 	my $delimiter = shift;
 	
-	if (is_array_hash($list)) { }
+	if (is_arrayhash($list)) { }
 	elsif (!$delimiter && ($key !~ /[a-zA-Z0-9]/)) { $delimiter = $key; undef $key; }
 	my $array = to_array($list, $key);
 	return arrayToList($array, $delimiter);
@@ -3790,6 +3840,7 @@ sub to_list {
 }
 
 
+sub to_hash {
 #=====================================================
 
 =head2 B<to_hash>
@@ -3802,7 +3853,6 @@ sub to_list {
 
 =cut
 #=====================================================
-sub to_hash {
 	my $list = shift || return;
 	my $key = shift;
 	my $value = shift;
@@ -3849,6 +3899,8 @@ sub to_hash {
 }
 
 
+sub arrayhash_to_hashhash { return to_hash_hash(@_); }
+sub to_hash_hash {
 #=====================================================
 
 =head2 B<to_hash_hash>
@@ -3859,8 +3911,6 @@ Given an array of hashes, this will return a hash of hashes using the value of t
 
 =cut
 #=====================================================
-sub arrayhash_to_hashhash { return to_hash_hash(@_); }
-sub to_hash_hash {
 	my $list = shift || return;
 	my $key = shift || return;
 	
@@ -3874,39 +3924,47 @@ sub to_hash_hash {
 }
 
 
+sub arrays_to_arrayhash {
 #=====================================================
 
-=head2 B<arrayToHash>
+=head2 B<arrays_to_arrayhash>
 
-Given an array ref, this will return a hash with the array items as keys and 1 as the value. The value can be specified with the second argument.
+Given an array of headers and an array of arrays, this will return an array with a hash per inner array. Good for turning a CSV into an arrayhash.
 
- $hash = arrayToHash($arrayref);
- $hash = arrayToHash($arrayref, $value);
+ my $arrayhash = arrays_to_arrayhash($headers, $arrays);
 
 =cut
 #=====================================================
-sub array_to_hash { return arrayToHash(@_); }
-sub arrayToHash {
-	my $array = shift || return;
-	my $value = shift || 1;
+	my $headers = shift || return;
+	my $arrays = shift || return;
+	is_array($headers) || return;
+	is_array($arrays) || return;
 	
-	return to_hash($array, undef, $value);
+	my $arrayhash = [];
+	my $field_total = @{$headers};
+	foreach my $array (@{$arrays}) {
+		my $hash = {};
+		for (my $i = 0; $i < @{$headers}; $i++) {
+			$hash->{$headers->[$i]} = $array->[$i];
+		}
+		push(@{$arrayhash}, $hash);
+	}
+	return $arrayhash;
 }
 
 
+sub unique_array {
 #=====================================================
 
-=head2 B<uniqueArray>
+=head2 B<unique_array>
 
 This will return an array of unique values from the given array. Alternately, passing it an array of hashes with a key will return an array of unique values from the value of the specified key from all the hashes.
 
- $array = uniqueArray($arrayhash, $key);
- $array = uniqueArray($array);
+ $array = unique_array($arrayhash, $key);
+ $array = unique_array($array);
 
 =cut
 #=====================================================
-sub unique_array { return uniqueArray(@_); }
-sub uniqueArray {
 	my $list = shift || return;
 	my $key = shift;
 	is_array_with_content($list) || return [];
@@ -3933,6 +3991,7 @@ sub uniqueArray {
 }
 
 
+sub contains {
 #=====================================================
 
 =head2 B<contains>
@@ -3946,7 +4005,6 @@ Accepts scalar, array, or hash refs and counts the number of occurrences of the 
 
 =cut
 #=====================================================
-sub contains {
 	my $input = shift || return;
 	my $match = shift || return;
 	
@@ -4094,6 +4152,7 @@ sub max_length {
 
 
 
+sub unique {
 #=====================================================
 
 =head2 B<unique>
@@ -4105,7 +4164,6 @@ This will return an array of unique values from the given array. Values can be a
 
 =cut
 #=====================================================
-sub unique {
 	my $array = shift || return;
 	is_array($array) || return;
 	
@@ -4120,6 +4178,7 @@ sub unique {
 }
 
 
+sub compare {
 #=====================================================
 
 =head2 B<compare>
@@ -4130,14 +4189,13 @@ Compares two inputs to see if they are equivalent. Mostly useful for comparing h
 
 =cut
 #=====================================================
-sub compare {
 	my $first = shift;
 	my $second = shift;
 	
 	if ((is_hash($first) && is_hash($second)) || (is_array($first) && is_array($second))) {
-		my $firstJSON = make_json($first, { compress => 1 });
-		my $secondJSON = make_json($second, { compress => 1 });
-		if ($firstJSON eq $secondJSON) { return TRUE; }
+		my $first_json = make_json($first, { compress => TRUE, unidecode => TRUE });
+		my $second_json = make_json($second, { compress => TRUE, unidecode => TRUE });
+		if ($first_json eq $second_json) { return TRUE; }
 	}
 	elsif ((is_number($first) && is_number($second)) && ($first == $second)) {
 		return TRUE;
@@ -4147,18 +4205,17 @@ sub compare {
 	}
 }
 
+sub compress_ref {
 #=====================================================
 
-=head2 B<compressRef>
+=head2 B<compress_ref>
 
 Removes undefined and empty entries in variables. Should accept one or more scalars, arrays, and references to scalars, arrays, and hashes and navigate through all references.
 
- my $var = compressRef($var);
+ my $var = compress_ref($var);
 
 =cut
 #=====================================================
-sub compress_var { return compressRef(@_); }
-sub compressRef {
 	my @input = @_;
 	my @output;
 	foreach my $input (@input) {
@@ -4197,22 +4254,21 @@ sub compressRef {
 }
 
 
+sub merge_hashes {
 #=====================================================
 
-=head2 B<mergeHashes>
+=head2 B<merge_hashes>
 
 Merge any number of hashes into one hash. The first argument should be a reference to the hash that will get everything.
 Any number of source hash references can be passed as additional arguments to be merged into the first one.
 Later hash keys overwrite earlier ones.
 Does not recurse.
 
- mergeHashes( $targetHashRef, $sourceHashRef, ... );
- my $targetHash = newHash($sourceHashRef, ...);
+ merge_hashes( $targetHashRef, $sourceHashRef, ... );
+ my $targetHash = new_hash($sourceHashRef, ...);
 
 =cut
 #=====================================================
-sub merge_hashes { return mergeHashes(@_); }
-sub mergeHashes {
 	my $targetHash = shift;
 	is_hash($targetHash) || return;
 	
@@ -4227,36 +4283,36 @@ sub mergeHashes {
 		}
 	}
 }
-sub newHash {
+sub new_hash {
 	my $targetHash = {};
-	mergeHashes($targetHash, @_);
+	merge_hashes($targetHash, @_);
 	return $targetHash;
 }
 
 
+sub copy_ref {
 #=====================================================
 
-=head2 B<copyRef>
+=head2 B<copy_ref>
 
 Returns a copy of the given scalar, array, or hash. Recurses through arrays and hashes.
 
 =cut
 #=====================================================
-sub copyRef {
 	my $input = shift;
 	my $limit = shift;
 	if ($limit >= 20) { return $input; }
 	
 	if (ref($input) eq 'HASH') {
 		my $newHash;
-		while (my($name, $value) = each(%{$input})) {
-			$newHash->{$name} = copyRef($value, $limit + 1);
+		foreach my $name (keys(%{$input})) {
+			$newHash->{$name} = copy_ref($input->{$name}, $limit + 1);
 		}
 		return $newHash;
 	} elsif (ref($input) eq 'ARRAY') {
 		my $newArray = [];
 		foreach my $value (@{$input}) {
-			push(@{$newArray}, copyRef($value, $limit + 1));
+			push(@{$newArray}, copy_ref($value, $limit + 1));
 		}
 		return $newArray;
 	} elsif (ref($input) eq 'SCALAR') {
@@ -4268,20 +4324,20 @@ sub copyRef {
 }
 
 
+sub join_ref {
 #=====================================================
 
-=head2 B<joinRef>
+=head2 B<join_ref>
 
 Joins array values and hash keys.
 Joins arrayHash values with the given key.
 Returns scalars and scalar refs as their value.
 
- my $text = joinRef($ref, $delimiter);
- my $text = joinRef($arrayHash, $key, $delimiter);
+ my $text = join_ref($ref, $delimiter);
+ my $text = join_ref($arrayHash, $key, $delimiter);
 
 =cut
 #=====================================================
-sub joinRef {
 	my $reference = shift || return;
 	my $delimiter = shift || ',';
 	my $delimiter2 = shift || ',';
@@ -4289,7 +4345,7 @@ sub joinRef {
 	my $answer;
 	if (!ref($reference)) { $answer = $reference; }
 	elsif (ref($reference) eq 'SCALAR') { $answer = $$reference; }
-	elsif (is_array_hash($reference)) {
+	elsif (is_arrayhash($reference)) {
 		my $tempArray = to_array($reference, $delimiter);
 		$answer = join($delimiter2, @{$tempArray});
 	}
@@ -4299,6 +4355,7 @@ sub joinRef {
 }
 
 
+sub diff {
 #=====================================================
 
 =head2 B<diff>
@@ -4309,13 +4366,12 @@ Returns a hash with the key value pairs from the second hash.
 
 =cut
 #=====================================================
-sub diff {
 	my $old = shift || {};
 	my $new = shift || {};
 	if (!is_hash($old) || !is_hash($new)) { return; }
 	
 	my @keys = (keys(%{$old}), keys(%{$new}));
-	my $keys = uniqueArray(\@keys);
+	my $keys = unique_array(\@keys);
 	my $diff = {};
 	foreach my $key (@{$keys}) {
 		if ((!exists($old->{$key}) || !defined($old->{$key})) && (!exists($new->{$key}) || !defined($new->{$key}))) { next; }
@@ -4593,7 +4649,7 @@ sub makeDigest {
 
 # sub add_to_array(_array, _item) {
 # 	_array.push(_item);
-# 	var newArray = uniqueArray(_array);
+# 	var newArray = unique_array(_array);
 # 	return newArray;
 # }
 # 
@@ -4606,7 +4662,7 @@ sub makeDigest {
 # }
 # 
 # sub arrayToList(_array) {
-# 	var newArray = uniqueArray(_array);
+# 	var newArray = unique_array(_array);
 # 	var list = newArray.join(', ');
 # 	return list;
 # }
@@ -4616,7 +4672,7 @@ sub makeDigest {
 # 	if (_list) {
 # 		var _array = _list.split(/\s*,\s*/);
 # 		if (_array) {
-# 			newArray = uniqueArray(_array);
+# 			newArray = unique_array(_array);
 # 		}
 # 	}
 # 	return newArray;
@@ -4980,20 +5036,20 @@ sub stripOutside {
 }
 
 
+sub insert_data {
 #=====================================================
 
-=head2 B<insertData>
+=head2 B<insert_data>
 
 Recursively replaces ${key} variables in any string in a complex object with the supplied hash of key/values.
 
- my $text = insertData("The ${adjective} brown ${noun}", {
+ my $text = insert_data("The ${adjective} brown ${noun}", {
 	adjective	=> 'quick',
 	noun		=> 'fox'
  } );
 
 =cut
 #=====================================================
-sub insertData {
 	my $template = shift;
 	my $data = shift;
 	my $depth = shift;
@@ -5001,33 +5057,34 @@ sub insertData {
 	is_hash($data) || return $template;
 	
 	if (ref($template) eq 'SCALAR') {
-		my $value = _insertDataIntoString(${$template}, $data);
+		my $value = _insert_data_into_string(${$template}, $data);
 		return ${$value};
 	}
 	elsif (is_array($template)) {
 		my $newTemplate = [];
 		foreach my $value (@{$template}) {
-			push(@{$newTemplate}, insertData($value, $data, $depth+1));
+			push(@{$newTemplate}, insert_data($value, $data, $depth+1));
 		}
 		return $newTemplate;
 	}
 	elsif (is_hash($template)) {
 		my $newTemplate = {};
 		while (my($key, $value) = each(%{$template})) {
-			$newTemplate->{$key} = insertData($value, $data, $depth+1);
+			$newTemplate->{$key} = insert_data($value, $data, $depth+1);
 		}
 		return $newTemplate;
 	}
-	elsif (!ref($template)) { return _insertDataIntoString($template, $data); }
+	elsif (!ref($template)) { return _insert_data_into_string($template, $data); }
 	return $template;
 }
-sub _insertDataIntoString {
+sub _insert_data_into_string {
 	my $template = shift;
 	my $data = shift;
 	$template =~ s/\$\{(\w+)\}/$data->{$1}/eg;
 	return $template;
 }
 
+sub summarize {
 #=====================================================
 
 =head2 B<summarize>
@@ -5036,7 +5093,6 @@ sub _insertDataIntoString {
 
 =cut
 #=====================================================
-sub summarize {
 	my $html = shift || return;
 	my $limit = shift || return;
 	my $type = shift || 'word';
@@ -5069,6 +5125,7 @@ sub summarize {
 }
 
 
+sub context {
 #=====================================================
 
 =head2 B<context>
@@ -5080,7 +5137,6 @@ Returns text of the length specified surrounding the given search term. An optio
 
 =cut
 #=====================================================
-sub context {
 	my $text = shift || return;
 	my $search = shift;
 	my $length = shift || 256;
@@ -5113,6 +5169,7 @@ sub context {
 }
 
 
+sub to_camel_case {
 #=====================================================
 
 =head2 B<to_camel_case>
@@ -5125,7 +5182,6 @@ Recurses through objects converting hash keys. Only converts array and scalar va
 
 =cut
 #=====================================================
-sub to_camel_case {
 	my $input = shift;
 	my $limit = shift;
 	if ($limit >= 20) { return $input; }
@@ -5408,7 +5464,7 @@ sub toLatLongHash {
 		};
 	} elsif (is_hash_key($coords, 'latitude')) {
 		return $coords;
-	} elsif (is_array_hash($coords) && is_hash_key($coords->[0], 'lat')) {
+	} elsif (is_arrayhash($coords) && is_hash_key($coords->[0], 'lat')) {
 		my $newCoords = [];
 		foreach my $coord (@{$coords}) {
 			push(@{$newCoords}, {
@@ -5417,7 +5473,7 @@ sub toLatLongHash {
 			});
 		}
 		return $newCoords;
-	} elsif (is_array_hash($coords) && is_hash_key($coords->[0], 'latitude')) {
+	} elsif (is_arrayhash($coords) && is_hash_key($coords->[0], 'latitude')) {
 		return $coords;
 	}
 	
@@ -5975,7 +6031,7 @@ sub getEstimatedTimeRemaining {
 # 				$xmlRef->{$tag} = $elementRef->[0];
 # 			}
 # 		} elsif (ref($ref) eq 'HASH') {
-# 			my $attr = {}; mergeHashes($attr, $ref);
+# 			my $attr = {}; merge_hashes($attr, $ref);
 # 			if ($attr->{type} eq 'array') { delete($attr->{type}); }
 # 			if (keys(%{$attr})) { $xmlRef->{sub_attribute} = $attr; }
 # 		} elsif ($tag eq '_data') {
@@ -6241,6 +6297,24 @@ sub get_unique_name {
 	return $name_list->[int(rand(@{$name_list}))];
 }
 
+
+sub getFilenameUTCMinute {
+	my $gm = gmtime();
+	my $year = $gm->year + 1900; my $mon = $gm->mon + 1;
+	return sprintf("%04d-%02d-%02d_%02d-%02d", $year, $mon, $gm->mday, $gm->hour, $gm->min);
+}
+
+sub getFilenameUTCHour {
+	my $gm = gmtime();
+	my $year = $gm->year + 1900; my $mon = $gm->mon + 1;
+	return sprintf("%04d-%02d-%02d_%02d", $year, $mon, $gm->mday, $gm->hour);
+}
+
+sub getFilenameUTCDate {
+	my $gm = gmtime();
+	my $year = $gm->year + 1900; my $mon = $gm->mon + 1;
+	return sprintf("%04d-%02d-%02d", $year, $mon, $gm->mday);
+}
 
 
 

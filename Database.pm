@@ -1,4 +1,4 @@
-$jsonpackage SitemasonPl::Database 8.0;
+package SitemasonPl::Database 8.0;
 
 =head1 NAME
 
