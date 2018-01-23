@@ -28,8 +28,8 @@ use SitemasonPl::Common;
 require Exporter;
 our @ISA = qw(Exporter);
 our @EXPORT = qw(
-	compareTitles compareVenueTitles compareAddresses doubleMetaphone normalizeTitle phoneticizeTitle
-	unplural translate getAddressScore convertNumbers normalizeFull normalizeAddress stripBoxFromAddress cleanAddress normalizeCity areSimilar getTimeZone
+	compare_titles compare_addresses double_metaphone normalize_title phoneticize_title
+	unplural translate get_address_score convert_numbers normalize_full normalize_address strip_box_from_address clean_address normalize_city are_similar get_time_zone
 );
 
 #=====================================================
@@ -46,13 +46,13 @@ Things to investigate:
 
 #=====================================================
 
-=head2 B<compareTitles>
+=head2 B<compare_titles>
 
- my ($wordRatio, $editRatio, $wordCount) = compareTitles($titleA, $titleB);
- my ($wordRatio, $editRatio, $wordCount) = compareTitles( {
- 	normalizedA	=> 'first-word',	# output from normalizeTitle 
+ my ($wordRatio, $editRatio, $wordCount) = compare_titles($titleA, $titleB);
+ my ($wordRatio, $editRatio, $wordCount) = compare_titles( {
+ 	normalizedA	=> 'first-word',	# output from normalize_title 
  	normalizedB	=> 'second-word',
- 	phoneticA	=> 'FST-WRD',		# output from phoneticizeTitle
+ 	phoneticA	=> 'FST-WRD',		# output from phoneticize_title
  	phoneticB	=> 'SCND-WRD'
  } );
 
@@ -68,7 +68,7 @@ editRatio returns the Damerau–Levenshtein distance divided by the number of ch
 
 =cut
 #=====================================================
-sub compareTitles {
+sub compare_titles {
 	my $args = shift || return;
 	my $titleB = shift;
 	my $results = [];
@@ -77,10 +77,10 @@ sub compareTitles {
 	if (isText($args)) {
 		my $titleA = $args;
 		$args = {};
-		$args->{normalizedA} = normalizeFull($titleA);
-		$args->{normalizedB} = normalizeFull($titleB);
-		$args->{phoneticA} = phoneticizeTitle($args->{normalizedA});
-		$args->{phoneticB} = phoneticizeTitle($args->{normalizedB});
+		$args->{normalizedA} = normalize_full($titleA);
+		$args->{normalizedB} = normalize_full($titleB);
+		$args->{phoneticA} = phoneticize_title($args->{normalizedA});
+		$args->{phoneticB} = phoneticize_title($args->{normalizedB});
 	}
 	isHash($args) || return;
 	
@@ -100,13 +100,13 @@ sub compareTitles {
 	$a->{phon} = $args->{phoneticA};
 	$b->{phon} = $args->{phoneticB};
 	if ($args->{checkSynonyms}) {
-		my ($synA, $synB) = _checkSynonyms($a->{norm}, $b->{norm});
+		my ($synA, $synB) = _check_synonyms($a->{norm}, $b->{norm});
 		if ($synA) {
 			push(@{$results}, "Synonyms: $a->{norm} -> $synA | $b->{norm} -> $synB");
 			$a->{norm} = $synA;
 			$b->{norm} = $synB;
-			$a->{phon} = phoneticizeTitle($a->{norm});
-			$b->{phon} = phoneticizeTitle($b->{norm});
+			$a->{phon} = phoneticize_title($a->{norm});
+			$b->{phon} = phoneticize_title($b->{norm});
 		}
 	}
 	$a->{words} = [split('-', $a->{norm})];
@@ -124,8 +124,8 @@ sub compareTitles {
 	my @leftoverA;
 	my @leftoverB;
 	my @leftoverWordsA;
-	if ($args->{address}) { loadCommonAddressWords(); }
-	else { loadCommonWords(); }
+	if ($args->{address}) { load_common_address_words(); }
+	else { load_common_words(); }
 	for (my $i = 0; $i < @{$a->{meta}}; $i++) {
 		my $meta1 = $a->{meta}->[$i];
 		my $word1 = $a->{words}->[$i];
@@ -154,7 +154,7 @@ sub compareTitles {
 		# Normalized match
 		if ($word1 eq $word2) { $score = 1; $reason = 'exact'; }
 		# Address phonetic match
-		elsif ($args->{address}) { $score = _compareMetaphones($meta1, $meta2) * .8; $reason = 'address'; }
+		elsif ($args->{address}) { $score = _compare_metaphones($meta1, $meta2) * .8; $reason = 'address'; }
 		# Phonetic match
 		elsif ($meta1 eq $meta2) { $score = .8; $reason = 'phonetic'; }
 		
@@ -189,7 +189,7 @@ sub compareTitles {
 			my $meta2;
 			foreach $meta2 (@leftoverB) {
 				# Phonetic match
-				if ($args->{address}) { $score = _compareMetaphones($meta1, $meta2) * .7; }
+				if ($args->{address}) { $score = _compare_metaphones($meta1, $meta2) * .7; }
 				elsif ($meta1 eq $meta2) { $score = .7; }
 				
 				if ($score) { last; }
@@ -214,7 +214,7 @@ sub compareTitles {
 }
 
 
-sub compareAddresses {
+sub compare_addresses {
 	my $args = shift || return;
 	
 	my $a = {};
@@ -242,7 +242,7 @@ sub compareAddresses {
 		# Normalized match
 		if ($wordsA[$i] eq $wordsB[$i]) { $score = 1; }
 		# Phonetic match
-		else { $score = _compareMetaphones($meta1, $meta2) * .8; }
+		else { $score = _compare_metaphones($meta1, $meta2) * .8; }
 		
 		if ($score) { $wordMatch += $score; }
 		# Non-matching leftovers
@@ -266,7 +266,7 @@ sub compareAddresses {
 			my @leftoverBTemp;
 			my $score = 0;
 			foreach my $meta2 (@leftoverB) {
-				$score = _compareMetaphones($meta1, $meta2);
+				$score = _compare_metaphones($meta1, $meta2);
 				
 				if ($score) { last; }
 				else { push(@leftoverBTemp, $meta2); }
@@ -285,10 +285,10 @@ sub compareAddresses {
 	return ($wordRatio, $wordCount);
 }
 
-sub _checkSynonyms {
+sub _check_synonyms {
 	my $normA = shift;
 	my $normB = shift;
-	loadSynonyms();
+	load_synonyms();
 	foreach my $values (@{$SitemasonPl::Normalize::synonyms}) {
 		my ($matchA, $matchB);
 		my $isA;
@@ -309,7 +309,7 @@ sub _checkSynonyms {
 	}
 }
 
-sub _compareMetaphones {
+sub _compare_metaphones {
 	my $metaA = shift;
 	my $metaB = shift;
 	
@@ -344,7 +344,7 @@ sub _compareMetaphones {
 	return 0;
 }
 
-sub doubleMetaphone {
+sub double_metaphone {
 	my $word = shift;
 	defined($word) || return;
 	my @parts = $word =~ /(\d+(?=\D)|\D+(?=\d)|\d+$|\D+)/g;
@@ -360,7 +360,7 @@ sub doubleMetaphone {
 	return $code;
 }
 
-sub normalizeTitle {
+sub normalize_title {
 	my $input = lc(shift);
 	defined($input) || return;
 	
@@ -418,14 +418,14 @@ sub normalizeTitle {
 	return $input;
 }
 
-sub phoneticizeTitle {
+sub phoneticize_title {
 	my $normalized = shift;
 	defined($normalized) || return;
-	if ($normalized =~ /[^a-z0-9-]/) { $normalized = normalizeTitle($normalized); }
+	if ($normalized =~ /[^a-z0-9-]/) { $normalized = normalize_title($normalized); }
 	my @words = split('-', $normalized);
 	my @meta;
 	foreach my $word (@words) {
-		my $code = doubleMetaphone($word);
+		my $code = double_metaphone($word);
 		if (defined($code)) { push(@meta, $code); }
 	}
 	return join('-', @meta);
@@ -450,7 +450,7 @@ sub unplural {
 # $word = translate($normalized_word);
 sub translate {
 	my $word = shift;
-	loadTranslations();
+	load_translations();
 	my $translation = $SitemasonPl::Normalize::translations->{$word};
 	$translation && return $translation;
 	return $word;
@@ -459,7 +459,7 @@ sub translate {
 # $phrase = hyphenate($normalized_word);
 sub hyphenate {
 	my $word = shift;
-	loadHyphenated();
+	load_hyphenated();
 	my $hyphenated = $SitemasonPl::Normalize::hyphenated->{$word};
 	$hyphenated && return $hyphenated;
 	return $word;
@@ -469,22 +469,22 @@ sub hyphenate {
 sub compound {
 	my $word1 = shift || return;
 	my $word2 = shift || return;
-	loadCompounds();
+	load_compounds();
 	my $compound = $SitemasonPl::Normalize::compounds->{"$word1-$word2"};
 	$compound && return $compound;
 	return;
 }
 
-# $word = unabbreviateAddress($word);
-sub unabbreviateAddress {
+# $word = unabbreviate_address($word);
+sub unabbreviate_address {
 	my $word = shift;
-	loadAddressAbbreviations();
+	load_address_abbreviations();
 	my $translation = $SitemasonPl::Normalize::addressAbbreviations->{$word};
 	$translation && return $translation;
 	return $word;
 }
 
-sub getAddressScore {
+sub get_address_score {
 	my $venue = shift || return;
 	if (isText($venue)) { $venue = { address => $venue }; }
 	isHash($venue) || return;
@@ -494,7 +494,7 @@ sub getAddressScore {
 	my $score = 0;
 	if (($venue->{city} && $venue->{state}) || $venue->{postal_code}) {
 		undef $addressOnly;
-		$venue->{city_normalized} ||= normalizeFull($venue->{city});
+		$venue->{city_normalized} ||= normalize_full($venue->{city});
 		$venue->{state_code} ||= getStateCode($venue->{state});
 		if (!$venue->{postal_clean}) {
 			my ($code, $cc) = getPostalCode($venue->{postal_code});
@@ -505,8 +505,8 @@ sub getAddressScore {
 		if ($venue->{postal_clean}) { $score += .1; }
 	}
 	
-	loadCommonAddressWords();
-	$venue->{address_normalized} ||= normalizeAddress($venue->{address});
+	load_common_address_words();
+	$venue->{address_normalized} ||= normalize_address($venue->{address});
 	my @words = split('-', $venue->{address_normalized});
 	my $hasCommonWord;
 	foreach my $word (@words) {
@@ -522,10 +522,10 @@ sub getAddressScore {
 	
 }
 
-# $phrase = convertNumbers($normalized_phrase);
-sub convertNumbers {
+# $phrase = convert_numbers($normalized_phrase);
+sub convert_numbers {
 	my $phrase = shift || return '';
-	loadNumbers();
+	load_numbers();
 	my @words = split('-', $phrase);
 	
 	my @newWords;
@@ -625,30 +625,30 @@ sub convertNumbers {
 	return join('-', @newWords);
 }
 
-sub normalizeFull {
+sub normalize_full {
 	my $input = shift || return;
 	my $output;
 	
-	if (!ref($input)) { $output = _normalizeFull($input); }
-	elsif (ref($input) eq 'SCALAR') { $output = _normalizeFull(${$input}); }
+	if (!ref($input)) { $output = _normalize_full($input); }
+	elsif (ref($input) eq 'SCALAR') { $output = _normalize_full(${$input}); }
 	elsif (ref($input) eq 'ARRAY') {
 		$output = [];
 		foreach my $value (@{$input}) {
-			push(@{$output}, _normalizeFull($value));
+			push(@{$output}, _normalize_full($value));
 		}
 	} elsif (ref($input) eq 'HASH') {
 		while (my($name, $value) = each(%{$input})) {
-			$output->{$name} = _normalizeFull($value);
+			$output->{$name} = _normalize_full($value);
 		}
 	}
 	
 	return $output;
 }
 
-sub _normalizeFull {
+sub _normalize_full {
 	my $phrase = shift;
-	$phrase = normalizeTitle($phrase);
-	$phrase = convertNumbers($phrase);
+	$phrase = normalize_title($phrase);
+	$phrase = convert_numbers($phrase);
 	
 	my @words = split('-', $phrase);
 	
@@ -668,32 +668,32 @@ sub _normalizeFull {
 	return $phrase;
 }
 
-sub normalizeAddress {
+sub normalize_address {
 	my $input = shift || return;
 	my $output;
 	
-	if (!ref($input)) { $output = _normalizeAddress($input); }
-	elsif (ref($input) eq 'SCALAR') { $output = _normalizeAddress(${$input}); }
+	if (!ref($input)) { $output = _normalize_address($input); }
+	elsif (ref($input) eq 'SCALAR') { $output = _normalize_address(${$input}); }
 	elsif (ref($input) eq 'ARRAY') {
 		$output = [];
 		foreach my $value (@{$input}) {
-			push(@{$output}, _normalizeAddress($value));
+			push(@{$output}, _normalize_address($value));
 		}
 	} elsif (ref($input) eq 'HASH') {
 		while (my($name, $value) = each(%{$input})) {
-			$output->{$name} = _normalizeAddress($value);
+			$output->{$name} = _normalize_address($value);
 		}
 	}
 	
 	return $output;
 }
 
-sub _normalizeAddress {
+sub _normalize_address {
 	my $phrase = shift;
-	$phrase = cleanAddress($phrase);
-	$phrase = normalizeTitle($phrase);
-	$phrase = convertNumbers($phrase);
-	$phrase = _convertSaints($phrase);
+	$phrase = clean_address($phrase);
+	$phrase = normalize_title($phrase);
+	$phrase = convert_numbers($phrase);
+	$phrase = _convert_saints($phrase);
 	
 	my @words = split('-', $phrase);
 	
@@ -706,18 +706,18 @@ sub _normalizeAddress {
 			if ($compound) { $word = $compound; $i++; }
 		}
 		$word = translate($word);
-		$word = unabbreviateAddress($word);
+		$word = unabbreviate_address($word);
 		push(@newWords, $word);
 	}
 	my $phrase = join('-', @newWords);
 	return $phrase;
 }
 
-sub _convertSaints {
+sub _convert_saints {
 	my $phrase = shift || return;
 	if ($phrase !~ /\bst\-([a-z]+)\b/) { return $phrase; }
 	my $name = $1;
-	loadSaints();
+	load_saints();
 	if ($SitemasonPl::Normalize::saints->{$name}) {
 		$phrase =~ s/\bst\-$name\b/saint-$name/g;
 	} elsif ($name =~ /s$/) {
@@ -741,7 +741,7 @@ sub _convertSaints {
 	return $phrase;
 }
 
-sub stripBoxFromAddress {
+sub strip_box_from_address {
 	my $input = shift || return;
 	my $address = $input;
 	if (isHash($input)) { $address = $input->{address}; }
@@ -758,7 +758,7 @@ sub stripBoxFromAddress {
 	return $address;
 }
 
-sub cleanAddress {
+sub clean_address {
 	my $address = shift || return;
 	my $debug;
 	$debug && print STDERR "original:   $address\n";
@@ -801,7 +801,7 @@ sub cleanAddress {
 	$debug && print STDERR "colon:      $address\n";
 	
 	# Strip PO Boxes
-	$address = stripBoxFromAddress($address);
+	$address = strip_box_from_address($address);
 	$debug && print STDERR "strip box:  $address\n";
 	$address = stripOutside($address, 'period');
 	$debug && print STDERR "strip 3:    $address\n";
@@ -817,16 +817,16 @@ sub cleanAddress {
 
 
 
-sub normalizeCity {
+sub normalize_city {
 	my $phrase = shift;
-	$phrase = normalizeTitle($phrase);
+	$phrase = normalize_title($phrase);
 	
 	my @words = split('-', $phrase);
 	my @newWords;
 	for (my $i = 0; $i < @words; $i++) {
 		my $word = $words[$i];
 		if ($word eq 'st') { $word = 'saint'; }
-		else { $word = unabbreviateAddress($word); }
+		else { $word = unabbreviate_address($word); }
 		push(@newWords, $word);
 	}
 	my $phrase = join('-', @newWords);
@@ -839,20 +839,20 @@ sub normalizeCity {
 	return $phrase;
 }
 
-sub areSimilar {
+sub are_similar {
 	my $phrase1 = shift;
 	my $phrase2 = shift;
-	if (normalizeFull($phrase1) eq normalizeFull($phrase2)) { return TRUE; }
+	if (normalize_full($phrase1) eq normalize_full($phrase2)) { return TRUE; }
 }
 
-sub getTimeZone {
+sub get_time_zone {
 	my $tz = shift || return;
-	loadTimeZones();
+	load_time_zones();
 	my $norm = normalize($tz);
 	return $SitemasonPl::Normalize::timeZones->{$norm};
 }
 
-sub loadTimeZones {
+sub load_time_zones {
 	if (!isHash($SitemasonPl::Normalize::timeZones)) {
 		my $names = DateTime::TimeZone->all_names;
 		foreach my $name (@{$names}) {
@@ -868,7 +868,7 @@ sub loadTimeZones {
 }
 
 # Could add niners, etc.
-sub loadNumbers {
+sub load_numbers {
 	if (!isHash($SitemasonPl::Normalize::numbers)) {
 		$SitemasonPl::Normalize::numbers = {
 			one => { n => '1' },
@@ -974,7 +974,7 @@ sub loadNumbers {
 	}
 }
 
-sub loadHyphenated {
+sub load_hyphenated {
 	if (!isHash($SitemasonPl::Normalize::hyphenated)) {
 		$SitemasonPl::Normalize::hyphenated = {
 			ablebodied => 'able-bodied',
@@ -1072,7 +1072,7 @@ sub loadHyphenated {
 	}
 }
 
-sub loadCompounds {
+sub load_compounds {
 	if (!isHash($SitemasonPl::Normalize::compounds)) {
 		$SitemasonPl::Normalize::compounds = {
 			'after-thought' => 'afterthought',
@@ -1199,7 +1199,7 @@ sub loadCompounds {
 	}
 }
 
-sub loadTranslations {
+sub load_translations {
 	if (!isHash($SitemasonPl::Normalize::translations)) {
 		$SitemasonPl::Normalize::translations = {
 			january		=> 'jan',
@@ -1452,7 +1452,7 @@ sub loadTranslations {
 	}
 }
 
-sub loadSynonyms {
+sub load_synonyms {
 	isArray($SitemasonPl::Normalize::synonyms) && return;
 	$SitemasonPl::Normalize::synonyms = [
 		['arena', 'amphitheater', 'auditorium', 'ballpark', 'center', 'coliseum', 'community-center', 'concert-hall', 'exhibition-hall', 'field', 'hall', 'park', 'sportsplex', 'stadium'],
@@ -1466,9 +1466,9 @@ sub loadSynonyms {
 	];
 }
 
-sub loadCommonWords {
+sub load_common_words {
 	isHash($SitemasonPl::Normalize::commonWords) && return;
-	loadSynonyms();
+	load_synonyms();
 	$SitemasonPl::Normalize::commonWords = {
 		and		=> TRUE,
 		as		=> TRUE,
@@ -1498,16 +1498,16 @@ sub loadCommonWords {
 	}
 }
 
-sub loadCommonAddressWords {
+sub load_common_address_words {
 	isHash($SitemasonPl::Normalize::commonAddressWords) && return;
-	loadAddressAbbreviations();
+	load_address_abbreviations();
 	$SitemasonPl::Normalize::commonAddressWords = {};
 	while (my($abbr, $word) = each(%{$SitemasonPl::Normalize::addressAbbreviations})) {
 		$SitemasonPl::Normalize::commonAddressWords->{$word} = TRUE;
 	}
 }
 
-sub loadAddressAbbreviations {
+sub load_address_abbreviations {
 	if (!isHash($SitemasonPl::Normalize::addressAbbreviations)) {
 		$SitemasonPl::Normalize::addressAbbreviations = {
 			's'		=> 'south',
@@ -2048,7 +2048,7 @@ sub loadAddressAbbreviations {
 }
 
 # http://en.wikipedia.org/wiki/List_of_saints
-sub loadSaints {
+sub load_saints {
 	if (!isHash($SitemasonPl::Normalize::saints)) {
 		$SitemasonPl::Normalize::saints = {};
 		my @saints = qw(
