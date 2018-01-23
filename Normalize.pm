@@ -74,7 +74,7 @@ sub compare_titles {
 	my $results = [];
 	
 	# Convert two strings into args hash
-	if (isText($args)) {
+	if (is_text($args)) {
 		my $titleA = $args;
 		$args = {};
 		$args->{normalizedA} = normalize_full($titleA);
@@ -82,7 +82,7 @@ sub compare_titles {
 		$args->{phoneticA} = phoneticize_title($args->{normalizedA});
 		$args->{phoneticB} = phoneticize_title($args->{normalizedB});
 	}
-	isHash($args) || return;
+	is_hash($args) || return;
 	
 	# Quick answer on exact match
 	if ($args->{normalizedA} eq $args->{normalizedB}) {
@@ -221,7 +221,7 @@ sub compare_addresses {
 	my $b = {};
 	my (@wordsA, @wordsB, @metaA, @metaB);
 	
-	if (isHash($args)) {
+	if (is_hash($args)) {
 		$a->{norm} = $args->{normalizedA};
 		$b->{norm} = $args->{normalizedB};
 		@wordsA = split('-', $a->{norm});
@@ -486,8 +486,8 @@ sub unabbreviate_address {
 
 sub get_address_score {
 	my $venue = shift || return;
-	if (isText($venue)) { $venue = { address => $venue }; }
-	isHash($venue) || return;
+	if (is_text($venue)) { $venue = { address => $venue }; }
+	is_hash($venue) || return;
 	$venue->{address} || return 0;
 	
 	my $addressOnly = TRUE;
@@ -608,7 +608,7 @@ sub convert_numbers {
  			if (length($reset) >= 4) { $total = $reset; $subtotal = 0; }
  			else { $subtotal = $reset; $total = 0; }
  			undef $reset;
- 		} elsif (isHashWithContent($new)) {
+ 		} elsif (is_hash_with_content($new)) {
 # 			print "  new ($total + $subtotal)\n";
  			
  		} else {
@@ -744,7 +744,7 @@ sub _convert_saints {
 sub strip_box_from_address {
 	my $input = shift || return;
 	my $address = $input;
-	if (isHash($input)) { $address = $input->{address}; }
+	if (is_hash($input)) { $address = $input->{address}; }
 	elsif (ref($input)) { return; }
 	
 # 	$address =~ s/\b(?:\s*[,-\\]\s*)?(?:r\.?\s*r\.?|h\.?\s*c\.?|rte?\.?|(?:rural\s+|business\s+)?route|r\.?\s*f\.?\s*d\.?|p\.?\s*m\.?\s*b\.?|subway)\s*#?\w+//ig;
@@ -754,7 +754,7 @@ sub strip_box_from_address {
 	$address =~ s/\b(?:p\.?o\.?\s*|campus\s+|post\s+office\s+)box//ig;
 	$address =~ s/(?:^\s*[,\-\/]|[,\-\/]\s*$)//g;
 	$address =~ s/(?:^\s+|\s+$)//g;
-	if (isHash($input)) { $input->{address} = $address; return $input; }
+	if (is_hash($input)) { $input->{address} = $address; return $input; }
 	return $address;
 }
 
@@ -853,7 +853,7 @@ sub get_time_zone {
 }
 
 sub load_time_zones {
-	if (!isHash($SitemasonPl::Normalize::timeZones)) {
+	if (!is_hash($SitemasonPl::Normalize::timeZones)) {
 		my $names = DateTime::TimeZone->all_names;
 		foreach my $name (@{$names}) {
 			my $norm = normalize($name);
@@ -869,7 +869,7 @@ sub load_time_zones {
 
 # Could add niners, etc.
 sub load_numbers {
-	if (!isHash($SitemasonPl::Normalize::numbers)) {
+	if (!is_hash($SitemasonPl::Normalize::numbers)) {
 		$SitemasonPl::Normalize::numbers = {
 			one => { n => '1' },
 			two => { n => '2' },
@@ -975,7 +975,7 @@ sub load_numbers {
 }
 
 sub load_hyphenated {
-	if (!isHash($SitemasonPl::Normalize::hyphenated)) {
+	if (!is_hash($SitemasonPl::Normalize::hyphenated)) {
 		$SitemasonPl::Normalize::hyphenated = {
 			ablebodied => 'able-bodied',
 			absentminded => 'absent-minded',
@@ -1073,7 +1073,7 @@ sub load_hyphenated {
 }
 
 sub load_compounds {
-	if (!isHash($SitemasonPl::Normalize::compounds)) {
+	if (!is_hash($SitemasonPl::Normalize::compounds)) {
 		$SitemasonPl::Normalize::compounds = {
 			'after-thought' => 'afterthought',
 			'any-time' => 'anytime',
@@ -1200,7 +1200,7 @@ sub load_compounds {
 }
 
 sub load_translations {
-	if (!isHash($SitemasonPl::Normalize::translations)) {
+	if (!is_hash($SitemasonPl::Normalize::translations)) {
 		$SitemasonPl::Normalize::translations = {
 			january		=> 'jan',
 			february	=> 'feb',
@@ -1467,7 +1467,7 @@ sub load_synonyms {
 }
 
 sub load_common_words {
-	isHash($SitemasonPl::Normalize::commonWords) && return;
+	is_hash($SitemasonPl::Normalize::commonWords) && return;
 	load_synonyms();
 	$SitemasonPl::Normalize::commonWords = {
 		and		=> TRUE,
@@ -1499,7 +1499,7 @@ sub load_common_words {
 }
 
 sub load_common_address_words {
-	isHash($SitemasonPl::Normalize::commonAddressWords) && return;
+	is_hash($SitemasonPl::Normalize::commonAddressWords) && return;
 	load_address_abbreviations();
 	$SitemasonPl::Normalize::commonAddressWords = {};
 	while (my($abbr, $word) = each(%{$SitemasonPl::Normalize::addressAbbreviations})) {
@@ -1508,7 +1508,7 @@ sub load_common_address_words {
 }
 
 sub load_address_abbreviations {
-	if (!isHash($SitemasonPl::Normalize::addressAbbreviations)) {
+	if (!is_hash($SitemasonPl::Normalize::addressAbbreviations)) {
 		$SitemasonPl::Normalize::addressAbbreviations = {
 			's'		=> 'south',
 			'sw'	=> 'southwest',
@@ -2049,7 +2049,7 @@ sub load_address_abbreviations {
 
 # http://en.wikipedia.org/wiki/List_of_saints
 sub load_saints {
-	if (!isHash($SitemasonPl::Normalize::saints)) {
+	if (!is_hash($SitemasonPl::Normalize::saints)) {
 		$SitemasonPl::Normalize::saints = {};
 		my @saints = qw(
 abadiu abakuh abamun abanoub abaskhayroun abban abbo abdas abel abib
