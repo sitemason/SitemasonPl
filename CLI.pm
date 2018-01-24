@@ -473,6 +473,35 @@ sub say_bold {
 	print $self->make_color(shift, 'bold') . "\n";
 }
 
+sub get_callers {
+	my $start = shift || 1;
+	my $trail = [];
+	for (my $i = $start; $i < 100; $i++) {
+		my @caller = caller($i);
+		$caller[0] || last;
+		
+		my $subroutine = $caller[0];
+		my $line = $caller[2];
+		
+		my @caller2 = caller($i + 1);
+		if ($caller2[0]) {
+			$subroutine = $caller2[3];
+		}
+		if ($subroutine =~ /^main\b/) {
+			my ($script) = $caller[1] =~ m#.*/(.*?)$#;
+			$subroutine =~ s/^main\b/$script/;
+		}
+		my $summary = "$subroutine - Line $line";
+		push(@{$trail}, $summary);
+	}
+	return $trail;
+}
+
+sub get_debug_header {
+	my $callers = get_callers(2);
+	my $ts = get_timestamp;
+	return "$ts $callers->[0]";
+}
 
 sub mark {
 	my $self = shift;
@@ -485,15 +514,10 @@ sub mark {
 	}
 	if ($label) { $label .= ' '; } else { $label = ''; }
 	
-	my @returns = caller(-1);
-	print_object(\@returns, '@returns');
-	my $location = '';
-	if ($returns[3]) { $location = "$returns[3] - Line $returns[2]"; }
-	if (!@returns) { @returns = caller(0); $location = "$returns[1] - Line $returns[2]"; }
-	
+	my $header = get_debug_header;
 	state $counter = 0;
 	print $self->make_color(' ' . $counter++ . ' ', ['bold', 'inverse']) . 
-		$self->bold(" ${label}===> $location") . "\n";
+		$self->bold(" ${label}===> $header") . "\n";
 }
 
 sub print_object {
@@ -650,6 +674,16 @@ sub convert_object_to_string {
 	return $string;
 }
 
+sub debug_object {
+	my $self = shift;
+	my $object;
+	if (!is_object($self)) {
+		$self = SitemasonPl::CLI->new();
+	}
+	my $header = get_debug_header;
+	$self->say_bold($header);
+	$self->print_object(@_);
+}
 
 
 =head1 CHANGES

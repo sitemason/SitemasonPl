@@ -35,7 +35,7 @@ use Unicode::Collate;
 require Exporter;
 our @ISA = qw(Exporter);
 our @EXPORT = qw(read_cookie generate_password
-	get_filename_utc_minute get_filename_utc_hour get_filename_utc_date convert_arrays_to_csv convert_csv_to_arrays read_file_list read_file write_file
+	get_timestamp get_filename_utc_minute get_filename_utc_hour get_filename_utc_date convert_arrays_to_csv convert_csv_to_arrays read_file_list read_file write_file
 	get_url post_url parse_query_string url_decode url_encode
 	parse_json make_json jsonify xmlify
 	html_entities_to_text to_html_entities from_html_entities convert_to_utf8 read_vfile
@@ -50,7 +50,7 @@ our @EXPORT = qw(read_cookie generate_password
 	insert_data summarize context to_camel_case from_camel_case is_camel_case camel_case is_kebab_case kebab_case is_snake_case snake_case
 	to_lat_long to_lat_long_hash to_coordinates distance_in_miles look_up_ip identify_nic
 	convert_string_to_date_time convert_string_to_epoch convert_date_time_to_string get_duration_summary get_estimated_time_remaining
-	get_unique_name get_filename_utc_minute get_filename_utc_hour get_filename_utc_date
+	get_unique_name
 );
 
 
@@ -125,6 +125,12 @@ sub generate_password {
 	return $pass;
 }
 
+
+sub get_timestamp {
+	my $gm = gmtime();
+	my $year = $gm->year + 1900; my $mon = $gm->mon + 1;
+	return sprintf("%04d-%02d-%02d %02d:%02d:%02d", $year, $mon, $gm->mday, $gm->hour, $gm->min, $gm->sec);
+}
 
 sub get_filename_utc_minute {
 	my $gm = gmtime();
@@ -6286,24 +6292,6 @@ sub get_unique_name {
 	return $name_list->[int(rand(@{$name_list}))];
 }
 
-
-sub get_filename_utc_minute {
-	my $gm = gmtime();
-	my $year = $gm->year + 1900; my $mon = $gm->mon + 1;
-	return sprintf("%04d-%02d-%02d_%02d-%02d", $year, $mon, $gm->mday, $gm->hour, $gm->min);
-}
-
-sub get_filename_utc_hour {
-	my $gm = gmtime();
-	my $year = $gm->year + 1900; my $mon = $gm->mon + 1;
-	return sprintf("%04d-%02d-%02d_%02d", $year, $mon, $gm->mday, $gm->hour);
-}
-
-sub get_filename_utc_date {
-	my $gm = gmtime();
-	my $year = $gm->year + 1900; my $mon = $gm->mon + 1;
-	return sprintf("%04d-%02d-%02d", $year, $mon, $gm->mday);
-}
 
 
 
