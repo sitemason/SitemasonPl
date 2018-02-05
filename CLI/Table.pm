@@ -19,6 +19,7 @@ use constant TRUE => 1;
 use constant FALSE => 0;
 
 use lib qw( /opt/lib/site_perl );
+use SitemasonPl::CLI;
 use SitemasonPl::Common;
 
 #=====================================================
@@ -48,14 +49,15 @@ use SitemasonPl::Common;
 sub new {
 	my ($class, %arg) = @_;
 	$class || return;
-	is_object($arg{debug}) || return;
 	is_array($arg{columns}) || return;
 	
 	my $self = {
-		debug		=> $arg{debug},
-		columns		=> $arg{columns},
-		post_args	=> { header => FALSE, output => 'stdout' }
+		columns			=> $arg{columns},
+		use_plain_text	=> $arg{use_plain_text},
+		suppress_colors	=> $arg{suppress_colors},
+		post_args		=> { header => FALSE, output => 'stdout' }
 	};
+	bless $self, $class;
 	
 	$self->{width} = 0;
 	my $first = TRUE;
@@ -68,7 +70,7 @@ sub new {
 		$self->{width} += $column->{width} + 2;
 	}
 	
-	if ($self->is_person) { $arg{unicode} = TRUE; }
+	if ($self->is_person && !$self->{use_plain_text}) { $arg{unicode} = TRUE; }
 # 	if ($ENV{TERM} eq 'screen') { $arg{unicode} = FALSE; }
 	
 	if ($arg{unicode} && ($ENV{TERM} ne 'screen')) {
@@ -114,8 +116,6 @@ sub new {
 		};
 	}
 	
-	bless $self, $class;
-	
 	if ($arg{label}) {
 		$self->print_label($arg{label});
 	}
@@ -126,13 +126,13 @@ sub new {
 
 sub print_top {
 	my $self = shift || return;
-	$self->info($self->get_top(@_), $self->{post_args});
+	$self->body($self->get_top(@_));
 	return $self;
 }
 
 sub get_top {
 	my $self = shift || return;
-	my $type = shift;
+	my $type = shift || '';
 	my $hor = $self->{char}->{hor};
 	my $ut = $self->{char}->{ut};
 	my $ul = $self->{char}->{ul};
@@ -160,7 +160,7 @@ sub get_top {
 sub print_bottom {
 	my $self = shift || return;
 	$self->{was_top} || return;
-	$self->info($self->get_bottom(), $self->{post_args});
+	$self->body($self->get_bottom());
 	return $self;
 }
 
@@ -184,15 +184,15 @@ sub get_bottom {
 
 sub print_line {
 	my $self = shift || return;
-	my $type = shift;
+	my $type = shift || '';
 	$self->{was_top} || return $self->print_top($type);
-	$self->info($self->get_line($type), $self->{post_args});
+	$self->body($self->get_line($type));
 	return $self;
 }
 
 sub get_line {
 	my $self = shift || return;
-	my $type = shift;
+	my $type = shift || '';
 	
 	my $hor = $self->{char}->{hor};
 	my $plus = $self->{char}->{plus};
@@ -226,11 +226,11 @@ sub get_line {
 sub print_label {
 	my $self = shift || return;
 	if (!$self->{was_top}) {
-		$self->info($self->{char}->{ul} . $self->{char}->{hor} x $self->{width} . $self->{char}->{ur}, $self->{post_args});
+		$self->body($self->{char}->{ul} . $self->{char}->{hor} x $self->{width} . $self->{char}->{ur});
 		$self->{was_top} = TRUE;
 	}
 	
-	$self->info($self->get_label(@_), $self->{post_args});
+	$self->body($self->get_label(@_));
 	return $self;
 }
 
@@ -241,7 +241,8 @@ sub get_label {
 	my $line;
 	if ($header) {
 		my $width = $self->{width} - length($header) - 1;
-		$line .= $self->{char}->{vert} . ' ' . $self->bold($header) . ' ' x $width . $self->{char}->{vert};
+		if (!$self->{suppress_colors}) { $header = $self->bold($header); }
+		$line .= $self->{char}->{vert} . ' ' . $header . ' ' x $width . $self->{char}->{vert};
 		$self->{was_label} = TRUE;
 	}
 	return $line;
@@ -249,8 +250,8 @@ sub get_label {
 
 sub print_header {
 	my $self = shift || return;
-	if (!$self->{was_top}) { $self->info($self->get_top, $self->{post_args}); }
-	$self->info($self->get_header(@_), $self->{post_args});
+	if (!$self->{was_top}) { $self->body($self->get_top); }
+	$self->body($self->get_header(@_));
 	return $self;
 }
 
@@ -273,8 +274,8 @@ sub get_header {
 
 sub print_row {
 	my $self = shift || return;
-	if (!$self->{was_top}) { $self->info($self->get_top, $self->{post_args}); }
-	$self->info($self->get_row(@_), $self->{post_args});
+	if (!$self->{was_top}) { $self->body($self->get_top); }
+	$self->body($self->get_row(@_));
 	return $self;
 }
 
@@ -303,7 +304,7 @@ sub get_row {
 		$line .= $self->{char}->{vert};
 		foreach my $column (@{$self->{columns}}) {
 			my $width = $column->{width};
-			my $text;
+			my $text = '';
 			if (is_array($row->{$column->{name}})) {
 				if ($i < @{$row->{$column->{name}}}) {
 					$text = "[$i]: " . $self->to_string($row->{$column->{name}}->[$i], TRUE);
@@ -319,18 +320,22 @@ sub get_row {
 			my ($style, $color, $format);
 			if ($column->{format}) { $format = TRUE; }
 			if (is_hash($args)) {
-				if ($args->{style} && $self->get_term_color($args->{style})) { $style = $args->{style}; }
-				if ($args->{color} && $self->get_term_color($args->{color})) { $color = $args->{color}; }
+				if (!$self->{suppress_colors}) {
+					if ($args->{style} && $self->get_term_color($args->{style})) { $style = $args->{style}; }
+					if ($args->{color} && $self->get_term_color($args->{color})) { $color = $args->{color}; }
+				}
 				if ($args->{$column->{name}}) {
 					if (exists($args->{$column->{name}}->{format})) { $format = $args->{$column->{name}}->{format}; }
 					
-					if ($args->{$column->{name}}->{style} && $self->get_term_color($args->{$column->{name}}->{style})) {
-						$style = $args->{$column->{name}}->{style};
-					}
-					elsif (exists($args->{$column->{name}}->{bold})) { $style = 'bold'; }
+					if (!$self->{suppress_colors}) {
+						if ($args->{$column->{name}}->{style} && $self->get_term_color($args->{$column->{name}}->{style})) {
+							$style = $args->{$column->{name}}->{style};
+						}
+						elsif (exists($args->{$column->{name}}->{bold})) { $style = 'bold'; }
 					
-					if ($args->{$column->{name}}->{color} && $self->get_term_color($args->{$column->{name}}->{color})) {
-						$color = $args->{$column->{name}}->{color};
+						if ($args->{$column->{name}}->{color} && $self->get_term_color($args->{$column->{name}}->{color})) {
+							$color = $args->{$column->{name}}->{color};
+						}
 					}
 				}
 			}
@@ -341,19 +346,22 @@ sub get_row {
 			}
 			my $uses_style;
 			if ($style) {
-				$width += 4;
-				$text = $self->get_term_color($style) . $text;
+				my $code = $self->get_term_color($style);
+				$width += length($code);
+				$text = $code . $text;
 				$uses_style = TRUE;
 			}
 			if ($color) {
-				$width += 5;
-				if (($color =~ /^on/i) && ($color =~ /high$/i)) { $width += 1; }
-				$text = $self->get_term_color($color) . $text;
+				my $code = $self->get_term_color($color);
+				$width += length($code);
+# 				if (($color =~ /^on/i) && ($color =~ /high$/i)) { $width += 1; }
+				$text = $code . $text;
 				$uses_style = TRUE;
 			}
+			if ($color || $style) { $width++; }
 			if ($uses_style) {
 				$width += 3;
-				$text .= $self->get_term_color(reset);
+				$text .= $self->get_term_color('reset');
 			}
 			$line .= ' ' . $text . ' ' x ($width - length($text)) . ' ' . $self->{char}->{vert};
 		}
@@ -381,7 +389,7 @@ sub to_string {
 		$string .= "['" . join("', '", @{$value}) . "']";
 	}
 	elsif (!defined($value)) { $string = '<N>'; }
-	elsif (($value eq ($value+0)) && is_pos_int($value)) { $string = $value + 0; }
+	elsif (is_pos_int($value) && ($value eq ($value+0))) { $string = $value + 0; }
 	elsif ($value) {
 		if ($should_quote) { $string = "'$value'"; }
 		else { $string = "$value"; }

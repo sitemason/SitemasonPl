@@ -28,7 +28,7 @@ sub new {
 
 =head2 B<new>
 
- my $db = SitemasonPl::Database::DynamoDB->new;
+ $self->{dd} = SitemasonPl::Database::DynamoDB->new;
 
 =cut
 #=====================================================
@@ -46,6 +46,22 @@ sub new {
 }
 
 
+sub list_tables {
+#=====================================================
+
+=head2 B<list_tables>
+
+ my $tables = $self->{dd}->list_tables;
+
+=cut
+#=====================================================
+	my $self = shift || return;
+	my $debug = shift;
+	
+	my $dd_tables = $self->_call_dynamodb("list-tables", $debug);
+	return $dd_tables->{TableNames};
+}
+
 sub describe_table {
 #=====================================================
 
@@ -56,23 +72,34 @@ sub describe_table {
 	my $self = shift || return;
 	my $table_name = shift || return;
 	my $debug = shift;
+	state $attr;
+	value($attr, $table_name) && return $attr->{$table_name};
 	
 	my $dd_table = $self->_call_dynamodb("describe-table --table-name $table_name", $debug);
-	return $dd_table->{Table};
+	$attr->{$table_name} = $dd_table->{Table};
+	return $attr->{$table_name};
 }
 
 
-sub get_table_key {
+sub get_table_keys {
 #=====================================================
 
-=head2 B<get_table_key>
+=head2 B<get_table_keys>
 
 =cut
 #=====================================================
 	my $self = shift || return;
 	my $table_name = shift || return;
-	my $attr = $self->describe_table($table_name);
-	return $attr->{KeySchema}->[0]->{AttributeName};
+	my $debug = shift;
+	
+	my $keys = [];
+	my $attr = $self->describe_table($table_name, $debug);
+	value($attr, ['KeySchema', '0', 'AttributeName']) || return;
+	push(@{$keys}, $attr->{KeySchema}->[0]->{AttributeName});
+	if (value($attr, ['KeySchema', '1', 'AttributeName'])) {
+		push(@{$keys}, $attr->{KeySchema}->[1]->{AttributeName});
+	}
+	return $keys;
 }
 
 
@@ -81,13 +108,14 @@ sub query {
 
 =head2 B<query>
 
- my $records = $self->{dd}->query($table_name, $index_name, $data_hash);
+ my $records = $self->{dd}->query($table_name, undef, $query_hash);
+ my $records = $self->{dd}->query($table_name, $index_name, $query_hash);
 
 =cut
 #=====================================================
 	my $self = shift || return;
 	my $table_name = shift || return;
-	my $index_name = shift || return;
+	my $index_name = shift;
 	my $data = shift || return;
 	my $debug = shift;
 	
@@ -127,18 +155,23 @@ sub get_item {
 
 =head2 B<get_item>
 
- my $record = $self->{dd}->get_item($table_name, $key_name, $key_value);
+ my $record = $self->{dd}->get_item($table_name, $partition_key_value[, $sort_key_value]);
 
 =cut
 #=====================================================
 	my $self = shift || return;
 	my $table_name = shift || return;
-	my $key_name = shift;
-	my $key = shift;
+	my $key = shift || return;
+	my $key2 = shift;
 	my $debug = shift;
 	
-	if (!$key_name) { $key_name = $self->get_table_key($table_name); }
-	my $dd_results = $self->_call_dynamodb("get-item --table-name $table_name --key '{\"$key_name\":{\"S\":\"$key\"}}'", $debug);
+	my $key_hash = {};
+	my $keys = $self->get_table_keys($table_name);
+	$key_hash->{$keys->[0]} = $key;
+	if ($keys->[1]) { $key_hash->{$keys->[1]} = $key2; }
+	my $key_json = _convert_to_key_json($key_hash);
+	
+	my $dd_results = $self->_call_dynamodb("get-item --table-name $table_name --key '$key_json'", $debug);
 	my $results = _convert_from_dynamodb($dd_results);
 	return $results->{Item};
 }
@@ -231,7 +264,7 @@ sub _convert_to_key_json {
 	
 	my $key_hash = {};
 	while (my($name, $value) = each(%{$keys})) {
-		my $new_value = _convert_to_dynamodb($value, 1) || next;
+		my $new_value = _convert_to_dynamodb($value, undef, 1) || next;
 		$key_hash->{$name} = $new_value;
 	}
 	my $key_json = make_json($key_hash, { compress => TRUE });
@@ -260,7 +293,7 @@ sub _convert_to_expression {
 	_convert_to_expression_traverse($data, $container, []);
 	my $expression = join(', ', @{$container->{comparisons}});
 	my $names = make_json($container->{names}, { compress => TRUE });
-	my $values = make_json($container->{values}, { compress => TRUE });
+	my $values = make_json($container->{values}, { compress => TRUE, include_nulls => TRUE });
 	return {
 		comparisons		=> $container->{comparisons},
 		names_json		=> $names,
@@ -293,9 +326,9 @@ sub _convert_to_expression_item {
 	my $path = shift || return;
 	my @path = @{$path};
 	
-	if (is_hash($value) || is_array($value)) {
+	if (is_hash_with_content($value) || is_array_with_content($value)) {
 		_convert_to_expression_traverse($value, $container, [@path, $name]);
-	} elsif (is_text($value)) {
+	} elsif (defined($value)) {
 		push(@path, $name);
 		my $comparison_name;
 		foreach my $item (@path) {
@@ -309,10 +342,12 @@ sub _convert_to_expression_item {
 			}
 		}
 		my $comp;
-		($comp, $value) = $value =~ m#^(=|<=|<|>=|>|/)?(.*)$#;
+		if (is_text($value)) {
+			($comp, $value) = $value =~ m#^(=|<=|<|>=|>|/)?(.*)$#;
+		}
 		$comp ||= '=';
 		
-		my $new_value = _convert_to_dynamodb($value, 1);
+		my $new_value = _convert_to_dynamodb($value, undef, 1);
 		my $value_ref = ":v" . $container->{value_count}++;
 		$container->{values}->{$value_ref} = $new_value;
 		if ($comp eq '/') {
@@ -348,11 +383,14 @@ sub _convert_to_dynamodb {
 =cut
 #=====================================================
 	my $item = shift || return;
+	my $type = shift;
 	my $level = shift;
 	if (is_hash($item)) {
 		my $new_hash = {};
 		while (my($name, $value) = each(%{$item})) {
-			my $new_value = _convert_to_dynamodb($value, $level+1);
+			my $value_type;
+			if ($name =~ /^#/) { $value_type = 'N'; $name =~ s/^#//; }
+			my $new_value = _convert_to_dynamodb($value, $value_type, $level+1);
 			$new_hash->{$name} = $new_value;
 		}
 		if ($level) { return { "M" => $new_hash }; }
@@ -360,13 +398,13 @@ sub _convert_to_dynamodb {
 	} elsif (is_array($item)) {
 		my $new_array = [];
 		foreach my $value (@{$item}) {
-			my $new_value = _convert_to_dynamodb($value, $level+1);
+			my $new_value = _convert_to_dynamodb($value, undef, $level+1);
 			push(@{$new_array}, $new_value);
 		}
 		if ($level) { return { "L" => $new_array }; }
 		else { return $new_array; }
-# 	} elsif (is_number($item)) {
-# 		return { "N" => $item };
+	} elsif (($type eq 'N') && is_number($item)) {
+		return { "N" => $item };
 	} else {
 		return { "S" => $item };
 	}

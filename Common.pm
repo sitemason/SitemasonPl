@@ -295,7 +295,8 @@ sub write_file {
 		} else {
 			$filename .= "_$time";
 		}
-		$fullpath = "$path/$filename";
+		$fullpath = $filename;
+		if ($path) { $fullpath = "$path/$filename"; }
 	}
 	
 	if (!$options->{overwrite} && -s $fullpath) {
@@ -563,6 +564,8 @@ Returns a reference matching the given JSON if successful or scalar error messag
 	$json = $json->utf8(0);
 	my $perl;
 	
+	$json_string =~ s/:\s*(True|False)(,|$)/: \l$1$2/gm;
+	$json_string =~ s/:\s*(None)(,|$)/: \lnull$2/gm;
 	eval { $perl = $json->decode($json_string); };
 	if ($@) {
 		print "Error parsing JSON: $@";
@@ -580,11 +583,10 @@ sub make_json {
 
  my $json = make_json($jsonRef);
  my $jsonToPrint = make_json($jsonRef, {
- 	splitValues		=> 1,		# Split values greater than 32k
- 	includeNulls	=> 1,		# Includes all entries, even those with blank, false, or null values
+ 	include_nulls	=> 1,		# Includes all entries, even those with blank, false, or null values
  	compress		=> 1,		# Don't include unnecessary tabs, spaces, or CRs
  	escape_for_bash	=> 1,		# Escape single quotes as '"'"';
- 	outputHTML		=> 1,
+ 	output_html		=> 1,
  	unidecode		=> 1,		# Convert unicode characters to standard ASCII
  	jsonp			=> $callbackFunction	# Return as jsonp using the specified callback function
  } );
@@ -600,7 +602,7 @@ sub make_json {
 	my $n = "\n";
 	
 	my ($ls, $vs, $qs, $es, $se);
-	if ($options->{outputHTML}) {
+	if ($options->{output_html}) {
 		$ls = '<span class="l">';
 		$vs = '<span class="v">';
 		$qs = '<span class="q">';
@@ -623,8 +625,7 @@ sub make_json {
 		return "$es\"[EXCEEDED LINE LIMIT]\"$se";
 	}
 	
-	my $splitXML = $options->{splitValues} || $options->{split_values};
-	my $includeNulls = $options->{includeNulls} || $options->{include_nulls};
+	my $include_nulls = $options->{include_nulls};
 	my $compress = $options->{compress};
 	my $jsonp = $options->{jsonp};
 	my $json;
@@ -641,29 +642,29 @@ sub make_json {
 			if (is_boolean($value)) {
 				# booleans
 				if ($value) { push(@subJSON, "${tabsplus}${ls}\"$jname\"${se}:${space}true"); }
-				elsif ($includeNulls) { push(@subJSON, "${tabsplus}${ls}\"$jname\"${se}:${space}false"); }
+				elsif ($include_nulls) { push(@subJSON, "${tabsplus}${ls}\"$jname\"${se}:${space}false"); }
 			} elsif ((ref($value) eq 'HASH') || (ref($value) eq 'ARRAY')) {
 				my $subJSON = make_json($value,$options,$depth+1);
 				if ($subJSON) { push(@subJSON, "${tabsplus}${ls}\"$jname\"${se}:${space}$subJSON"); }
 			} elsif (!ref($value)) {
-				if (defined($value) || $includeNulls) {
-					if (!defined($value) && $includeNulls) {
+				if (defined($value) || $include_nulls) {
+					if (!defined($value) && $include_nulls) {
 						# nulls
 						push(@subJSON, "${tabsplus}${ls}\"$jname\"${se}:${space}${vs}null${se}");
 					} elsif (($name =~ /^(?:is|has)(?:_|[A-Z])/)) {
 						# booleans
 						if ($value) { push(@subJSON, "${tabsplus}${ls}\"$jname\"${se}:${space}${vs}true${se}"); }
-						elsif ($includeNulls) { push(@subJSON, "${tabsplus}${ls}\"$jname\"${se}:${space}${vs}false${se}"); }
+						elsif ($include_nulls) { push(@subJSON, "${tabsplus}${ls}\"$jname\"${se}:${space}${vs}false${se}"); }
 					} elsif ($value || is_number($value)) {
 						if (is_number($value) && !$value) { $value = '0'; }
 						else {
-							$value = jsonify($value, $options->{outputHTML}, $options->{unidecode});
+							$value = jsonify($value, $options->{output_html}, $options->{unidecode});
 							if ($options->{escape_for_bash}) { $value = escape_for_bash($value); }
 						}
 						push(@subJSON, "${tabsplus}${ls}\"$jname\"${se}:${space}${qs}\"$value\"${se}");
-					} elsif ($includeNulls) {
+					} elsif ($include_nulls) {
 						# blanks
-						$value = jsonify($value, $options->{outputHTML}, $options->{unidecode});
+						$value = jsonify($value, $options->{output_html}, $options->{unidecode});
 						if ($options->{escape_for_bash}) { $value = escape_for_bash($value); }
 						push(@subJSON, "${tabsplus}${ls}\"$jname\"${se}:${space}${qs}\"$value\"${se}");
 					}
@@ -680,6 +681,8 @@ sub make_json {
 				else { $json .= "$subJSON${n}"; }
 			}
 			$json .= "${tabs}\}";
+		} elsif ($include_nulls) {
+			$json = "\{\}";
 		}
 	} elsif (ref($data) eq 'ARRAY') {
 		foreach my $item (@{$data}) {
@@ -691,7 +694,7 @@ sub make_json {
 			} elsif (!ref($value)) {
 				if (defined($value)) {
 					# non nulls
-					$value = jsonify($value, $options->{outputHTML}, $options->{unidecode});
+					$value = jsonify($value, $options->{output_html}, $options->{unidecode});
 					if ($options->{escape_for_bash}) { $value = escape_for_bash($value); }
 					push(@subJSON, "${tabsplus}${qs}\"$value\"${se}");
 				} else {
@@ -719,6 +722,8 @@ sub make_json {
 				}
 			}
 			$json .= "${tabs}\]";
+		} elsif ($include_nulls) {
+			$json = "\[\]";
 		}
 	}
 	
@@ -3734,11 +3739,11 @@ Remove a list of items from the specified list.
 	
 	if (ref($list) eq 'ARRAY') {
 		my $remove = to_hash(\@remove);
-		my $newArray = [];
+		my $new_array = [];
 		foreach my $item (@{$list}) {
-			unless ($remove->{$item}) { push(@{$newArray}, $item); }
+			unless ($remove->{$item}) { push(@{$new_array}, $item); }
 		}
-		return $newArray;
+		return $new_array;
 	} else {
 		return $list;
 	}
@@ -4175,9 +4180,9 @@ This will return an array of unique values from the given array. Values can be a
 		my $value = make_digest($item);
 		$map->{$value} = $item;
 	}
-	my $newArray = [];
-	@{$newArray} = values(%{$map});
-	return $newArray;
+	my $new_array = [];
+	@{$new_array} = values(%{$map});
+	return $new_array;
 }
 
 
@@ -4307,17 +4312,17 @@ Returns a copy of the given scalar, array, or hash. Recurses through arrays and 
 	if ($limit >= 20) { return $input; }
 	
 	if (ref($input) eq 'HASH') {
-		my $newHash;
+		my $new_hash = {};
 		foreach my $name (keys(%{$input})) {
-			$newHash->{$name} = copy_ref($input->{$name}, $limit + 1);
+			$new_hash->{$name} = copy_ref($input->{$name}, $limit + 1);
 		}
-		return $newHash;
+		return $new_hash;
 	} elsif (ref($input) eq 'ARRAY') {
-		my $newArray = [];
+		my $new_array = [];
 		foreach my $value (@{$input}) {
-			push(@{$newArray}, copy_ref($value, $limit + 1));
+			push(@{$new_array}, copy_ref($value, $limit + 1));
 		}
-		return $newArray;
+		return $new_array;
 	} elsif (ref($input) eq 'SCALAR') {
 		my $newScalar = ${$input};
 		return \$newScalar;
@@ -5183,28 +5188,28 @@ Recurses through objects converting hash keys. Only converts array and scalar va
 	
 	if (ref($input) eq 'HASH') {
 		# Always do hash keys and recurse to find more hash keys
-		my $newHash = {};
+		my $new_hash = {};
 		while (my($name, $value) = each(%{$input})) {
 			my $newName = _to_camel_case_scalar($name);
-			$newHash->{$newName} = to_camel_case($value, $limit + 1);
+			$new_hash->{$newName} = to_camel_case($value, $limit + 1);
 		}
-		return $newHash;
+		return $new_hash;
 	} elsif ($limit) {
 		# If farther in, search arrays for more hashes. Otherwise, return.
 		if (ref($input) eq 'ARRAY') {
-			my $newArray = [];
+			my $new_array = [];
 			foreach my $value (@{$input}) {
 				my $newValue = to_camel_case($value, $limit + 1);
-				push(@{$newArray}, $newValue);
+				push(@{$new_array}, $newValue);
 			}
-			return $newArray;
+			return $new_array;
 		} else {
 			return $input;
 		}
 	} else {
 		# First level, process scalars, array values, and hash keys
 		if (ref($input) eq 'ARRAY') {
-			my $newArray = [];
+			my $new_array = [];
 			foreach my $value (@{$input}) {
 				my $newValue = $value;
 				if ((ref($value) eq 'SCALAR') || !ref($value)) {
@@ -5212,9 +5217,9 @@ Recurses through objects converting hash keys. Only converts array and scalar va
 				} else {
 					$newValue = to_camel_case($value, $limit + 1);
 				}
-				push(@{$newArray}, $newValue);
+				push(@{$new_array}, $newValue);
 			}
-			return $newArray;
+			return $new_array;
 		} elsif ((ref($input) eq 'SCALAR') || !ref($input)) {
 			return _to_camel_case_scalar($input);
 		} else {
@@ -5249,28 +5254,28 @@ Recurses through objects converting hash keys. Only converts array and scalar va
 	
 	if (ref($input) eq 'HASH') {
 		# Always do hash keys and recurse to find more hash keys
-		my $newHash = {};
+		my $new_hash = {};
 		while (my($name, $value) = each(%{$input})) {
 			my $newName = _from_camel_case_scalar($name);
-			$newHash->{$newName} = from_camel_case($value, $limit + 1);
+			$new_hash->{$newName} = from_camel_case($value, $limit + 1);
 		}
-		return $newHash;
+		return $new_hash;
 	} elsif ($limit) {
 		# If farther in, search arrays for more hashes. Otherwise, return.
 		if (ref($input) eq 'ARRAY') {
-			my $newArray = [];
+			my $new_array = [];
 			foreach my $value (@{$input}) {
 				my $newValue = from_camel_case($value, $limit + 1);
-				push(@{$newArray}, $newValue);
+				push(@{$new_array}, $newValue);
 			}
-			return $newArray;
+			return $new_array;
 		} else {
 			return $input;
 		}
 	} else {
 		# First level, process scalars, array values, and hash keys
 		if (ref($input) eq 'ARRAY') {
-			my $newArray = [];
+			my $new_array = [];
 			foreach my $value (@{$input}) {
 				my $newValue = $value;
 				if ((ref($value) eq 'SCALAR') || !ref($value)) {
@@ -5278,9 +5283,9 @@ Recurses through objects converting hash keys. Only converts array and scalar va
 				} else {
 					$newValue = from_camel_case($value, $limit + 1);
 				}
-				push(@{$newArray}, $newValue);
+				push(@{$new_array}, $newValue);
 			}
-			return $newArray;
+			return $new_array;
 		} elsif ((ref($input) eq 'SCALAR') || !ref($input)) {
 			return _from_camel_case_scalar($input);
 		} else {

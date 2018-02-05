@@ -35,8 +35,9 @@ sub new {
 =head2 B<new>
 
  my $cli = SitemasonPl::CLI->new(
-	exit_if_running		=> TRUE,
-	commandline_args	=> []		# As defined in get_options; includes 'help' and 'version'
+	exit_if_running		=> FALSE,
+	commandline_args	=> [],		# As defined in get_options; includes 'help' and 'version'
+	use_markdown		=> FALSE
  );
 
 =cut
@@ -44,7 +45,9 @@ sub new {
 	my ($class, %arg) = @_;
 	$class || return;
 	
-	my $self = {};
+	my $self = {
+		use_markdown	=> $arg{use_markdown}
+	};
 	bless $self, $class;
 	($self->{script_name}) = $0 =~ /\/([^\/]+?)$/;
 	
@@ -57,7 +60,7 @@ sub new {
 	if ($arg{commandline_args}) {
 		if (!is_array($arg{commandline_args})) { $arg{commandline_args} = []; }
 		push(@{$arg{commandline_args}}, 'help|h');
-		push(@{$arg{commandline_args}}, 'version');
+		push(@{$arg{commandline_args}}, 'version|V');
 		$self->{options} = $self->get_options(@{$arg{commandline_args}});
 		if ($self->{options}->{help} || $self->{options}->{usage}) { $self->print_usage; exit; }
 		if ($self->{options}->{version}) { $self->print_version; exit; }
@@ -174,14 +177,14 @@ Given a list of acceptable options, returns a hash of the options with their val
 
 sub print_usage {
 	my $self = shift || return;
-	pod2usage({ -indent => 4, -width => 140, -verbose => 99, -sections => ['USAGE'] });
+	pod2usage({ -indent => 1, -width => 140, -verbose => 99, -sections => ['USAGE'] });
 	return TRUE;
 }
 
 sub print_version {
 	my $self = shift || return;
 	print $self->{script_name};
-	if ($main::VERSION) { print " $main::VERSION"; }
+	if ($main::VERSION) { printf(" %1.2f", $main::VERSION); }
 	say "";
 	return TRUE;
 }
@@ -192,14 +195,26 @@ sub print_version {
 sub info {
 	my $self = shift || return;
 	my $text = shift;
-	print "$text\n";
+	$text = $self->convert_markdown_to_ansi($text);
+	my $header = get_debug_header();
+	print "$header - $text\n";
 }
 
 sub body {
 	my $self = shift || return;
+	my $text = shift || return '';
+	my $suppress_newline = shift;
+	$text = $self->convert_markdown_to_ansi($text);
+	print $text;
+	$suppress_newline || print "\n";
+}
+
+sub title {
+	my $self = shift || return;
 	my $text = shift;
 	my $suppress_newline = shift;
-	print $text;
+	$text = $self->convert_markdown_to_ansi($text);
+	print $self->make_color(" $text ", ['blue', 'bold', 'inverse']);
 	$suppress_newline || print "\n";
 }
 
@@ -207,7 +222,18 @@ sub header {
 	my $self = shift || return;
 	my $text = shift;
 	my $suppress_newline = shift;
-	$self->print_bold($text);
+	$text = $self->convert_markdown_to_ansi($text);
+	$text =~ s/^(\s*)(.*)$/$1.$self->make_color(" $2 ", ['blue', 'bold', 'underline'])/egm;
+	print $text;
+	$suppress_newline || print "\n";
+}
+
+sub success {
+	my $self = shift || return;
+	my $text = shift;
+	my $suppress_newline = shift;
+	$text = $self->convert_markdown_to_ansi($text);
+	print $self->make_color($text, ['green', 'bold']);
 	$suppress_newline || print "\n";
 }
 
@@ -215,7 +241,9 @@ sub warning {
 	my $self = shift || return;
 	my $text = shift;
 	my $suppress_newline = shift;
-	$self->print_bold($text);
+	$text = $self->convert_markdown_to_ansi($text);
+	$text =~ s/^(.*)$/$self->make_quote('olive_bg').$self->make_color($1,['bold','olive'])/egm;
+	print $text;
 	$suppress_newline || print "\n";
 }
 
@@ -223,7 +251,10 @@ sub error {
 	my $self = shift || return;
 	my $text = shift;
 	my $suppress_newline = shift;
-	$self->print_bold("ERROR: $text");
+	$text = $self->convert_markdown_to_ansi($text);
+	$text = 'ERROR: ' . $text;
+	$text =~ s/^(.*)$/$self->make_quote('maroon_bg').$self->make_color($1,['bold','maroon'])/egm;
+	print $text;
 	$suppress_newline || print "\n";
 }
 
@@ -260,6 +291,17 @@ $array_of_answers is an array of inputs that should be used before STDIN. Good f
 	return $answer;
 }
 
+sub make_index {
+	my $self = shift || return;
+	my $width = shift;
+	my $i = shift;
+	if (is_pos_int($i)) {
+		return $self->make_color('[', ['gray', 'bold']) . $self->make_color(sprintf("%${width}d", $i), ['azure', 'bold']) . $self->make_color(']', ['gray', 'bold']);
+	} else {
+		return $self->make_color('[', ['gray', 'bold']) . $self->make_color($i, ['azure', 'bold']) . $self->make_color(']', ['gray', 'bold']);
+	}
+}
+
 sub get_menu_answer {
 #=====================================================
 
@@ -268,19 +310,29 @@ sub get_menu_answer {
 Returns an answer from an array of choices:
 
  my $value = $self->{cli}->get_menu_answer($choices_as_array, $label) || exit;
- my $value = $self->{cli}->get_menu_answer($choices_as_array, $label, $preinputs) || exit;
- my $hash = $self->{cli}->get_menu_answer($choices_as_arrayhash, $label, $preinputs, $key_name) || exit;
- my $value = $self->{cli}->get_menu_answer($choices_as_arrayhash, $label, $preinputs, $key_name, $value_name) || exit;
+ my $value = $self->{cli}->get_menu_answer($choices_as_array, $label, {
+ 	key_name	=> $key_name,	# optional, but requires value_name
+ 	value_name	=> $value_name,	# optional, but requires key_name
+ 	inputs		=> $inputs		# optional
+ }) || exit;
+ my $hash = $self->{cli}->get_menu_answer($choices_as_arrayhash, $label, {
+ 	key_name	=> $key_name,
+ 	inputs		=> $inputs		# optional
+ }) || exit;
 
 =cut
 #=====================================================
 	my $self = shift || return;
 	my $choices = shift || return;
 	my $label = shift;
-	my $inputs = shift;
-	my $key_name = shift;
-	my $value_name = shift;
+	my $options = shift;
+	
 	is_array_with_content($choices) || return;
+	if (!is_hash($options)) { $options = {}; }
+	my $inputs = $options->{inputs};
+	my $key_name = $options->{key_name};
+	my $value_name = $options->{value_name};
+	my $default = $options->{default};
 	
 	my $input;
 	if (is_array_with_content($inputs)) { $input = shift(@{$inputs}); }
@@ -296,17 +348,18 @@ Returns an answer from an array of choices:
 		if (!$pre_input && is_text($input) && ($key =~ /^\Q$input\E/)) {
 			$pre_input = $i + 1;
 		}
-		my $index_label = $self->make_color('[', ['gray', 'bold']) . $self->make_color(sprintf("%${index_width}d", $i+1), ['azure', 'bold']) . $self->make_color(']', ['gray', 'bold']);
-		printf("  %s %s\n", $index_label, $self->make_color($key, 'maroon'));
+		printf("  %s %s\n", $self->make_index($index_width, $i+1), $self->make_color($key, 'maroon'));
 	}
 	
 	my $answer;
 	if ($pre_input && is_pos_int($pre_input)) { $pre_input = [$pre_input]; }
 	while (42) {
+		if ($default) { printf("  %s %s\n", $self->make_index(7,'default'), $self->make_color($default, 'maroon')); }
 		print "$label [1 - " . $array_length . "]: ";
 		defined($answer = $self->get_answer($pre_input)) || return;
 		if (is_pos_int($answer, 1, $array_length)) { last; }
-		if (is_text($answer)) { $self->warning("The answer must be a number from 1 to " . $array_length); }
+		if (is_text($answer)) { $self->warning("The answer must be a number from 1 to " . $array_length); @{$inputs} = (); }
+		elsif ($default) { return $default; }
 		else { $self->warning("An answer is required (CTRL-D to exit)"); }
 	}
 	
@@ -371,21 +424,23 @@ sub _get_term_color_numbers {
 		
 		{ name => 'white_bg',		num => 107 },
 		{ name => 'silver_bg',		num => 47 },
-		{ name => 'silver_bg',			num => 100 },
+		{ name => 'gray_bg',		num => 100 },
 		{ name => 'black_bg',		num => 40 },
 		
 		{ name => 'red_bg',			num => 101 },
 		{ name => 'maroon_bg',		num => 41 },
 		{ name => 'yellow_bg',		num => 103 },
-		{ name => 'yellow_bg',		num => 43 },
-		{ name => 'lime_bg',			num => 102 },
+		{ name => 'olive_bg',		num => 43 },
+		{ name => 'lime_bg',		num => 102 },
 		{ name => 'green_bg',		num => 42 },
-		{ name => 'cyan_bg',			num => 106 },
-		{ name => 'teal_bg',			num => 46 },
-		{ name => 'blue_bg',			num => 104 },
+		{ name => 'cyan_bg',		num => 106 },
+		{ name => 'teal_bg',		num => 46 },
+		{ name => 'blue_bg',		num => 104 },
 		{ name => 'azure_bg',		num => 44 },
-		{ name => 'pink_bg',			num => 105 },
-		{ name => 'magenta_bg',		num => 45 }
+		{ name => 'pink_bg',		num => 105 },
+		{ name => 'magenta_bg',		num => 45 },
+		
+		{ name => 'reset_bg',		num => 49 }
 	];
 	for (my $color = 0; $color < @{$colors}; $color++) {
 		my $item = $colors->[$color];
@@ -403,12 +458,24 @@ sub _get_term_color_numbers {
 					print "\n";
 				}
 				my $name = $item->{name};
-				$name =~ s/Bg$//;
 				printf("%14s: ${s}m%-14s$e ${s};1m%-14s$e ${s};2m%-14s$e ${s};7m%-14s$e\n", $name, $name, $name, $name, $name);
 			}
 		}
 	}
-	if ($debug) { print "\n"; }
+	if ($debug) {
+		print "\n";
+		$self->info("This is info");
+		$self->error("This is an error\n  Line 2");
+		$self->warning("This is a warning\n  Line 2");
+		$self->title("This is a title");
+		$self->header("This is a header");
+		$self->bold("This is bold");
+		$self->body("This is a body");
+		$self->body("> This is a quote");
+		$self->success("This is success");
+		$self->mark("This is a mark");
+		print "\n";
+	}
 	return $term_colors;
 }
 sub get_term_color {
@@ -433,8 +500,8 @@ sub make_color {
 	my $debug = shift;
 	
 	if ($bg) {
-		if (is_array($color)) { push(@{$color}, "${bg}Bg"); }
-		else { $color = [$color, "${bg}Bg"]; }
+		if (is_array($color)) { push(@{$color}, "${bg}_bg"); }
+		else { $color = [$color, "${bg}_bg"]; }
 	}
 	
 	my $color_numbers = $self->_get_term_color_numbers($debug);
@@ -451,6 +518,18 @@ sub make_color {
 	return $text;
 }
 
+sub make_quote {
+	my $self = shift || return;
+	my $color_name = shift || 'silver_bg';
+	my $debug = shift;
+	_term_supports_colors() || return '| ';
+	if ($color_name !~ /_bg$/) { return '| '; }
+	
+	my $color_code = $self->get_term_color($color_name);
+	my $reset_code = $self->get_term_color('reset_bg');
+	return "${color_code} ${reset_code} ";
+}
+
 sub reset_color {
 	my $self = shift || return;
 	my $colors = $self->get_term_color();
@@ -465,12 +544,28 @@ sub bold {
 
 sub print_bold {
 	my $self = shift || return;
-	print $self->make_color(shift, 'bold');
+	my $text = shift;
+	$text = $self->convert_markdown_to_ansi($text);
+	print $self->make_color($text, 'bold');
 }
 
 sub say_bold {
 	my $self = shift || return;
-	print $self->make_color(shift, 'bold') . "\n";
+	$self->print_bold(shift);
+	print "\n";
+}
+
+sub convert_markdown_to_ansi {
+	my $self = shift || return;
+	my $text = shift;
+	$self->{use_markdown} || return $text;
+	_term_supports_colors() || return $text;
+	$text =~ s/(?:^|(?<=\s))\*(\S.*?)\*/\e[1m$1\e[21m/g;
+	$text =~ s/(?:^|(?<=\s))\_(\S.*?)\_/\e[4m$1\e[24m/g;
+	$text =~ s/(?:^|(?<=\s))\~(\S.*?)\~/\e[7m$1\e[27m/g;
+	$text =~ s/(?:^|(?<=\s))\`(\S.*?)\`/$self->make_color($1,'red','silver')/eg;
+	$text =~ s/^>/$self->make_quote('silver_bg')/egm;
+	return $text;
 }
 
 sub get_callers {
@@ -500,7 +595,7 @@ sub get_callers {
 sub get_debug_header {
 	my $callers = get_callers(2);
 	my $ts = get_timestamp;
-	return "$ts $callers->[0]";
+	return "[$ts] $callers->[0]";
 }
 
 sub mark {
