@@ -564,8 +564,8 @@ Returns a reference matching the given JSON if successful or scalar error messag
 	$json = $json->utf8(0);
 	my $perl;
 	
-	$json_string =~ s/:\s*(True|False)(,|$)/: \l$1$2/gm;
-	$json_string =~ s/:\s*(None)(,|$)/: \lnull$2/gm;
+	$json_string =~ s/:\s*(True|False)(,|\]|\}|$)/: \l$1$2/gm;
+	$json_string =~ s/:\s*(None)(,|\]|\}|$)/: \lnull$2/gm;
 	eval { $perl = $json->decode($json_string); };
 	if ($@) {
 		print "Error parsing JSON: $@";
