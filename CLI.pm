@@ -27,7 +27,7 @@ use SitemasonPl::CLI::Table;
 
 require Exporter;
 our @ISA = qw(Exporter);
-our @EXPORT_OK = qw(mark print_object is_already_running is_already_running_with_args);
+our @EXPORT_OK = qw(mark trace print_object is_already_running is_already_running_with_args);
 
 sub new {
 #=====================================================
@@ -596,6 +596,22 @@ sub get_debug_header {
 	my $callers = get_callers(2);
 	my $ts = get_timestamp;
 	return "[$ts] $callers->[0]";
+}
+
+sub trace {
+	my $self = shift;
+	my $label;
+	if (is_object($self)) {
+		$label = shift;
+	} else {
+		$label = $self;
+		$self = SitemasonPl::CLI->new();
+	}
+	$label ||= 'Trace';
+	
+	my $callers = get_callers(2);
+	my $ts = get_timestamp;
+	$self->print_object($callers, "[$ts] $label");
 }
 
 sub mark {
