@@ -281,7 +281,9 @@ sub _modify_quote {
 sub quote_list {
 	my $self = shift || return;
 	my $inputList = shift || return;
-	my $qlist = $self->quote($inputList);
+	is_array($inputList) || return;
+	
+	my $qlist = $self->quote($inputList) || return;
 	my $qstring = join(', ', @{$qlist});
 	return $qstring;
 }
@@ -895,7 +897,7 @@ sub do_update_insert {
  	input	=> $input,
  	where	=> $where,
  	idName		=> $idName,
- 	noNextval	=> 1 || 0,
+ 	no_nextval	=> 1 || 0,
  	force		=> 1
  } );
  
@@ -922,7 +924,7 @@ sub do_update_insert {
 	my $input = $args->{input};
 	my $modifiers = $args->{modifiers};
 	my $idName = $args->{idName} || $args->{id_name} || 'id';
-	my $noNextval = $args->{noNextval} || $args->{no_nextval};
+	my $no_nextval = $args->{no_nextval} || $args->{no_nextval};
 	my $force = $args->{force};
 	delete($self->{lastAction}); delete($self->{last_action});
 	
@@ -955,7 +957,7 @@ sub do_update_insert {
 		
 		# Get an id
 		$id ||= $input->{$idName};
-		if (!$id && !$noNextval && ($self->{db_type} eq 'pg')) {
+		if (!$id && !$no_nextval && ($self->{db_type} eq 'pg')) {
 			if ($idName eq 'id') { $id = $self->nextval($table, $log); }
 			else {
 				($id) = $self->selectrow_array("SELECT nextval('${table}_${idName}_seq')");

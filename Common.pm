@@ -3388,6 +3388,7 @@ sub pluralize {
 	elsif ($text =~ s/ma$/mata/) { }
 	elsif ($text =~ s/([ae])ndum$/${1}nda/) { }
 	elsif ($text =~ s/(s|x|ch|sh)$/${1}es/) { }
+	elsif ($text =~ s/ey$/eys/) { }
 	elsif ($text =~ s/y$/ies/) { }
 	elsif ($text =~ s/rae$/rae/) { }
 	elsif ($text =~ s/([^aeiouy])a$/${1}ae/) { }
@@ -3523,6 +3524,12 @@ On the other hand, the following leaves the source as is.
  my $answer = value($ref, [qw(first second 0 fourth)]);
 
 	$ref: {}
+
+To get one hash from an array, pass the key name, colon, value and the key. The colon notation works for any array of hashes at any depth in a complex object.
+
+ my $array = [{ id => 1, color => 'blue' }, { id => 2, color => 'red' }, { id => 3, color => 'green' }];
+ my $answer = value($array, 'id:2');
+ Returns: { id => 2, color => 'red' }
 
 =cut
 #=====================================================

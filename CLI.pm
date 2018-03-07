@@ -350,6 +350,9 @@ Returns an answer from an array of choices:
 		}
 		printf("  %s %s\n", $self->make_index($index_width, $i+1), $self->make_color($key, 'maroon'));
 	}
+	if (!$pre_input && is_pos_int($input, 1, ($array_length+1))) {
+		$pre_input = $input;
+	}
 	
 	my $answer;
 	if ($pre_input && is_pos_int($pre_input)) { $pre_input = [$pre_input]; }
@@ -636,7 +639,12 @@ sub print_object {
 
 =head2 B<print_object>
 
-	print_object($object, $label, $indent, $limit);
+	print_object($object, $label, {
+		indent		=> 4,	# number of spaces to indent
+		limit		=> 3,	# limit number of items to display from an array or hash at the top level
+		inner_limit	=> 3	# limit number of items to display from an array or hash at lower depths
+		depth		=> 2,	# limit the depth to recurse
+	});
 
 	my $string = 'string';
 	my $function = sub { print "Lambda\n"; };
@@ -672,11 +680,17 @@ sub print_object {
 		$self = SitemasonPl::CLI->new();
 	}
 	my $label = shift || '';
-	my $indent = shift || 0;
-	my $limit = shift;
+	my $args = shift || {};
+	if (!is_hash($args)) {
+		$args = {
+			indent	=> $args,
+			limit	=> shift
+		};
+	}
+	my $indent = $args->{indent} || 0;
 	
 	if ($label) { $label = $self->make_color($label, 'bold'); }
-	my $string = $self->convert_object_to_string($object, undef, $limit);
+	my $string = $self->convert_object_to_string($object, undef, $args);
 	my $indentString = ' ' x $indent;
 	$string =~ s/\n/\n$indentString/gs;
 	$string =~ s/$indentString$//;
@@ -701,7 +715,10 @@ sub convert_object_to_string {
 	my $self = shift || return;
 	my $object = shift;
 	my $level = shift || 0;
-	my $limit = shift;
+	my $args = shift;
+	my $limit = $args->{limit};
+	if ($level > 0) { $limit = $args->{inner_limit}; }
+	my $depth = $args->{depth};
 	my $key_size = 20;
 	
 	my $string = '';
@@ -710,6 +727,11 @@ sub convert_object_to_string {
 	my $indent = $spacing x $level;
 	
 	if (is_hash($object)) {
+		if ($depth && ($level >= $depth)) {
+			my $fullKey = sprintf("%s - %d %s", $object, scalar keys %{$object}, pluralize('key', scalar keys %{$object}) );
+			$string = $self->_convert_object_to_string_key($fullKey, $object);
+			return "$string\n";
+		}
 		if (is_hash_with_content($object)) {
 			my $opening = $self->make_color('{', ['green', 'bold']);
 			my $closing = $self->make_color('}', ['green', 'bold']);
@@ -730,15 +752,25 @@ sub convert_object_to_string {
 				my $printKey = $self->_convert_object_to_string_key($key, $value);
 				my $tempMax = $max + length($printKey) - length($key) ;
 				$string .= sprintf("%s%s%-${tempMax}s => ", $indent, $spacing, $printKey);
-				$string .= $self->convert_object_to_string($value, $level + 1);
+				$string .= $self->convert_object_to_string($value, $level + 1, $args);
 				$cnt++;
-				if (!$level && $limit && ($cnt >= $limit)) { last; }
+				if ($limit && ($cnt >= $limit)) {
+					my $fullKey = sprintf("... showing %d of %d hash keys", $limit, scalar keys %{$object});
+					my $printKey = $self->_convert_object_to_string_key($fullKey, {});
+					$string .= sprintf("%s%s%s\n", $indent, $spacing, $printKey);
+					last;
+				}
 			}
 			$string .= "$indent$closing\n";
 		} else {
 			$string .= "{}\n";
 		}
 	} elsif (is_array($object)) {
+		if ($depth && ($level >= $depth)) {
+			my $fullKey = sprintf("%s - %d %s", $object, scalar keys @{$object}, pluralize('element', scalar keys @{$object}) );
+			$string = $self->_convert_object_to_string_key($fullKey, $object);
+			return "$string\n";
+		}
 		if (is_array_with_content($object)) {
 			my $opening = $self->make_color('[', ['blue', 'bold']);
 			my $closing = $self->make_color(']', ['blue', 'bold']);
@@ -751,9 +783,14 @@ sub convert_object_to_string {
 				my $fullKey = sprintf("[%${max}s]", $key);
 				my $printKey = $self->_convert_object_to_string_key($fullKey, $value);
 				$string .= sprintf("%s%s%s => ", $indent, $spacing, $printKey);
-				$string .= $self->convert_object_to_string($value, $level + 1);
+				$string .= $self->convert_object_to_string($value, $level + 1, $args);
 				$key++;
-				if (!$level && $limit && ($key >= $limit)) { last; }
+				if ($limit && ($key >= $limit)) {
+					my $fullKey = sprintf("... showing %d of %d array elements\n", $limit, scalar @{$object});
+					$printKey = $self->_convert_object_to_string_key($fullKey, []);
+					$string .= sprintf("%s%s%s", $indent, $spacing, $printKey);
+					last;
+				}
 			}
 			$string .= "$indent$closing\n";
 		} else {
