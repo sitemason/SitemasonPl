@@ -55,6 +55,7 @@ sub new {
 		columns			=> $arg{columns},
 		use_plain_text	=> $arg{use_plain_text},
 		suppress_colors	=> $arg{suppress_colors},
+		display_nulls	=> $arg{display_nulls},
 		post_args		=> { header => FALSE, output => 'stdout' }
 	};
 	bless $self, $class;
@@ -388,13 +389,19 @@ sub to_string {
 	elsif (is_array($value)) {
 		$string .= "['" . join("', '", @{$value}) . "']";
 	}
-	elsif (!defined($value)) { $string = '<N>'; }
+	elsif (!defined($value)) {
+		if ($self->{display_nulls}) { $string = '<N>'; }
+		else { $string = ''; }
+	}
 	elsif (is_pos_int($value) && ($value eq ($value+0))) { $string = $value + 0; }
 	elsif ($value) {
 		if ($should_quote) { $string = "'$value'"; }
 		else { $string = "$value"; }
 	}
-	else { $string = '<blank>'; }
+	else {
+		if ($self->{display_nulls}) { $string = '<blank>'; }
+		else { $string = ''; }
+	}
 	return $string;
 }
 

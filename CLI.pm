@@ -177,6 +177,8 @@ Given a list of acceptable options, returns a hash of the options with their val
 
 sub print_usage {
 	my $self = shift || return;
+	my $message = shift;
+	if ($message) { $self->error($message); }
 	pod2usage({ -indent => 1, -width => 140, -verbose => 99, -sections => ['USAGE'] });
 	return TRUE;
 }

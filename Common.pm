@@ -4743,7 +4743,7 @@ sub _normalize {
 	defined($input) || return;
 	my $isMinimal = shift;
 	$input = unidecode($input);
-	$input =~ s/[^a-z0-9.\s_-]//g;
+	$input =~ s/[^a-z0-9\.\s_-]//g;
 	if ($isMinimal) { $input =~ s/[\s\._-]+/-/g; }
 	else { $input =~ s/[\s_-]+/-/g; }
 	$input =~ s/(?:^-+|-+$)//g;
