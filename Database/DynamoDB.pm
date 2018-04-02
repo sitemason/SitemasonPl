@@ -470,7 +470,15 @@ sub _call_dynamodb {
 	my $args = shift || return;
 	my $debug = shift;
 	
-	my $command = "/usr/bin/aws dynamodb $args";
+	my $awscli = '/usr/bin/aws';
+	if (!-e $awscli) {
+		$awscli = '/usr/local/bin/aws';
+		if (!-e $awscli) {
+			$self->{cli}->error("AWS CLI not found.");
+		}
+	}
+	
+	my $command = "$awscli dynamodb $args";
 	$debug && say $command;
 	my $json = `$command`;
 	is_json($json) || return;
