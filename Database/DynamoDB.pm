@@ -19,6 +19,8 @@ use utf8;
 use constant TRUE => 1;
 use constant FALSE => 0;
 
+use JSON;
+
 use SitemasonPl::Common;
 use SitemasonPl::CLI qw(mark print_object);
 
@@ -426,6 +428,8 @@ sub _convert_to_dynamodb {
 		else { return $new_array; }
 	} elsif (($type eq 'N') && is_number($item)) {
 		return { "N" => $item };
+	} elsif (JSON::is_bool($item)) {
+		return { "BOOL" => $item };
 	} else {
 		return { "S" => $item };
 	}
