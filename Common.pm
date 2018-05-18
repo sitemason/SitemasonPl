@@ -262,6 +262,7 @@ sub write_file {
 
  my $newpath = write_file($path, $content, {
  	add_date		=> TRUE || FALSE,
+ 	dry_run			=> TRUE || FALSE,
  	make_dirs		=> TRUE || FALSE,
  	overwrite		=> TRUE || FALSE,
  	print_errors	=> TRUE || FALSE,
@@ -304,6 +305,7 @@ sub write_file {
 		return;
 	}
 	
+	if ($options->{dry_run}) { return $fullpath; }
 	unless (open(FILE, ">$fullpath")) {
 		$options->{print_errors} && print STDERR "ERROR: Can't open file for writing: $fullpath\n";
 		return;

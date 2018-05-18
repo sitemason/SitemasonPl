@@ -46,9 +46,11 @@ sub new {
 	$class || return;
 	
 	my $self = {
+		silent			=> $arg{silent},
 		use_markdown	=> $arg{use_markdown}
 	};
 	bless $self, $class;
+	$self->init_formats;
 	($self->{script_name}) = $0 =~ /\/([^\/]+?)$/;
 	
 	if ($arg{exit_if_running}) {
@@ -205,6 +207,8 @@ sub info {
 sub body {
 	my $self = shift || return;
 	my $text = shift || return '';
+	$self->{silent} && return;
+	
 	my $suppress_newline = shift;
 	$text = $self->convert_markdown_to_ansi($text);
 	print $text;
@@ -215,6 +219,8 @@ sub title {
 	my $self = shift || return;
 	my $text = shift;
 	my $suppress_newline = shift;
+	$self->{silent} && return;
+	
 	$text = $self->convert_markdown_to_ansi($text);
 	print $self->make_color(" $text ", ['blue', 'bold', 'inverse']);
 	$suppress_newline || print "\n";
@@ -224,6 +230,8 @@ sub header {
 	my $self = shift || return;
 	my $text = shift;
 	my $suppress_newline = shift;
+	$self->{silent} && return;
+	
 	$text = $self->convert_markdown_to_ansi($text);
 	$text =~ s/^(\s*)(.*)$/$1.$self->make_color(" $2 ", ['blue', 'bold', 'underline'])/egm;
 	print $text;
@@ -234,8 +242,22 @@ sub success {
 	my $self = shift || return;
 	my $text = shift;
 	my $suppress_newline = shift;
+	$self->{silent} && return;
+	
 	$text = $self->convert_markdown_to_ansi($text);
 	print $self->make_color($text, ['green', 'bold']);
+	$suppress_newline || print "\n";
+}
+
+sub dry_run {
+	my $self = shift || return;
+	my $text = shift;
+	my $suppress_newline = shift;
+	$self->{silent} && return;
+	
+	$text = $self->convert_markdown_to_ansi($text);
+	$text =~ s/^(.*)$/$self->make_quote('silver_bg').$self->make_color($1,['gray'])/egm;
+	print $text;
 	$suppress_newline || print "\n";
 }
 
@@ -243,6 +265,8 @@ sub warning {
 	my $self = shift || return;
 	my $text = shift;
 	my $suppress_newline = shift;
+	$self->{silent} && return;
+	
 	$text = $self->convert_markdown_to_ansi($text);
 	$text =~ s/^(.*)$/$self->make_quote('olive_bg').$self->make_color($1,['bold','olive'])/egm;
 	print $text;
@@ -256,7 +280,7 @@ sub error {
 	$text = $self->convert_markdown_to_ansi($text);
 	$text = 'ERROR: ' . $text;
 	$text =~ s/^(.*)$/$self->make_quote('maroon_bg').$self->make_color($1,['bold','maroon'])/egm;
-	print $text;
+	print STDERR $text;
 	$suppress_newline || print "\n";
 }
 
@@ -496,9 +520,18 @@ sub get_term_color {
 	return '';
 }
 
+sub make_style {
+	my $self = shift || return;
+	my $text = shift || '';	
+	my $class = shift || return;
+	my $style = shift || return;
+	my $attributes = $self->get_style($class, $style);
+	return $self->make_color($text, $attributes);
+}
+
 sub make_color {
 	my $self = shift || return;
-	my $text = shift;
+	my $text = shift || '';
 	my $color = shift || 'bold';
 	my $bg = shift;
 	_term_supports_colors() || return $text;
@@ -550,12 +583,16 @@ sub bold {
 sub print_bold {
 	my $self = shift || return;
 	my $text = shift;
+	$self->{silent} && return;
+	
 	$text = $self->convert_markdown_to_ansi($text);
 	print $self->make_color($text, 'bold');
 }
 
 sub say_bold {
 	my $self = shift || return;
+	$self->{silent} && return;
+	
 	$self->print_bold(shift);
 	print "\n";
 }
@@ -565,7 +602,8 @@ sub convert_markdown_to_ansi {
 	my $text = shift;
 	$self->{use_markdown} || return $text;
 	_term_supports_colors() || return $text;
-	$text =~ s/(?:^|(?<=\s))\*(\S.*?)\*/\e[1m$1\e[21m/g;
+# 	$text =~ s/(?:^|(?<=\s))\*(\S.*?)\*/\e[1m$1\e[21m/g;
+	$text =~ s/(?:^|(?<=\s))\*(\S.*?)\*/\e[1m$1\e[0m/g;
 	$text =~ s/(?:^|(?<=\s))\_(\S.*?)\_/\e[4m$1\e[24m/g;
 	$text =~ s/(?:^|(?<=\s))\~(\S.*?)\~/\e[7m$1\e[27m/g;
 	$text =~ s/(?:^|(?<=\s))\`(\S.*?)\`/$self->make_color($1,'red','silver')/eg;
@@ -645,7 +683,8 @@ sub print_object {
 		indent		=> 4,	# number of spaces to indent
 		limit		=> 3,	# limit number of items to display from an array or hash at the top level
 		inner_limit	=> 3	# limit number of items to display from an array or hash at lower depths
-		depth		=> 2,	# limit the depth to recurse
+		depth		=> 2,	# limit the depth to recurse,
+		output		=> 'perl' || 'json'
 	});
 
 	my $string = 'string';
@@ -689,28 +728,45 @@ sub print_object {
 			limit	=> shift
 		};
 	}
-	my $indent = $args->{indent} || 0;
+	$self->{silent} && return;
 	
-	if ($label) { $label = $self->make_color($label, 'bold'); }
+	my $indent = $args->{indent} || 0;
+	if ($args->{format}) { $self->change_format($args->{format}); }
+	$args->{output} ||= 'default';
+	
 	my $string = $self->convert_object_to_string($object, undef, $args);
-	my $indentString = ' ' x $indent;
-	$string =~ s/\n/\n$indentString/gs;
-	$string =~ s/$indentString$//;
-	if ($label) {
-		print "$indentString$label: $string";
+	my $indent_string = ' ' x $indent;
+	my $quote_style = $self->get_style('print_object', 'quote');
+	if ($quote_style) { $indent_string = $self->make_quote($quote_style) . $indent_string; }
+	$string =~ s/\n/\n$indent_string/gs;
+	if (($args->{output} eq 'perl') || ($args->{output} eq 'json')) {
+		$string =~ s/\Q$indent_string\E$/;/;
 	} else {
-		print "$indentString$string";
+		$string =~ s/\Q$indent_string\E$//;
 	}
+	if ($label) {
+		$label = $self->make_style($label, 'print_object', 'label');
+		if (($args->{output} eq 'perl') || ($args->{output} eq 'json')) {
+			print "$indent_string$label = $string";
+		} else {
+			print "$indent_string$label: $string";
+		}
+	} else {
+		print "$indent_string$string";
+	}
+	if ($args->{format}) { $self->change_format; }
 }
 
 sub _convert_object_to_string_key {
 	my $self = shift || return;
 	my $key = shift;
 	my $value = shift;
+	my $args = shift;
+	if ($args->{output} eq 'json') { $key = "'$key'"; }
 	my $printKey = $key;
-	if (is_hash($value)) { $printKey = $self->make_color($key, ['green', 'bold']); }
-	elsif (is_array($value)) { $printKey = $self->make_color($key, ['azure', 'bold']); }
-	else { $printKey = $self->make_color($key, ['gray', 'bold']); }
+	if (is_hash($value)) { $printKey = $self->make_style($key, 'print_object', 'hash_key'); }
+	elsif (is_array($value)) { $printKey = $self->make_style($key, 'print_object', 'array_key'); }
+	else { $printKey = $self->make_style($key, 'print_object', 'key'); }
 	return $printKey;
 }
 sub convert_object_to_string {
@@ -725,21 +781,27 @@ sub convert_object_to_string {
 	
 	my $string = '';
 	my $spacing = '.   ';
-	if (_term_supports_colors()) { $spacing = $self->make_color('+---', 'silver'); }
+	my $quote = '"';
+	if ($args->{output} eq 'json') { $quote = "'"; }
+	my $pointer = $self->make_style('=>', 'print_object', 'pointer');
+	if ($args->{output} eq 'json') { $pointer = $self->make_style(':', 'print_object', 'pointer'); }
+	my $comma = $self->make_style(',', 'print_object', 'comma');
+	if ($args->{output} eq 'perl' || $args->{output} eq 'json') { $spacing = $self->make_style('    ', 'print_object', 'indent'); }
+	elsif (_term_supports_colors()) { $spacing = $self->make_style('+---', 'print_object', 'indent'); }
 	my $indent = $spacing x $level;
 	
 	if (is_hash($object)) {
 		if ($depth && ($level >= $depth)) {
 			my $fullKey = sprintf("%s - %d %s", $object, scalar keys %{$object}, pluralize('key', scalar keys %{$object}) );
-			$string = $self->_convert_object_to_string_key($fullKey, $object);
+			$string = $self->_convert_object_to_string_key($fullKey, $object, $args);
 			return "$string\n";
 		}
 		if (is_hash_with_content($object)) {
-			my $opening = $self->make_color('{', ['green', 'bold']);
-			my $closing = $self->make_color('}', ['green', 'bold']);
+			my $opening = $self->make_style('{', 'print_object', 'braces');
+			my $closing = $self->make_style('}', 'print_object', 'braces');
 			
 			if ($object =~ /^(.*?)=HASH/) {
-				my $printObject = $self->make_color($1, 'teal');
+				my $printObject = $self->make_style($1, 'print_object', 'hash');
 				$string .= "$printObject $opening\n";
 			} else {
 				$string .= "$opening\n";
@@ -751,31 +813,32 @@ sub convert_object_to_string {
 			my $cnt = 0;
 			foreach my $key (sort { by_any($a,$b) } keys %{$object}) {
 				my $value = $object->{$key};
-				my $printKey = $self->_convert_object_to_string_key($key, $value);
+				my $printKey = $self->_convert_object_to_string_key($key, $value, $args);
 				my $tempMax = $max + length($printKey) - length($key) ;
-				$string .= sprintf("%s%s%-${tempMax}s => ", $indent, $spacing, $printKey);
+				$string .= sprintf("%s%s%-${tempMax}s $pointer ", $indent, $spacing, $printKey);
 				$string .= $self->convert_object_to_string($value, $level + 1, $args);
 				$cnt++;
 				if ($limit && ($cnt >= $limit)) {
 					my $fullKey = sprintf("... showing %d of %d hash keys", $limit, scalar keys %{$object});
-					my $printKey = $self->_convert_object_to_string_key($fullKey, {});
+					my $printKey = $self->_convert_object_to_string_key($fullKey, {}, $args);
 					$string .= sprintf("%s%s%s\n", $indent, $spacing, $printKey);
 					last;
 				}
 			}
-			$string .= "$indent$closing\n";
+			$string =~ s/\Q$comma\E\n$/\n/;
+			$string .= "$indent$closing$comma\n";
 		} else {
-			$string .= "{}\n";
+			$string .= $self->make_style('{}', 'print_object', 'braces') . "$comma\n";
 		}
 	} elsif (is_array($object)) {
 		if ($depth && ($level >= $depth)) {
 			my $fullKey = sprintf("%s - %d %s", $object, scalar keys @{$object}, pluralize('element', scalar keys @{$object}) );
-			$string = $self->_convert_object_to_string_key($fullKey, $object);
+			$string = $self->_convert_object_to_string_key($fullKey, $object, $args);
 			return "$string\n";
 		}
 		if (is_array_with_content($object)) {
-			my $opening = $self->make_color('[', ['blue', 'bold']);
-			my $closing = $self->make_color(']', ['blue', 'bold']);
+			my $opening = $self->make_style('[', 'print_object', 'brackets');
+			my $closing = $self->make_style(']', 'print_object', 'brackets');
 			$string .= "$opening\n";
 			my $arrayLength = @{$object};
 			my $max = length($arrayLength);
@@ -783,44 +846,50 @@ sub convert_object_to_string {
 			my $key = 0;
 			foreach my $value (@{$object}) {
 				my $fullKey = sprintf("[%${max}s]", $key);
-				my $printKey = $self->_convert_object_to_string_key($fullKey, $value);
-				$string .= sprintf("%s%s%s => ", $indent, $spacing, $printKey);
+				my $printKey = $self->_convert_object_to_string_key($fullKey, $value, $args);
+				if ($args->{output} eq 'perl' || $args->{output} eq 'json') {
+					$string .= sprintf("%s%s", $indent, $spacing);
+				} else {
+					$string .= sprintf("%s%s%s $pointer ", $indent, $spacing, $printKey);
+				}
 				$string .= $self->convert_object_to_string($value, $level + 1, $args);
 				$key++;
 				if ($limit && ($key >= $limit)) {
 					my $fullKey = sprintf("... showing %d of %d array elements\n", $limit, scalar @{$object});
-					$printKey = $self->_convert_object_to_string_key($fullKey, []);
+					$printKey = $self->_convert_object_to_string_key($fullKey, [], $args);
 					$string .= sprintf("%s%s%s", $indent, $spacing, $printKey);
 					last;
 				}
 			}
-			$string .= "$indent$closing\n";
+			$string =~ s/\Q$comma\E\n$/\n/;
+			$string .= "$indent$closing$comma\n";
 		} else {
-			$string .= "[]\n";
+			$string .= $self->make_style('[]', 'print_object', 'brackets') . "$comma\n";
 		}
 	} elsif (ref($object) eq 'CODE') {
 		my $cv = svref_2object ( $object );
 		my $gv = $cv->GV;
-		my $printObject = $self->make_color("sub " . $gv->NAME, 'blue');
-		$string .= "$printObject\n";
+		my $printObject = $self->make_style("sub " . $gv->NAME, 'print_object', 'code');
+		$string .= "$printObject$comma\n";
 	} elsif (ref($object) eq 'SCALAR') {
 		my $output = ${$object} || '';
 		$output =~ s/\n/\\n/gm;
 		$output =~ s/\r/\\r/gm;
-		my $printObject = $self->make_color('"' . $output . '"', 'maroon');
-		$string .= "scalar $printObject\n";
+		my $printObject = $self->make_style($quote . $output . $quote, 'print_object', 'scalar');
+		$string .= "scalar $printObject$comma\n";
 	} elsif (ref($object)) {
-		my $printObject = $self->make_color($object, 'olive');
-		$string .= "$printObject\n";
+		my $printObject = $self->make_style($object, 'print_object', 'ref');
+		$string .= "$printObject$comma\n";
 	} elsif (!defined($object)) {
-		my $printObject = $self->make_color('undef', 'line');
-		$string .= "$printObject\n";
+		my $printObject = $self->make_style('undef', 'print_object', 'undef');
+		$string .= "$printObject$comma\n";
 	} else {
 		$object =~ s/\n/\\n/gm;
 		$object =~ s/\r/\\r/gm;
-		my $printObject = $self->make_color('"' . $object . '"', 'maroon');
-		$string .= "$printObject\n";
+		my $printObject = $self->make_style($quote . $object . $quote, 'print_object', 'other');
+		$string .= "$printObject$comma\n";
 	}
+	if (!$level) { $string =~ s/\Q$comma\E\n$/\n/; }
 	return $string;
 }
 
@@ -833,6 +902,70 @@ sub debug_object {
 	my $header = get_debug_header;
 	$self->say_bold($header);
 	$self->print_object(@_);
+}
+
+sub init_formats {
+	my $self = shift || return;
+	$self->{stored_formats} = {
+		'default'		=> {
+			print_object	=> {
+				array_key		=> ['azure', 'bold'],
+				braces			=> ['green', 'bold'],
+				brackets		=> ['blue', 'bold'],
+				code			=> 'blue',
+				comma			=> 'default',
+				hash			=> 'teal',
+				hash_key		=> ['green', 'bold'],
+				indent			=> 'silver',
+				key				=> ['gray', 'bold'],
+				label			=> 'bold',
+				other			=> 'maroon',
+				pointer			=> 'default',
+				quote			=> undef,
+				'ref'			=> 'olive',
+				'scalar'		=> 'maroon',
+				'undef'			=> 'line'
+			}
+		},
+		dry_run			=> {
+			print_object	=> {
+				array_key		=> 'gray',
+				braces			=> 'gray',
+				brackets		=> 'gray',
+				code			=> 'gray',
+				comma			=> 'gray',
+				hash			=> 'gray',
+				hash_key		=> 'gray',
+				indent			=> 'silver',
+				key				=> 'gray',
+				label			=> 'gray',
+				other			=> 'gray',
+				pointer			=> 'gray',
+				quote			=> 'silver_bg',
+				'ref'			=> 'gray',
+				'scalar'		=> 'gray',
+				'undef'			=> 'gray'
+			}
+		}
+	};
+	$self->change_format;
+}
+
+sub change_format {
+	my $self = shift || return;
+	my $format = shift || 'default';
+	if (!value($self->{stored_formats}, $format)) { $format = 'default'; }
+	
+	$self->{format} = $self->{stored_formats}->{$format};
+}
+
+sub get_style {
+	my $self = shift || return;
+	my $class = shift || return;
+	my $style = shift || return;
+	if (value($self->{format}, [$class, $style])) {
+		return $self->{format}->{$class}->{$style};
+	}
 }
 
 

@@ -37,7 +37,8 @@ sub new {
 	
 	my $self = {
 		db_type		=> 'DynamoDB',
-		cli			=> $arg{cli}
+		cli			=> $arg{cli},
+		dry_run		=> $arg{dry_run},
 	};
 	if (!$self->{cli}) { $self->{cli} = SitemasonPl::CLI->new; }
 	
@@ -193,6 +194,12 @@ sub put_item {
 	
 	my $dd_item = _convert_to_dynamodb($item);
 	my $json = make_json($dd_item, { compress => TRUE, escape_for_bash => TRUE });
+	if ($self->{dry_run}) {
+		my $json = make_json($item, { compress => TRUE });
+		$self->{cli}->dry_run("DD put-item --table-name $table_name");
+		$self->{cli}->dry_run("     $json");
+		return {};
+	}
 	my $dd_results = $self->_call_dynamodb("put-item --table-name $table_name --item '$json'", $debug);
 # 	$debug && $self->{cli}->print_object($dd_results, '$dd_results');
 	return $dd_results;
@@ -222,6 +229,14 @@ sub update_item {
 	my $key_json = _convert_to_key_json($key_hash);
 	my $expressions = _convert_to_expression($item);
 	my $update = "SET " . join(', ', @{$expressions->{comparisons}});
+	if ($self->{dry_run}) {
+		my $key_json = make_json($key_hash, { compress => TRUE });
+		my $json = make_json($item, { compress => TRUE });
+		$self->{cli}->dry_run("DD update-item --table-name $table_name");
+		$self->{cli}->dry_run("     --key '$key_json'");
+		$self->{cli}->dry_run("     $json");
+		return {};
+	}
 	my $results = $self->_call_dynamodb("update-item --table-name $table_name --key '$key_json' --update-expression '$update' --expression-attribute-names '$expressions->{names_json}' --expression-attribute-values '$expressions->{values_json}'", $debug);
 	$debug && $self->{cli}->print_object($results, '$results');
 	return $results;
@@ -243,6 +258,12 @@ sub delete_item {
 	my $debug = shift;
 	
 	my $key_json = _convert_to_key_json($key_hash);
+	if ($self->{dry_run}) {
+		my $key_json = make_json($key_hash, { compress => TRUE });
+		$self->{cli}->dry_run("DD delete-item --table-name $table_name");
+		$self->{cli}->dry_run("     --key '$key_json'");
+		return {};
+	}
 	my $results = $self->_call_dynamodb("delete-item --table-name $table_name --key '$key_json'", $debug);
 	$debug && $self->{cli}->print_object($results, '$results');
 	return $results;
@@ -436,7 +457,7 @@ sub _convert_from_dynamodb {
 		} elsif ($key eq 'NULL') {
 			return undef;
 		} elsif ($key eq 'BOOL') {
-			if ($value eq 'true') { return TRUE; }
+			if ($value) { return TRUE; }
 			else { return FALSE; }
 		}
 		return;

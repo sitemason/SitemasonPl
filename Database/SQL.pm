@@ -428,6 +428,7 @@ sub do {
 		if ($command eq 'delete') { $message = 'Nothing to delete.'; }
 		elsif ($command eq 'update') { $message = 'Nothing to update.'; }
 		elsif ($command eq 'alter') { return $rv; }
+		elsif ($command eq 'create') { return $rv; }
 		if ($message) {
 #			$self->{debug}->debug($message, new_hash({ tags => 'results' }, $log));
 		} else {
@@ -454,7 +455,7 @@ sub selectrow_array {
 
 =head2 B<selectrow_array>
 
- @rowAry  = $dbh->selectrow_array($statement);
+ @rowAry = $dbh->selectrow_array($statement);
 
 =cut
 #=====================================================
@@ -2172,6 +2173,25 @@ sub make_suffix_sql {
 # Field Testing Methods
 #=====================================================
 
+sub get_tables {
+#=====================================================
+
+=head2 B<get_tables>
+
+ my $tables = $self->{dbh}->get_tables;
+
+=cut
+#=====================================================
+	my $self = shift || return;
+	if ($self->{db_type} eq 'mysql') {
+		return $self->selectcol_arrayref("SHOW TABLES");
+	}
+	if ($self->{db_type} eq 'pg') {
+# 		return $self->selectcol_arrayref("SELECT tablename FROM pg_catalog.pg_tables WHERE tableowner = current_user");
+		return $self->selectcol_arrayref("SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname = 'public'");
+	}
+}
+
 
 sub get_table_info {
 #=====================================================
@@ -2209,6 +2229,18 @@ sub get_column_info {
 	my $columnInfo = $self->get_server_info('columnInfo');
 	if (is_arrayhash($columnInfo->{$table})) {
 		return $columnInfo->{$table};
+	} elsif ($self->{db_type} eq 'mysql') {
+		my $sth = $self->{dbh}->column_info(undef, $self->{db_name}, $table, '%');
+		my $columns = $sth->fetchall_arrayref({});
+		foreach my $column (@{$columns}) {
+			$column->{name} = $column->{COLUMN_NAME};
+			$column->{name} =~ s/["`$self->{db_field_quote_char}]//g;
+			$column->{quoted} = "$self->{db_field_quote_char}$column->{name}$self->{db_field_quote_char}";
+		}
+		
+		$columnInfo->{$table} = $columns;
+		$self->set_server_info('columnInfo', $columnInfo);
+		return $columns;
 	} else {
 		my $sth = $self->{dbh}->column_info(undef, '%', $table, '%');
 		my $columns = $sth->fetchall_arrayref({});
