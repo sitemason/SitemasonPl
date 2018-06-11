@@ -31,11 +31,12 @@ use Text::Unidecode;
 # use XML::Parser::Expat;
 use Time::gmtime;
 use Unicode::Collate;
+use YAML;
 
 require Exporter;
 our @ISA = qw(Exporter);
 our @EXPORT = qw(read_cookie generate_password
-	get_timestamp get_filename_utc_minute get_filename_utc_hour get_filename_utc_date convert_arrays_to_csv convert_csv_to_arrays read_file_list read_file write_file
+	get_timestamp get_filename_utc_minute get_filename_utc_hour get_filename_utc_date convert_arrays_to_csv convert_csv_to_arrays read_file_list read_file write_file get_file_age read_cache_file write_cache_file
 	get_url post_url parse_query_string url_decode url_encode
 	parse_json make_json jsonify xmlify
 	html_entities_to_text to_html_entities from_html_entities convert_to_utf8 read_vfile
@@ -318,6 +319,35 @@ sub write_file {
 	return $fullpath;
 }
 
+sub get_file_age {
+	my $file = shift || return;
+	-e $file || return 31556900; # A year if it doesn't exist
+	
+	my $time = time;
+	my $mtime = (stat($file))[9];
+	return $time - $mtime;
+}
+
+sub read_cache_file {
+	my $cache_file = shift || return;
+	my $age = shift || 60;
+	
+	if (get_file_age($cache_file) > ($age * 60)) { return; }
+	open(CONF, "<$cache_file");
+	my @lines = <CONF>;
+	close(CONF);
+	my $yaml = join("\n", @lines);
+	return Load($yaml) || '';
+}
+
+sub write_cache_file {
+	my $cache_file = shift || return;
+	my $data = shift || return;
+	my $yaml_string = Dump($data);
+	open(CACHE, ">$cache_file");
+	print CACHE $yaml_string;
+	close(CACHE);
+}
 
 sub get_url {
 #=====================================================

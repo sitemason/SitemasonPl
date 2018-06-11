@@ -20,6 +20,7 @@ use constant FALSE => 0;
 
 use lib qw( /opt/lib/site_perl );
 use SitemasonPl::AWS;
+use SitemasonPl::Batch;
 use SitemasonPl::Common;
 use SitemasonPl::CLI qw(mark print_object);
 
@@ -38,8 +39,7 @@ sub new {
 	$class || return;
 	
 	my $self = {
-		cli			=> $arg{cli},
-		bucket_name	=> $arg{bucket_name}
+		cli			=> $arg{cli}
 	};
 	if (!$self->{cli}) { $self->{cli} = SitemasonPl::CLI->new; }
 	
@@ -76,6 +76,60 @@ sub get_instances {
 			}
 			push(@{$records}, $instance);
 		}
+	}
+	$debug && $self->{cli}->print_object($records, '$records', { limit => 3 });
+	return $records;
+}
+
+
+sub get_load_balancers {
+#=====================================================
+
+=head2 B<get_load_balancers>
+
+ my $elbs = $ec2->get_load_balancers;
+ my $elbs = $ec2->get_load_balancers($elb_name);
+
+=cut
+#=====================================================
+	my $self = shift || return;
+	my $identifier = shift || '';
+	my $debug = shift;
+	
+	my $arg = '';
+	if ($identifier) { $arg = " --load-balancer-names '$identifier'"; }
+	
+	my $response = $self->_call_elb("describe-load-balancers$arg", $debug);
+	my $records = [];
+	foreach my $record (@{$response->{LoadBalancerDescriptions}}) {
+		push(@{$records}, $record);
+	}
+	$debug && $self->{cli}->print_object($records, '$records', { limit => 3 });
+	return $records;
+}
+
+
+sub get_network_interfaces {
+#=====================================================
+
+=head2 B<get_network_interfaces>
+
+ my $enis = $ec2->get_network_interfaces;
+ my $enis = $ec2->get_network_interfaces($resource_id);
+
+=cut
+#=====================================================
+	my $self = shift || return;
+	my $identifier = shift || '';
+	my $debug = shift;
+	
+	my $arg = '';
+	if ($identifier =~ /^eni-/) { $arg = " --network-interface-ids '$identifier'"; }
+	
+	my $response = $self->_call_ec2("describe-network-interfaces$arg", $debug);
+	my $records = [];
+	foreach my $record (@{$response->{NetworkInterfaces}}) {
+		push(@{$records}, $record);
 	}
 	$debug && $self->{cli}->print_object($records, '$records', { limit => 3 });
 	return $records;
@@ -154,6 +208,62 @@ sub get_tags {
 	my $tags = $response->{Tags};
 	$debug && $self->{cli}->print_object($tags, '$tags', { limit => 3 });
 	return $tags;
+}
+
+
+sub get_elb_tags_as_ids {
+#=====================================================
+
+=head2 B<get_elb_tags_as_ids>
+
+ my $tags = $ec2->get_elb_tags_as_ids;
+ my $tags = $ec2->get_elb_tags_as_ids($elb_name);
+ my $tags = $ec2->get_elb_tags_as_ids([$elb_name]);
+
+=cut
+#=====================================================
+	my $self = shift || return;
+	my $elb_name = shift || '';
+	my $debug = shift;
+	
+	if (is_array_with_content($elb_name)) {
+		my $batch = SitemasonPl::Batch->new(
+			batchSize => 20,
+			process => sub {
+				my $payload = shift;
+				my $tags = shift;
+				
+				my $arg = " --load-balancer-name " . join(' ', @{$payload});
+				my $response = $self->_call_elb("describe-tags$arg");
+				if (is_hash($response) && is_array_with_content($response->{TagDescriptions})) {
+					foreach my $description (@{$response->{TagDescriptions}}) {
+						if (is_array_with_content($description->{Tags})) {
+							foreach my $tag (@{$description->{Tags}}) {
+								$tags->{$description->{LoadBalancerName}}->{$tag->{Key}} = $tag->{Value};
+							}
+						}
+					}
+				}
+			},
+			debug => $debug
+		);
+		
+		my $tags = {};
+		foreach my $elb (@{$elb_name}) {
+			$batch->add($elb, $tags);
+		}
+		$batch->end($tags);
+		$debug && $self->{cli}->print_object($tags, '$tags', { limit => 3 });
+		return $tags;
+	} else {
+		my $arg = '';
+		if (is_text($elb_name)) { $arg .= " --load-balancer-name '$elb_name'"; }
+	
+		my $response = $self->_call_elb("describe-tags$arg", $debug);
+		my $tags = $response->{Tags};
+		$debug && $self->{cli}->print_object($tags, '$tags', { limit => 3 });
+		return $tags;
+	}
 }
 
 
@@ -236,6 +346,20 @@ sub _call_ec2 {
 	my $debug = shift;
 	
 	return $self->SUPER::_call_aws("ec2 $args", $debug);
+}
+
+sub _call_elb {
+#=====================================================
+
+=head2 B<_call_elb>
+
+=cut
+#=====================================================
+	my $self = shift || return;
+	my $args = shift || return;
+	my $debug = shift;
+	
+	return $self->SUPER::_call_aws("elb $args", $debug);
 }
 
 

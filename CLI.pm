@@ -810,8 +810,15 @@ sub convert_object_to_string {
 			foreach my $key (keys(%{$object})) {
 				if ((length($key) > $max) && (length($key) <= $key_size)) { $max = length($key); }
 			}
+			
+			# Sort keys according to number of keys
+			my $key_total = scalar keys %{$object};
+			my @sorted_keys;
+			if ($key_total <= 100) { @sorted_keys = sort { by_any($a,$b) } keys %{$object}; }
+			else { @sorted_keys = sort keys %{$object}; }
+			
 			my $cnt = 0;
-			foreach my $key (sort { by_any($a,$b) } keys %{$object}) {
+			foreach my $key (@sorted_keys) {
 				my $value = $object->{$key};
 				my $printKey = $self->_convert_object_to_string_key($key, $value, $args);
 				my $tempMax = $max + length($printKey) - length($key) ;
@@ -819,7 +826,7 @@ sub convert_object_to_string {
 				$string .= $self->convert_object_to_string($value, $level + 1, $args);
 				$cnt++;
 				if ($limit && ($cnt >= $limit)) {
-					my $fullKey = sprintf("... showing %d of %d hash keys", $limit, scalar keys %{$object});
+					my $fullKey = sprintf("... showing %d of %d hash keys", $limit, $key_total);
 					my $printKey = $self->_convert_object_to_string_key($fullKey, {}, $args);
 					$string .= sprintf("%s%s%s\n", $indent, $spacing, $printKey);
 					last;

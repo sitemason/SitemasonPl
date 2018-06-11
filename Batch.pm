@@ -99,7 +99,13 @@ sub add {
 
 =head2 B<add>
 
- $batch->add($item, [$container]);
+ $batch->add($item);
+ $batch->add($item, $container);
+
+	foreach my $item (@{$items}) {
+		$batch->add($item, $container);
+	}
+
 
 =cut
 #=====================================================
@@ -131,7 +137,8 @@ sub end {
 
 =head2 B<end>
 
- $batch->end([$container]);
+ $batch->end;
+ $batch->end($container);
 
 =cut
 #=====================================================

@@ -29,7 +29,7 @@ sub new {
 
 =head2 B<new>
 
- my $s3 = SitemasonPl::AWS::S3->new;
+ my $s3 = SitemasonPl::AWS::S3->new(bucket_name => $bucket_name);
 
 =cut
 #=====================================================
