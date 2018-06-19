@@ -13,7 +13,7 @@ With $container:
  use SitemasonPl::Batch;
  
  my $batch = SitemasonPl::Batch->new(
-  	batchSize => 3,
+  	batch_size => 3,
   	process => sub {
  		my $payload = shift;
  		my $container = shift;
@@ -33,7 +33,7 @@ Without $container:
  use SitemasonPl::Batch;
  
  my $batch = SitemasonPl::Batch->new(
-  	batchSize => 3,
+  	batch_size => 3,
   	process => sub {
  		my $payload = shift;
  		print Dumper($payload);
@@ -63,7 +63,7 @@ sub new {
 =head2 B<new>
 
  my $batch = SitemasonPl::Batch->new(
-  	batchSize => 3,
+  	batch_size => 3,
   	process => sub {
  		my $payload = shift;
  		my $container = shift;	# optional
@@ -78,14 +78,14 @@ sub new {
 	$class || return;
 	
 	my $self = {
-		batchSize	=> $arg{batchSize},
+		batch_size	=> $arg{batch_size},
 		debug		=> $arg{debug},
 		process		=> $arg{process},
 		payload		=> [],
-		itemCount	=> 0,
-		itemTotal	=> 0,
-		batchCount	=> 1,
-		batchTotal	=> 0
+		item_count	=> 0,
+		item_total	=> 0,
+		batch_count	=> 1,
+		batch_total	=> 0
 	};
 	if ($self->{debug}) { print "Batch: new\n"; }
 	
@@ -112,22 +112,22 @@ sub add {
 	my $self = shift || return;
 	my $item = shift;
 	my $container = shift;
-	$self->{itemTotal}++;
+	$self->{item_total}++;
 	
 	push(@{$self->{payload}}, $item);
-	$self->{itemCount} = @{$self->{payload}};
+	$self->{item_count} = @{$self->{payload}};
 	
-# 	if ($self->{debug}) { print "Batch $self->{batchCount}: add\n"; }
+# 	if ($self->{debug}) { print "Batch $self->{batch_count}: add\n"; }
 	
 	
-	if ($self->{itemCount} >= $self->{batchSize}) {
-		$self->{batchTotal}++;
-		if ($self->{debug}) { print "Batch $self->{batchCount}: process\n"; }
+	if ($self->{item_count} >= $self->{batch_size}) {
+		$self->{batch_total}++;
+		if ($self->{debug}) { print "Batch $self->{batch_count}: process\n"; }
 		
 		&{$self->{process}}($self->{payload}, $container);
 		$self->{payload} = [];
-		$self->{itemCount} = 0;
-		$self->{batchCount}++;
+		$self->{item_count} = 0;
+		$self->{batch_count}++;
 	}
 }
 
@@ -144,17 +144,17 @@ sub end {
 #=====================================================
 	my $self = shift || return;
 	my $container = shift;
-	$self->{itemCount} = @{$self->{payload}};
-	if ($self->{itemCount}) {
-		$self->{batchTotal}++;
-		if ($self->{debug}) { print "Batch:     $self->{batchCount} process\n"; }
+	$self->{item_count} = @{$self->{payload}};
+	if ($self->{item_count}) {
+		$self->{batch_total}++;
+		if ($self->{debug}) { print "Batch:     $self->{batch_count} process\n"; }
 		
 		&{$self->{process}}($self->{payload}, $container);
 	}
 	
 	if ($self->{debug}) {
-		print "Batch: total items: $self->{itemTotal}\n";
-		print "Batch: total batches: $self->{batchTotal}\n";
+		print "Batch: total items: $self->{item_total}\n";
+		print "Batch: total batches: $self->{batch_total}\n";
 	}
 }
 
