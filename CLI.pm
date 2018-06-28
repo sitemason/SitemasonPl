@@ -290,8 +290,8 @@ sub get_answer {
 
 =head2 B<get_answer>
 
- defined(my $answer = get_answer) || return;
- defined(my $answer = get_answer($array_of_inputs) || return;
+ defined(my $answer = $self->{cli}->get_answer) || return;
+ defined(my $answer = $self->{cli}->get_answer($array_of_inputs) || return;
 
 $array_of_answers is an array of inputs that should be used before STDIN. Good for grabbing some advance answers in the original command line args.
 
@@ -315,6 +315,33 @@ $array_of_answers is an array of inputs that should be used before STDIN. Good f
 	if (!length($answer)) { return ""; }
 	if (!$answer) { return '0'; }
 	return $answer;
+}
+
+sub prompt {
+#=====================================================
+
+=head2 B<prompt>
+
+ defined(my $answer = $self->{cli}->prompt($label, $preinputs, $regex, $invalid_message)) || exit;
+
+=cut
+#=====================================================
+	my $self = shift || return;
+	my $label = shift || '?';
+	my $preinputs = shift || [];
+	my $regex = shift;
+	my $invalid = shift || 'Invalid input';
+	
+	my $answer;
+	while (42) {
+		$self->body("$label: ", TRUE);
+		defined($answer = $self->get_answer($preinputs)) || exit;
+		if ($regex && ($answer !~ /$regex/)) {
+			$self->warning($invalid);
+			$preinputs = [];
+		} else { last; }
+	}
+	return $answer || '';
 }
 
 sub make_index {
