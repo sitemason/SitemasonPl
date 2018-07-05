@@ -26,6 +26,7 @@ use SitemasonPl::Common;
 
 =head2 B<new>
 
+ use SitemasonPl::CLI::Table;
  SitemasonPl::CLI::Table->new(columns => [ {
  	name	=> $column_name,
  	width	=> $int_width,
@@ -42,7 +43,7 @@ use SitemasonPl::Common;
 	}, {
 		name	=> 'title',
 		width	=> 30
- } ], $label);
+ } ], label => $label);
 
 =cut
 #=====================================================
