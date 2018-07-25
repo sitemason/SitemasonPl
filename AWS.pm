@@ -21,6 +21,9 @@ use constant FALSE => 0;
 use SitemasonPl::Common;
 # use SitemasonPl::AWS::CloudWatch_Logs;
 # use SitemasonPl::AWS::CloudWatch_LogStream;
+# use SitemasonPl::AWS::CloudWatch_Metrics;
+# use SitemasonPl::AWS::EC2;
+# use SitemasonPl::AWS::ELB;
 # use SitemasonPl::AWS::S3;
 
 sub new {
