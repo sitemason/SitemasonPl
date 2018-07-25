@@ -128,13 +128,13 @@ sub put_metrics {
 	@{$self->{metric_data}} || return;
 	
 	my $batch = SitemasonPl::Batch->new(
-		batchSize => 20,
+		batch_size => 20,
 		process => sub {
 			my $payload = shift;
 			my $metric_data_json = encode_json($payload);
 			my $response = $self->_call_cw("put-metric-data --namespace $self->{namespace} --metric-data '$metric_data_json'", FALSE);
 		},
-		debug => FALSE
+		debug => $debug
 	);
 
 	foreach my $data (@{$self->{metric_data}}) {

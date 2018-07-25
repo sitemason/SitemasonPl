@@ -147,7 +147,7 @@ sub end {
 	$self->{item_count} = @{$self->{payload}};
 	if ($self->{item_count}) {
 		$self->{batch_total}++;
-		if ($self->{debug}) { print "Batch:     $self->{batch_count} process\n"; }
+		if ($self->{debug}) { print "Batch: $self->{batch_count} process\n"; }
 		
 		&{$self->{process}}($self->{payload}, $container);
 	}
