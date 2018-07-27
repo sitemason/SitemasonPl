@@ -18,6 +18,9 @@ use utf8;
 use constant TRUE => 1;
 use constant FALSE => 0;
 
+use DateTime;
+use DateTime::Duration;
+use DateTime::Format::ISO8601;
 use JSON;
 
 use lib qw( /opt/lib/site_perl );
@@ -57,7 +60,7 @@ sub add_metric {
 
 =head2 B<add_metric>
 
-	$self->add_metric($metric_name, $value, $unit);
+	$metrics->add_metric($metric_name, $value, $unit);
 	
 	$unit =
 		"Seconds" | "Microseconds" | "Milliseconds"
@@ -103,7 +106,7 @@ sub get_metric_data {
 
 =head2 B<get_metric_data>
 
- my $data = $self->get_metric_data;
+ my $data = $metrics->get_metric_data;
 
 =cut
 #=====================================================
@@ -119,7 +122,7 @@ sub put_metrics {
 
 =head2 B<_call_elb>
 
- $self->put_metrics;
+ $metrics->put_metrics;
 
 =cut
 #=====================================================
@@ -155,6 +158,60 @@ sub put_metrics {
 # 		my $metric_data_json2 = make_json(\@metric_data, { include_nulls => TRUE, compress => TRUE, escape_for_bash => TRUE } );
 # 		my $response2 = $self->_call_ec2("put-metric-data --namespace $self->{namespace} --metric-data '$metric_data_json2'", $debug);
 # 	}
+}
+
+
+sub get_metric_statistics {
+#=====================================================
+
+=head2 B<get_metric_statistics>
+
+To grab the past minute as an Average:
+ my $data = $metrics->get_metric_statistics($metric_name);
+
+ my $data = $metrics->get_metric_statistics(
+ 	$metric_name,
+	$duration,				# number of minutes in the past to grab; defaults to 1 minute
+	{ $name => $value },	# dimensions as a hash; optional
+	'SampleCount' || 'Average' || 'Sum' || 'Minimum' || 'Maximum'	# statistics; defaults to 'Average'
+ );
+
+=cut
+#=====================================================
+	my $self = shift || return;
+	my $metric_name = shift || return;
+	my $duration = shift || 1;
+	my $dimensions = shift;
+	my $statistics = shift || 'Average';
+	my $debug = shift;
+	
+	my $dim_string = '';
+	if (is_hash_with_content($dimensions)) {
+		$dim_string = ' --dimensions';
+		while (my($name, $value) = each(%{$dimensions})) {
+			$dim_string .= " Name=$name,Value=$value";
+		}
+	}
+	
+	my $now = DateTime->now(time_zone => 'UTC');
+	my $dur = DateTime::Duration->new(minutes => $duration);
+	my $before = $now->clone;
+	$before->subtract_duration($dur);
+	my $before_string = $before->iso8601() . 'Z';
+	my $now_string = $now->iso8601() . 'Z';
+	
+	my $response = $self->_call_cw("get-metric-statistics --namespace $self->{namespace} --metric-name '$metric_name'$dim_string " .
+		"--start-time '$before_string' --end-time '$now_string' --period 60 --statistics $statistics", $debug);
+	is_array($response->{Datapoints}) || return;
+	
+	foreach my $point (@{$response->{Datapoints}}) {
+		my $iso8601 = DateTime::Format::ISO8601->new(base_datetime => $now);
+		my $isodt = $iso8601->parse_datetime($point->{Timestamp});
+		$point->{Epoch} = $isodt->epoch();
+		$point->{Data} = $point->{$statistics};
+	}
+	my @output = sort { $a->{Epoch} <=> $b->{Epoch} } @{$response->{Datapoints}};
+	return \@output;
 }
 
 
