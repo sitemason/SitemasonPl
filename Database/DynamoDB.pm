@@ -30,6 +30,7 @@ sub new {
 
 =head2 B<new>
 
+ use SitemasonPl::Database::DynamoDB;
  $self->{dd} = SitemasonPl::Database::DynamoDB->new;
 
 =cut
