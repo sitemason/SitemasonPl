@@ -45,6 +45,7 @@ sub new {
 	
 	my $self = {
 		cli			=> $arg{cli},
+		dry_run		=> $arg{dry_run},
 		namespace	=> $arg{namespace},
 		metric_data	=> []
 	};
@@ -134,8 +135,14 @@ sub put_metrics {
 		batch_size => 20,
 		process => sub {
 			my $payload = shift;
-			my $metric_data_json = encode_json($payload);
-			my $response = $self->_call_cw("put-metric-data --namespace $self->{namespace} --metric-data '$metric_data_json'", FALSE);
+			if ($self->{dry_run}) {
+				my $payload_count = @{$payload};
+				my $payload_string = "$payload_count " . pluralize('record', $payload_count);
+				$self->{cli}->dry_run("CW put-metric-data --namespace $self->{namespace} --metric-data '[$payload_string]'");
+			} else {
+				my $metric_data_json = encode_json($payload);
+				my $response = $self->_call_cw("put-metric-data --namespace $self->{namespace} --metric-data '$metric_data_json'", FALSE);
+			}
 		},
 		debug => $debug
 	);
@@ -225,8 +232,9 @@ sub _call_cw {
 	my $self = shift || return;
 	my $args = shift || return;
 	my $debug = shift;
+	my $dry_run = shift;
 	
-	return $self->SUPER::_call_aws("cloudwatch $args", $debug);
+	return $self->SUPER::_call_aws("cloudwatch $args", $debug, $dry_run);
 }
 
 

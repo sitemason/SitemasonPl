@@ -52,6 +52,7 @@ sub _call_aws {
 	my $self = shift || return;
 	my $args = shift || return;
 	my $debug = shift;
+	my $dry_run = shift;
 	
 	my $awscli = '/usr/bin/aws';
 	if (!-e $awscli) {
@@ -63,6 +64,10 @@ sub _call_aws {
 	
 	my $command = "$awscli $args";
 	$debug && say $command;
+	if ($dry_run) {
+		$self->{cli}->dry_run($command);
+		return {};
+	}
 	my $json = `$command`;
 	is_json($json) || return $json;
 	return parse_json($json);
