@@ -141,7 +141,7 @@ sub put_metrics {
 				$self->{cli}->dry_run("CW put-metric-data --namespace $self->{namespace} --metric-data '[$payload_string]'");
 			} else {
 				my $metric_data_json = encode_json($payload);
-				my $response = $self->_call_cw("put-metric-data --namespace $self->{namespace} --metric-data '$metric_data_json'", FALSE);
+				my $response = $self->_call_cw("put-metric-data --namespace $self->{namespace} --metric-data '$metric_data_json'", TRUE);
 			}
 		},
 		debug => $debug
