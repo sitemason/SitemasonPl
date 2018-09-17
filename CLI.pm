@@ -67,6 +67,7 @@ sub new {
 		if ($self->{options}->{help} || $self->{options}->{usage}) { $self->print_usage; exit; }
 		if ($self->{options}->{version}) { $self->print_version; exit; }
 	}
+	if ($arg{print_intro}) { $self->print_intro; }
 	
 	return $self;
 }
@@ -176,6 +177,12 @@ Given a list of acceptable options, returns a hash of the options with their val
 	return $options;
 }
 
+
+sub print_intro {
+	my $self = shift || return;
+	$self->say_bold("Running: " . scalar localtime());
+	return TRUE;
+}
 
 sub print_usage {
 	my $self = shift || return;
