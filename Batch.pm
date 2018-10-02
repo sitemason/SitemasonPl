@@ -13,8 +13,9 @@ With $container:
  use SitemasonPl::Batch;
  
  my $batch = SitemasonPl::Batch->new(
-  	batch_size => 3,
-  	process => sub {
+  	batch_size	=> 100,		# Maximum number of items allowed in a batch
+  	limit		=> 10,		# Limit the number of items that can be added, for testing purposes
+  	process		=> sub {
  		my $payload = shift;
  		my $container = shift;
  		print Dumper($payload, $container);
@@ -33,8 +34,8 @@ Without $container:
  use SitemasonPl::Batch;
  
  my $batch = SitemasonPl::Batch->new(
-  	batch_size => 3,
-  	process => sub {
+  	batch_size	=> 100,
+  	process		=> sub {
  		my $payload = shift;
  		print Dumper($payload);
  	},
@@ -80,6 +81,7 @@ sub new {
 	my $self = {
 		batch_size	=> $arg{batch_size},
 		debug		=> $arg{debug},
+		limit		=> $arg{limit},
 		process		=> $arg{process},
 		payload		=> [],
 		item_count	=> 0,
@@ -112,6 +114,8 @@ sub add {
 	my $self = shift || return;
 	my $item = shift;
 	my $container = shift;
+	
+	if ($self->{limit} && ($self->{item_total} >= $self->{limit})) { return; }
 	$self->{item_total}++;
 	
 	push(@{$self->{payload}}, $item);
@@ -128,6 +132,7 @@ sub add {
 		$self->{payload} = [];
 		$self->{item_count} = 0;
 		$self->{batch_count}++;
+		return TRUE;
 	}
 }
 
