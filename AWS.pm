@@ -24,6 +24,7 @@ use SitemasonPl::Common;
 # use SitemasonPl::AWS::CloudWatch_Metrics;
 # use SitemasonPl::AWS::EC2;
 # use SitemasonPl::AWS::ELB;
+# use SitemasonPl::AWS::Launch_Template;
 # use SitemasonPl::AWS::S3;
 
 sub new {
@@ -54,9 +55,9 @@ sub _call_aws {
 	my $debug = shift;
 	my $dry_run = shift;
 	
-	my $awscli = '/usr/bin/aws';
+	my $awscli = '/usr/local/bin/aws';
 	if (!-e $awscli) {
-		$awscli = '/usr/local/bin/aws';
+		$awscli = '/usr/bin/aws';
 		if (!-e $awscli) {
 			$self->{cli}->error("AWS CLI not found.");
 		}
