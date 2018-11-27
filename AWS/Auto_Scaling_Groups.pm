@@ -34,6 +34,10 @@ sub new {
 
  use SitemasonPl::AWS::Auto_Scaling_Groups;
  my $asg = SitemasonPl::AWS::Auto_Scaling_Groups->new;
+ my $asg = SitemasonPl::AWS::Auto_Scaling_Groups->new(
+	cli		=> $self->{cli},
+	dry_run	=> $self->{dry_run}
+ );
 
 =cut
 #=====================================================
@@ -75,6 +79,37 @@ sub get_auto_scaling_groups {
 	} else {
 		return $response->{AutoScalingGroups};
 	}
+}
+
+
+sub set_desired_capacity {
+#=====================================================
+
+=head2 B<set_desired_capacity>
+
+	$asg->set_desired_capacity($asg_name, $desired_capacity);
+
+=cut
+#=====================================================
+	my $self = shift || return;
+	my $asg_name = shift || return;
+	my $desired_capacity = shift;
+	my $debug = shift;
+	is_pos_int($desired_capacity) || return;
+	
+	my $auto_scaling_group = $self->get_auto_scaling_groups($asg_name);
+	is_hash($auto_scaling_group) || return;
+	my $min_size = $auto_scaling_group->{MinSize};
+	my $max_size = $auto_scaling_group->{MaxSize};
+	if ($desired_capacity < $min_size) {
+		$self->{cli}->error("Cannnot set desired capacity of $desired_capacity to less than the minimum size of $min_size");
+		return;
+	} elsif ($desired_capacity > $max_size) {
+		$self->{cli}->error("Cannnot set desired capacity of $desired_capacity to greater than the maximum size of $max_size");
+	}
+	
+	my $response = $self->_call_asg("update-auto-scaling-group --auto-scaling-group-name $asg_name --desired-capacity $desired_capacity", $debug, $self->{dry_run});
+	return TRUE;
 }
 
 

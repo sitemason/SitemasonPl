@@ -34,6 +34,11 @@ sub new {
 
  use SitemasonPl::AWS::Launch_Template;
  my $lt = SitemasonPl::AWS::Launch_Template->new($name);
+ my $lt = SitemasonPl::AWS::Launch_Template->new(
+	cli		=> $self->{cli},
+	dry_run	=> $self->{dry_run},
+	name	=> $name
+ );
 
 =cut
 #=====================================================
@@ -102,7 +107,7 @@ sub set_default_version_number {
 	
 	if (!is_pos_int($version)) { $self->{cli}->error("A positive integer for a version number is required"); return; }
 		
-	my $response = $self->_call_ec2("modify-launch-template --launch-template-name $self->{name} --default-version $version", $debug);
+	my $response = $self->_call_ec2("modify-launch-template --launch-template-name $self->{name} --default-version $version", $debug, $self->{dry_run});
 	if (value($response, [qw(LaunchTemplates DefaultVersionNumber)]) == $version) { return TRUE; }
 }
 
@@ -126,7 +131,7 @@ sub create_version {
 	if (!is_pos_int($source_version)) { $self->{cli}->error("A positive integer for a version number is required"); return; }
 	
 	my $data = '{"ImageId":"' . lc($ami_id) . '"}';
-	my $response = $self->_call_ec2("create-launch-template-version --launch-template-name $self->{name} --source-version $source_version --launch-template-data '$data'", $debug);
+	my $response = $self->_call_ec2("create-launch-template-version --launch-template-name $self->{name} --source-version $source_version --launch-template-data '$data'", $debug, $self->{dry_run});
 	return value($response, [qw(LaunchTemplateVersion VersionNumber)]);
 }
 
