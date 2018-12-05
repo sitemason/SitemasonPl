@@ -130,7 +130,7 @@ sub create_version {
 	if (!is_pos_int($source_version)) { $source_version = $self->get_latest_version_number($debug); }
 	if (!is_pos_int($source_version)) { $self->{cli}->error("A positive integer for a version number is required"); return; }
 	
-	my $data = '{"ImageId":"' . lc($ami_id) . '"}';
+	my $data = '{"ImageId":"' . lc($ami_id) . '", "InstanceType":"t3.medium"}';
 	my $response = $self->_call_ec2("create-launch-template-version --launch-template-name $self->{name} --source-version $source_version --launch-template-data '$data'", $debug, $self->{dry_run});
 	return value($response, [qw(LaunchTemplateVersion VersionNumber)]);
 }
