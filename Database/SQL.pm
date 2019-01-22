@@ -2466,8 +2466,8 @@ You probably won't need to call this method directly. It is used by other method
 			}
 			elsif ($type eq 'boolean') {
 				if ($old && (($value && $old->{$field}) || (!$value && !$old->{$field}))) { next; }
-				if (isBoolean($value) && $value) { $quote = 'TRUE'; }
-				elsif (isBoolean($value)) { $quote = 'FALSE'; }
+				if (is_boolean($value) && $value) { $quote = 'TRUE'; }
+				elsif (is_boolean($value)) { $quote = 'FALSE'; }
 				elsif ($value eq 'NULL') {
 					$quote = 'NULL';
 				} elsif ($value) {
