@@ -123,14 +123,16 @@ sub create_version {
 #=====================================================
 	my $self = shift || return;
 	my $ami_id = shift;
+	my $instance_size = shift;
 	my $source_version = shift;
 	my $debug = shift;
 	
 	if (!$ami_id || ($ami_id !~ /^ami\-[0-9a-f]+/i)) { $self->{cli}->error("A valid AMI ID is required"); return; }
+	if (!$instance_size || ($instance_size !~ /^[a-z][1-9][a-z]?\.(nano|micro|small|medium|x?large|[1-3]?[0-9]xlarge)$/i)) { $self->{cli}->error("A valid instance size required"); return; }
 	if (!is_pos_int($source_version)) { $source_version = $self->get_latest_version_number($debug); }
 	if (!is_pos_int($source_version)) { $self->{cli}->error("A positive integer for a version number is required"); return; }
 	
-	my $data = '{"ImageId":"' . lc($ami_id) . '", "InstanceType":"t3.medium"}';
+	my $data = '{"ImageId":"' . lc($ami_id) . '", "InstanceType":"'. $instance_size . '"}';
 	my $response = $self->_call_ec2("create-launch-template-version --launch-template-name $self->{name} --source-version $source_version --launch-template-data '$data'", $debug, $self->{dry_run});
 	return value($response, [qw(LaunchTemplateVersion VersionNumber)]);
 }
