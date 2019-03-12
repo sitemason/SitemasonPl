@@ -5184,7 +5184,7 @@ Returns text of the length specified surrounding the given search term. An optio
 	my $summary = $first;
 	
 	if (length($first) > $length) {
-		if ($search && ($first =~ /$search/ig)) {
+		if ($search && ($first =~ /\Q$search\E/ig)) {
 			my $pos = pos($first);
 			my $offset = int(($length - length($search)) / 2) - 2;
 			if ($pos < $offset) {
