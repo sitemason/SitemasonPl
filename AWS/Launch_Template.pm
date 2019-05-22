@@ -18,7 +18,8 @@ use utf8;
 use constant TRUE => 1;
 use constant FALSE => 0;
 
-use JSON;
+use MIME::Base64;
+use YAML;
 
 use lib qw( /opt/lib/site_perl );
 use SitemasonPl::AWS;
@@ -125,15 +126,25 @@ sub create_version {
 	my $ami_id = shift;
 	my $instance_size = shift;
 	my $source_version = shift;
+	my $user_data = shift;
 	my $debug = shift;
 	
 	if (!$ami_id || ($ami_id !~ /^ami\-[0-9a-f]+/i)) { $self->{cli}->error("A valid AMI ID is required"); return; }
-	if (!$instance_size || ($instance_size !~ /^[a-z][1-9][a-z]?\.(nano|micro|small|medium|x?large|[1-3]?[0-9]xlarge)$/i)) { $self->{cli}->error("A valid instance size required"); return; }
+	if (!$instance_size || ($instance_size !~ /^[a-z][1-9][a-z]?\.(nano|micro|small|medium|x?large|[1-3]?[0-9]xlarge)$/i)) { $self->{cli}->error("A valid instance size is required"); return; }
 	if (!is_pos_int($source_version)) { $source_version = $self->get_latest_version_number($debug); }
 	if (!is_pos_int($source_version)) { $self->{cli}->error("A positive integer for a version number is required"); return; }
 	
-	my $data = '{"ImageId":"' . lc($ami_id) . '", "InstanceType":"'. $instance_size . '"}';
-	my $response = $self->_call_ec2("create-launch-template-version --launch-template-name $self->{name} --source-version $source_version --launch-template-data '$data'", $debug, $self->{dry_run});
+	my $data = {
+		ImageId		=> lc($ami_id),
+		InstanceType => $instance_size
+	};
+	if ($user_data) {
+		my $user_data_yaml = Dump($user_data);
+		$data->{UserData} = encode_base64($user_data_yaml);
+	}
+	
+	my $json_data = make_json($data, { compress => TRUE, escape_for_bash => TRUE });
+	my $response = $self->_call_ec2("create-launch-template-version --launch-template-name $self->{name} --source-version $source_version --launch-template-data '$json_data'", $debug, $self->{dry_run});
 	return value($response, [qw(LaunchTemplateVersion VersionNumber)]);
 }
 
