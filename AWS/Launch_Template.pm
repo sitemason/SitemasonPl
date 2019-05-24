@@ -137,21 +137,21 @@ sub create_version {
 	if (!is_pos_int($source_version)) { $self->{cli}->error("A positive integer for a version number is required"); return; }
 	
 	my $version_description = '';
-	if ($description) {
-		$description =~ s/'/'"'"'/g;
-		$version_description = " --version-description='$description'";
+	if ($data->{version_description}) {
+		$data->{version_description} =~ s/'/'"'"'/g;
+		$version_description = " --version-description='$data->{version_description}'";
 	}
 	
-	my $data = {
+	my $data_arg = {
 		ImageId		=> lc($ami_id),
 		InstanceType => $instance_size
 	};
 	if ($user_data) {
 		my $user_data_yaml = Dump($user_data);
-		$data->{UserData} = encode_base64($user_data_yaml);
+		$data_arg->{UserData} = encode_base64($user_data_yaml);
 	}
 	
-	my $json_data = make_json($data, { compress => TRUE, escape_for_bash => TRUE });
+	my $json_data = make_json($data_arg, { compress => TRUE, escape_for_bash => TRUE });
 	my $response = $self->_call_ec2("create-launch-template-version --launch-template-name $self->{name} --source-version $source_version$version_description --launch-template-data '$json_data'", $debug, $self->{dry_run});
 	return value($response, [qw(LaunchTemplateVersion VersionNumber)]);
 }
