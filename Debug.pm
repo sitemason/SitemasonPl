@@ -28,7 +28,7 @@ use SitemasonPl::Database;
 
 =head2 B<new>
 
- $self->{debug} = Sitemason::Debug->new({
+ $self->{debug} = SitemasonPl::Debug->new({
  	logLevel	=> 'debug',		# log items with matching tags of this level or higher
  	logLevelAll	=> 'notice',	# log all items of this level or higher
  	logTags		=> []
@@ -771,8 +771,8 @@ Finally, there is an optional hash of arguments you can pass. 'limit' lets you s
 		suppressParents	=> 1,
 		showNulls			=> 1,
 		classList	=> [
-			'Sitemason::System::File::',
-			'Sitemason::System::Data::'
+			'SitemasonPl::System::File::',
+			'SitemasonPl::System::Data::'
 		]
 	} );
 
