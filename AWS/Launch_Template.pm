@@ -34,7 +34,7 @@ sub new {
 =head2 B<new>
 
  use SitemasonPl::AWS::Launch_Template;
- my $lt = SitemasonPl::AWS::Launch_Template->new($name);
+ my $lt = SitemasonPl::AWS::Launch_Template->new(name => $name);
  my $lt = SitemasonPl::AWS::Launch_Template->new(
 	cli		=> $self->{cli},
 	dry_run	=> $self->{dry_run},

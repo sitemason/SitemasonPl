@@ -20,6 +20,7 @@ use constant FALSE => 0;
 
 use lib qw( /opt/lib/site_perl );
 use SitemasonPl::AWS;
+use SitemasonPl::AWS::Launch_Template;
 use SitemasonPl::Batch;
 use SitemasonPl::Common;
 use SitemasonPl::CLI qw(mark print_object);
@@ -31,7 +32,12 @@ sub new {
 =head2 B<new>
 
  use SitemasonPl::AWS::EC2;
- my $ec2 = SitemasonPl::AWS::EC2->new;
+ my $ec2 = SitemasonPl::AWS::EC2->new();
+ my $ec2 = SitemasonPl::AWS::EC2->new(
+	cli		=> $self->{cli},
+	dry_run	=> $self->{dry_run},
+	name	=> $name
+ );
 
 =cut
 #=====================================================
@@ -39,7 +45,8 @@ sub new {
 	$class || return;
 	
 	my $self = {
-		cli			=> $arg{cli}
+		cli			=> $arg{cli},
+		dry_run		=> $arg{dry_run}
 	};
 	if (!$self->{cli}) { $self->{cli} = SitemasonPl::CLI->new; }
 	
@@ -81,6 +88,117 @@ sub get_instances {
 	return $records;
 }
 
+sub run_instance_from_template {
+#=====================================================
+
+=head2 B<run_instance_from_template>
+
+ my $ip_address = $ec2->run_instance_from_template($template_name, $subnet_id);
+ my $ip_address = $ec2->run_instance_from_template($template_name, $subnet_id, $image_size);
+
+=cut
+#=====================================================
+	my $self = shift || return;
+	my $template_name = shift || return;
+	my $subnet_id = shift || return;
+	my $instance_type = shift;
+	my $debug = shift;
+	
+	my $lt = SitemasonPl::AWS::Launch_Template->new(
+		cli		=> $self->{cli},
+		dry_run	=> $self->{dry_run},
+		name	=> $template_name
+	);
+	my $version = $lt->get_latest_version_number;
+	
+	my $arg = '';
+	if ($instance_type) { $arg = " --instance-type $instance_type"; }
+	if ($self->{dry_run}) { 
+		$self->_call_ec2("run-instances --launch-template LaunchTemplateName=$template_name,Version=$version --subnet-id $subnet_id$arg", $debug, TRUE);
+		$arg = ' --dry-run';
+	}
+	
+	my $response = $self->_call_ec2("run-instances --launch-template LaunchTemplateName=$template_name,Version=$version --subnet-id $subnet_id$arg", $debug);
+	$self->{cli}->print_object($response, '$response');
+	my $records = [];
+	foreach my $instance (@{$response->{Instances}}) {
+		push(@{$records}, $instance->{PrivateIpAddress});
+	}
+	$debug && $self->{cli}->print_object($records, '$records', { limit => 3 });
+	return $records->[0];
+}
+
+sub stop_instance {
+#=====================================================
+
+=head2 B<stop_instance>
+
+ my $response = $ec2->stop_instance($instance_id);
+
+=cut
+#=====================================================
+	my $self = shift || return;
+	my $instance_id = shift || return;
+	my $debug = shift;
+	
+	my $arg = '';
+	if ($self->{dry_run}) { 
+		$self->_call_ec2("stop-instances --instance-ids $instance_id$arg", $debug, TRUE);
+		$arg = ' --dry-run';
+	}
+	
+	my $response = $self->_call_ec2("stop-instances --instance-ids $instance_id$arg", $debug);
+	$debug && $self->{cli}->print_object($response, '$response');
+	return $response;
+}
+
+sub terminate_instance {
+#=====================================================
+
+=head2 B<terminate_instance>
+
+ my $response = $ec2->terminate_instance($instance_id);
+
+=cut
+#=====================================================
+	my $self = shift || return;
+	my $instance_id = shift || return;
+	my $debug = shift;
+	
+	my $arg = '';
+	if ($self->{dry_run}) { 
+		$self->_call_ec2("terminate-instances --instance-ids $instance_id$arg", $debug, TRUE);
+		$arg = ' --dry-run';
+	}
+	
+	my $response = $self->_call_ec2("terminate-instances --instance-ids $instance_id$arg", $debug);
+	$debug && $self->{cli}->print_object($response, '$response');
+	return $response;
+}
+
+sub get_instance_status {
+#=====================================================
+
+=head2 B<get_instance_status>
+
+ my $status = $ec2->get_instance_status($ec2_instance_object);
+ my $status = $ec2->get_instance_status($instance_id);
+
+=cut
+#=====================================================
+	my $self = shift || return;
+	my $instance = shift || return;
+	my $debug = shift;
+	
+	if (is_text($instance)) {
+		my $instances = $self->get_instances($instance);
+		$instance = $instances->[0];
+	}
+	if (is_hash($instance) && $instance->{State}) {
+		return $instance->{State}->{Name};
+	}
+
+}
 
 sub get_load_balancers {
 #=====================================================
@@ -344,8 +462,9 @@ sub _call_ec2 {
 	my $self = shift || return;
 	my $args = shift || return;
 	my $debug = shift;
+	my $dry_run = shift;
 	
-	return $self->SUPER::_call_aws("ec2 $args", $debug);
+	return $self->SUPER::_call_aws("ec2 $args", $debug, $dry_run);
 }
 
 sub _call_elb {
@@ -358,8 +477,9 @@ sub _call_elb {
 	my $self = shift || return;
 	my $args = shift || return;
 	my $debug = shift;
+	my $dry_run = shift;
 	
-	return $self->SUPER::_call_aws("elb $args", $debug);
+	return $self->SUPER::_call_aws("elb $args", $debug, $dry_run);
 }
 
 
