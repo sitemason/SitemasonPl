@@ -113,6 +113,41 @@ sub set_default_version_number {
 }
 
 
+sub create {
+#=====================================================
+
+=head2 B<create>
+
+	my $new_version = $lt->create(["cluster lms", "int ssh control", "int lms elb web"], $tags);
+
+=cut
+#=====================================================
+	my $self = shift || return;
+	my $security_groups = shift;
+	my $tags = shift;
+	my $debug = shift;
+	
+	my $data_arg = {
+		EbsOptimized	=> "true",
+		Monitoring		=> {
+			Enabled			=> "true"
+		},
+		TagSpecifications	=> [ {
+			ResourceType		=> "instance",
+			Tags				=> $tags
+		}, {
+			ResourceType		=> "volume",
+			Tags				=> $tags
+		} ],
+		SecurityGroupIds	=> $security_groups
+	};
+	
+	my $json_data = make_json($data_arg, { compress => TRUE, escape_for_bash => TRUE });
+	my $response = $self->_call_ec2("create-launch-template --launch-template-name $self->{name} --launch-template-data '$json_data'", $debug, $self->{dry_run});
+	return value($response, [qw(LaunchTemplate LatestVersionNumber)]);
+}
+
+
 sub create_version {
 #=====================================================
 
