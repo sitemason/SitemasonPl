@@ -76,7 +76,7 @@ sub invoke {
 	my $outfile = "/tmp/lambda_invoke_$key";
 	my $json_data = make_json($payload, { compress => TRUE, escape_for_bash => TRUE });
 	my $response = $self->_call_lambda("invoke --function-name $self->{name} --payload '$json_data' $outfile", $debug, $self->{dry_run});
-	if ($response && is_hash($response) && ($response->{StatusCode} eq '200')) {
+	if (is_hash_with_content($response) && ($response->{StatusCode} eq '200')) {
 		my $output = '';
 		if (-e $outfile) {
 			open(OUTPUT, "<$outfile");
