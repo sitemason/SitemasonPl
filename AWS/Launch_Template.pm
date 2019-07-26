@@ -103,13 +103,13 @@ sub set_default_version_number {
 =cut
 #=====================================================
 	my $self = shift || return;
-	my $version = shift;
+	my $version = shift || 1;
 	my $debug = shift;
 	
 	if (!is_pos_int($version)) { $self->{cli}->error("A positive integer for a version number is required"); return; }
 		
 	my $response = $self->_call_ec2("modify-launch-template --launch-template-name $self->{name} --default-version $version", $debug, $self->{dry_run});
-	if (value($response, [qw(LaunchTemplates DefaultVersionNumber)]) == $version) { return TRUE; }
+	if (value($response, [qw(LaunchTemplate DefaultVersionNumber)]) == $version) { return TRUE; }
 }
 
 
