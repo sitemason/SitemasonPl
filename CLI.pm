@@ -52,6 +52,8 @@ sub new {
 	bless $self, $class;
 	$self->init_formats;
 	($self->{script_name}) = $0 =~ /\/([^\/]+?)$/;
+	my ($hostname) = `/bin/hostname`;
+	if ($hostname =~ /dev/) { $self->{is_dev} = TRUE; }
 	
 	if ($arg{exit_if_running}) {
 		if (is_already_running()) { $self->warning("Another instance of $self->{script_name} is already running"); exit; }
