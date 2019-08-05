@@ -162,6 +162,7 @@ sub cycle_instances {
 		my $new_cap = $auto_scaling_group->{DesiredCapacity} * 2;
 		if ($auto_scaling_group->{DesiredCapacity} == 2) { $new_cap = 6; }
 		$self->set_desired_capacity($auto_scaling_group, $new_cap, $debug);
+		$self->set_min_size($auto_scaling_group, $new_cap, $debug);
 		$debug && $self->{cli}->success("Auto scaling group \"$asg_name\" set to a desired capacity of $new_cap");
 		return TRUE;
 	} else {
