@@ -119,7 +119,6 @@ sub run_instance_from_template {
 	}
 	
 	my $response = $self->_call_ec2("run-instances --launch-template LaunchTemplateName=$template_name,Version=$version --subnet-id $subnet_id$arg", $debug);
-	$self->{cli}->print_object($response, '$response');
 	my $records = [];
 	foreach my $instance (@{$response->{Instances}}) {
 		push(@{$records}, $instance->{PrivateIpAddress});
