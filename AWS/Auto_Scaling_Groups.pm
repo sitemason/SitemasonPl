@@ -172,6 +172,49 @@ sub cycle_instances {
 }
 
 
+sub increment_group {
+	# $asg->increment_group($asg_name);
+	my $self = shift || return;
+	my $asg_input = shift || return;
+	my $debug = shift;
+	
+	my ($auto_scaling_group, $asg_name) = $self->get_auto_scaling_groups($asg_input);
+	is_hash($auto_scaling_group) || return;
+	
+	if (value($auto_scaling_group, 'DesiredCapacity')) {
+		my $new_cap = $auto_scaling_group->{DesiredCapacity} + 1;
+		$self->set_desired_capacity($auto_scaling_group, $new_cap, $debug);
+		$self->set_min_size($auto_scaling_group, $new_cap, $debug);
+		$debug && $self->{cli}->success("Auto scaling group \"$asg_name\" set to a desired capacity of $new_cap");
+		return TRUE;
+	} else {
+		$self->{cli}->error("Desired capacity for auto scaling group \"$asg_name\" is currently zero.");
+		exit;
+	}
+}
+
+sub decrement_group {
+	# $asg->decrement_group($asg_name);
+	my $self = shift || return;
+	my $asg_input = shift || return;
+	my $debug = shift;
+	
+	my ($auto_scaling_group, $asg_name) = $self->get_auto_scaling_groups($asg_input);
+	is_hash($auto_scaling_group) || return;
+	
+	if (value($auto_scaling_group, 'DesiredCapacity')) {
+		my $new_cap = $auto_scaling_group->{DesiredCapacity} - 1;
+		$self->set_desired_capacity($auto_scaling_group, $new_cap, $debug);
+		$self->set_min_size($auto_scaling_group, $new_cap, $debug);
+		$debug && $self->{cli}->success("Auto scaling group \"$asg_name\" set to a desired capacity of $new_cap");
+		return TRUE;
+	} else {
+		$self->{cli}->error("Desired capacity for auto scaling group \"$asg_name\" is currently zero.");
+		exit;
+	}
+}
+
+
 sub _call_asg {
 #=====================================================
 
