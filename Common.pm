@@ -793,7 +793,7 @@ Escape text values for JSON.
 		$value =~ s/\\/\\\\/g;
 # 		$value =~ s/\//\\\//g;
 		$value =~ s/"/\\"/g;
-		$value =~ s/'/\\'/g;
+# 		$value =~ s/'/\\'/g;
 		$value =~ s/\r/\\r/g;
 		$value =~ s/\n/\\n/g;
 		$value =~ s/\t/\\t/g;
