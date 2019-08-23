@@ -161,9 +161,9 @@ sub cycle_instances {
 	if (value($auto_scaling_group, 'DesiredCapacity')) {
 		my $new_cap = $auto_scaling_group->{DesiredCapacity} * 2;
 		if ($auto_scaling_group->{DesiredCapacity} == 2) { $new_cap = 6; }
-		$self->set_desired_capacity($auto_scaling_group, $new_cap, $debug);
+# 		$self->set_desired_capacity($auto_scaling_group, $new_cap, $debug);
 		$self->set_min_size($auto_scaling_group, $new_cap, $debug);
-		$debug && $self->{cli}->success("Auto scaling group \"$asg_name\" set to a desired capacity of $new_cap");
+		$debug && $self->{cli}->success("Auto scaling group \"$asg_name\" set to a min capacity of $new_cap");
 		return TRUE;
 	} else {
 		$self->{cli}->error("Desired capacity for auto scaling group \"$asg_name\" is currently zero.");
@@ -183,9 +183,9 @@ sub increment_group {
 	
 	if (value($auto_scaling_group, 'DesiredCapacity')) {
 		my $new_cap = $auto_scaling_group->{DesiredCapacity} + 1;
-		$self->set_desired_capacity($auto_scaling_group, $new_cap, $debug);
+# 		$self->set_desired_capacity($auto_scaling_group, $new_cap, $debug);
 		$self->set_min_size($auto_scaling_group, $new_cap, $debug);
-		$debug && $self->{cli}->success("Auto scaling group \"$asg_name\" set to a desired capacity of $new_cap");
+		$debug && $self->{cli}->success("Auto scaling group \"$asg_name\" set to a min capacity of $new_cap");
 		return TRUE;
 	} else {
 		$self->{cli}->error("Desired capacity for auto scaling group \"$asg_name\" is currently zero.");
@@ -204,9 +204,9 @@ sub decrement_group {
 	
 	if (value($auto_scaling_group, 'DesiredCapacity')) {
 		my $new_cap = $auto_scaling_group->{DesiredCapacity} - 1;
-		$self->set_desired_capacity($auto_scaling_group, $new_cap, $debug);
+# 		$self->set_desired_capacity($auto_scaling_group, $new_cap, $debug);
 		$self->set_min_size($auto_scaling_group, $new_cap, $debug);
-		$debug && $self->{cli}->success("Auto scaling group \"$asg_name\" set to a desired capacity of $new_cap");
+		$debug && $self->{cli}->success("Auto scaling group \"$asg_name\" set to a min capacity of $new_cap");
 		return TRUE;
 	} else {
 		$self->{cli}->error("Desired capacity for auto scaling group \"$asg_name\" is currently zero.");
