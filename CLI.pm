@@ -567,11 +567,12 @@ sub make_style {
 
 sub make_color {
 	my $self = shift || return;
-	my $text = shift || '';
+	my $text = shift;
 	my $color = shift || 'bold';
 	my $bg = shift;
 	_term_supports_colors() || return $text;
 	my $debug = shift;
+	if (!defined($text)) { $text = ''; }
 	
 	if ($bg) {
 		if (is_array($color)) { push(@{$color}, "${bg}_bg"); }

@@ -29,6 +29,7 @@ sub new {
 
 =head2 B<new>
 
+ use SitemasonPl::AWS::S3;
  my $s3 = SitemasonPl::AWS::S3->new(bucket_name => $bucket_name);
 
 =cut
@@ -64,8 +65,17 @@ sub get_file_list {
 	}
 	
 	my $response = $self->_call_s3("ls $args", TRUE);
-	my @files = split("\n", $response);
-	$self->{cli}->print_object($response, '$response');
+	my @file_lines = split("\n", $response);
+	my $files = [];
+	foreach my $line (@file_lines) {
+		my ($date, $size, $file) = $line =~ /^([\d-]+ [\d:]+) +(\d+) +(.*)$/;
+		push(@{$files}, {
+			timestamp	=> $date,
+			size		=> $size,
+			filename	=> $file
+		});
+	}
+	return $files;
 }
 
 
