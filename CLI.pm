@@ -570,6 +570,7 @@ sub make_color {
 	my $text = shift;
 	my $color = shift || 'bold';
 	my $bg = shift;
+	if (!defined($text)) { $text = ''; }
 	_term_supports_colors() || return $text;
 	my $debug = shift;
 	if (!defined($text)) { $text = ''; }
@@ -637,6 +638,7 @@ sub say_bold {
 sub convert_markdown_to_ansi {
 	my $self = shift || return;
 	my $text = shift;
+	if (!defined($text)) { $text = ''; }
 	$self->{use_markdown} || return $text;
 	_term_supports_colors() || return $text;
 # 	$text =~ s/(?:^|(?<=\s))\*(\S.*?)\*/\e[1m$1\e[21m/g;
