@@ -36,7 +36,7 @@ use YAML;
 require Exporter;
 our @ISA = qw(Exporter);
 our @EXPORT = qw(read_cookie generate_password
-	get_timestamp get_filename_utc_minute get_filename_utc_hour get_filename_utc_date convert_arrays_to_csv convert_csv_to_arrays read_file_list read_file write_file get_file_age read_cache_file write_cache_file
+	get_timestamp get_iso_timestamp get_filename_utc_minute get_filename_utc_hour get_filename_utc_date convert_arrays_to_csv convert_csv_to_arrays read_file_list read_file write_file get_file_age read_cache_file write_cache_file
 	get_url post_url parse_query_string url_decode url_encode
 	parse_json make_json jsonify xmlify
 	html_entities_to_text to_html_entities from_html_entities convert_to_utf8 read_vfile
@@ -131,6 +131,12 @@ sub get_timestamp {
 	my $gm = gmtime();
 	my $year = $gm->year + 1900; my $mon = $gm->mon + 1;
 	return sprintf("%04d-%02d-%02d %02d:%02d:%02d", $year, $mon, $gm->mday, $gm->hour, $gm->min, $gm->sec);
+}
+
+sub get_iso_timestamp {
+	my $gm = gmtime();
+	my $year = $gm->year + 1900; my $mon = $gm->mon + 1;
+	return sprintf("%04d-%02d-%02dT%02d:%02d:%02dZ", $year, $mon, $gm->mday, $gm->hour, $gm->min, $gm->sec);
 }
 
 sub get_filename_utc_minute {
