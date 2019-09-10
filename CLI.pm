@@ -433,6 +433,107 @@ Returns an answer from an array of choices:
 	return $value;
 }
 
+sub pause {
+#=====================================================
+
+=head2 B<pause>
+
+ $self->{cli}->pause($seconds_to_pause);
+ $self->{cli}->pause($seconds_to_pause, $label);
+
+=cut
+#=====================================================
+	my $self = shift || return;
+	my $seconds = shift || return;
+	my $display_start = shift || '';
+	is_pos_int($seconds) || return;
+	
+	if (!$self->is_person) { sleep $seconds; return; }
+	
+	if ($display_start) { $display_start .= ': '; }
+	
+	if ($seconds > 1) {
+		my $last_length;
+		for (my $i = $seconds; $i > 0; $i--) {
+			my $display = $self->make_color($display_start . "==> $i <== ", 'bold');
+			$last_length = length($display);
+			if ($ENV{TERM} eq 'screen') { $last_length = length($display_start . "==> $i <== "); }
+			print STDERR $display;
+			sleep 1;
+			print STDERR "\r";
+		}
+		print STDERR ' ' x $last_length . "\r";
+	} else {
+		sleep 1;
+	}
+}
+
+
+sub progress {
+#=====================================================
+
+=head2 B<progress>
+
+Displays a progress bar at the given fraction of progress, a number between 0 and 1 inclusive.
+Pass 'end' to cleanly stop the progress bar.
+
+ $self->{cli}->progress($fraction_of_progress, [$label]);
+ $self->{cli}->progress('end');
+
+=cut
+#=====================================================
+	my $self = shift || return;
+	my $fraction = shift || return;
+	my $label = shift;
+	my $debug;
+	$self->is_person || return;
+	
+	# end
+	if ($fraction eq 'end') {
+		if ($debug) { print STDERR "end\n"; }
+		my $label_length = 0;
+		my $progress_length = 102;
+		if ($ENV{TERM} ne 'screen') { $progress_length += length($self->make_color('', 'bold')); }
+		if ($self->{progress_label}) { $label_length = length($self->{progress_label}) + 1; }
+		print STDERR "\r" . ' ' x ($label_length + $progress_length) . "\r";
+		delete $self->{progress};
+		delete $self->{progress_label};
+		return;
+	}
+	
+	if ($fraction > 1) { $fraction = 1; }
+	$fraction = int($fraction * 100);
+	
+	if ($debug) {
+		my $progress = $self->{progress} || 0;
+		$self->body("$fraction - $progress");
+	}
+	
+	# reset
+	if (exists($self->{progress}) && ($fraction < $self->{progress})) {
+		if ($debug) { print STDERR "reset\n"; }
+		print STDERR "\n";
+		delete $self->{progress};
+		delete $self->{progress_label};
+	}
+	
+	# update
+	my $progress = $self->{progress} || 0;
+	if ($fraction - $progress) {
+		if ($debug) { print STDERR "update\n"; }
+		my $remaining = 100 - $fraction;
+		my $cursor_move = $remaining + 1;
+		if (!$remaining) { $cursor_move--; }
+		if ($label) {
+			print STDERR $self->make_color("\r$label |" . '-'x$fraction . ' 'x$remaining . '|' . "\b"x$cursor_move, 'bold');
+		} else {
+			print STDERR $self->make_color("\r|" . '-'x$fraction . ' 'x$remaining . '|' . "\b"x$cursor_move, 'bold');
+		}
+		$self->{progress_label} = $label;
+		$self->{progress} = $fraction;
+	}
+}
+
 
 
 sub is_person {
