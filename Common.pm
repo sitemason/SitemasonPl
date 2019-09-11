@@ -26,6 +26,7 @@ use Encode qw(from_to is_utf8 decode);
 use JSON;
 use LWP::UserAgent;
 use Math::Trig qw(deg2rad pi great_circle_distance asin acos);
+use Text::CSV qw( csv );
 use Text::ParseWords;
 use Text::Unidecode;
 # use XML::Parser::Expat;
@@ -36,7 +37,7 @@ use YAML;
 require Exporter;
 our @ISA = qw(Exporter);
 our @EXPORT = qw(read_cookie generate_password
-	get_timestamp get_iso_timestamp get_filename_utc_minute get_filename_utc_hour get_filename_utc_date convert_arrays_to_csv convert_csv_to_arrays read_file_list read_file write_file get_file_age read_cache_file write_cache_file
+	get_timestamp get_iso_timestamp get_filename_utc_minute get_filename_utc_hour get_filename_utc_date convert_arrays_to_csv convert_csv_to_arrays read_file_list read_file read_csv_file write_file get_file_age read_cache_file write_cache_file
 	get_url post_url parse_query_string url_decode url_encode
 	parse_json make_json jsonify xmlify
 	html_entities_to_text to_html_entities from_html_entities convert_to_utf8 read_vfile
@@ -260,6 +261,28 @@ sub read_file {
 		if (wantarray) { return @data; }
 		else { return $data; }
 	}
+}
+
+sub read_csv_file {
+#=====================================================
+
+=head2 B<read_csv_file>
+
+ my $data = read_csv_file($filename);
+
+=cut
+#=====================================================
+	my $filename = shift || return;
+	if (!-s $filename) { return; }
+	
+	my $rows = [];
+	my $csv = Text::CSV->new ({ binary => 1, auto_diag => 1 });
+	open my $fh, "<:encoding(utf8)", $filename or die "$filename: $!";
+	while (my $row = $csv->getline ($fh)) {
+		push(@{$rows}, $row);
+	}
+	close $fh;
+	return $rows;
 }
 
 sub write_file {
