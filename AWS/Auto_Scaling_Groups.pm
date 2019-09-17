@@ -88,6 +88,35 @@ sub get_auto_scaling_groups {
 }
 
 
+sub get_healthy_instance_count {
+#=====================================================
+
+=head2 B<get_healthy_instance_count>
+
+	my $count = $asg->get_healthy_instance_count($asg_name);
+	my $count = $asg->get_healthy_instance_count($auto_scaling_group);
+
+=cut
+#=====================================================
+	my $self = shift || return;
+	my $asg_input = shift || return;
+	my $debug = shift;
+	
+	my ($auto_scaling_group, $asg_name) = $self->get_auto_scaling_groups($asg_input);
+	is_hash($auto_scaling_group) || return;
+	
+	if (is_array($auto_scaling_group->{Instances})) {
+		my $count = 0;
+		foreach my $instance (@{$auto_scaling_group->{Instances}}) {
+			if ($instance->{HealthStatus} eq 'Healthy') { $count++; }
+		}
+		return $count;
+	} else {
+		return 0;
+	}
+}
+
+
 sub set_desired_capacity {
 #=====================================================
 
@@ -204,8 +233,8 @@ sub decrement_group {
 	
 	if (value($auto_scaling_group, 'DesiredCapacity')) {
 		my $new_cap = $auto_scaling_group->{DesiredCapacity} - 1;
-# 		$self->set_desired_capacity($auto_scaling_group, $new_cap, $debug);
 		$self->set_min_size($auto_scaling_group, $new_cap, $debug);
+		$self->set_desired_capacity($auto_scaling_group, $new_cap, $debug);
 		$debug && $self->{cli}->success("Auto scaling group \"$asg_name\" set to a min capacity of $new_cap");
 		return TRUE;
 	} else {
