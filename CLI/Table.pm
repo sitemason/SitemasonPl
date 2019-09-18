@@ -64,6 +64,7 @@ sub new {
 	$self->{width} = 0;
 	my $first = TRUE;
 	foreach my $column (@{$self->{columns}}) {
+		$column->{width} ||= 0;
 		if (length($column->{name}) > $column->{width}) {
 			$column->{width} = length($column->{name});
 		}
