@@ -902,7 +902,7 @@ sub _convert_object_to_string_key {
 	my $key = shift;
 	my $value = shift;
 	my $args = shift;
-	if ($args->{output} eq 'json') { $key = "'$key'"; }
+	if ($args->{output} eq 'json') { $key = "\"$key\""; }
 	my $printKey = $key;
 	if (is_hash($value)) { $printKey = $self->make_style($key, 'print_object', 'hash_key'); }
 	elsif (is_array($value)) { $printKey = $self->make_style($key, 'print_object', 'array_key'); }
@@ -922,7 +922,7 @@ sub convert_object_to_string {
 	my $string = '';
 	my $spacing = '.   ';
 	my $quote = '"';
-	if ($args->{output} eq 'json') { $quote = "'"; }
+# 	if ($args->{output} eq 'json') { $quote = "'"; }
 	my $pointer = $self->make_style('=>', 'print_object', 'pointer');
 	if ($args->{output} eq 'json') { $pointer = $self->make_style(':', 'print_object', 'pointer'); }
 	my $comma = $self->make_style(',', 'print_object', 'comma');
