@@ -24,7 +24,7 @@ use lib qw( /opt/lib/site_perl );
 use SitemasonPl::AWS;
 use SitemasonPl::Batch;
 use SitemasonPl::Common;
-use SitemasonPl::CLI qw(mark print_object);
+use SitemasonPl::IO qw(mark print_object);
 
 
 sub new {
@@ -41,9 +41,9 @@ sub new {
 	$class || return;
 	
 	my $self = {
-		cli			=> $arg{cli}
+		io			=> $arg{io}
 	};
-	if (!$self->{cli}) { $self->{cli} = SitemasonPl::CLI->new; }
+	if (!$self->{io}) { $self->{io} = SitemasonPl::IO->new; }
 	
 	bless $self, $class;
 	return $self;

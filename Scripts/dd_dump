@@ -27,7 +27,7 @@ use constant FALSE => 0;
 
 use lib qw( /opt/lib/site_perl );
 use SitemasonPl::Common;
-use SitemasonPl::CLI qw(mark print_object);
+use SitemasonPl::IO qw(mark print_object);
 use SitemasonPl::Database::DynamoDB;
 
 
@@ -39,10 +39,10 @@ my @preinputs = @ARGV;
 
 $self->{dd} = SitemasonPl::Database::DynamoDB->new;
 my $tables = $self->{dd}->list_tables;
-my $table = $self->{cli}->get_menu_answer($tables, "Choose a table to dump", { inputs => \@preinputs }) || exit;
+my $table = $self->{io}->get_menu_answer($tables, "Choose a table to dump", { inputs => \@preinputs }) || exit;
 my $ts = get_filename_utc_minute;
 
-$self->{cli}->body("Dumping $table to $table-$ts.json");
+$self->{io}->body("Dumping $table to $table-$ts.json");
 my $records = $self->{dd}->scan($table);
 my $json = make_json($records);
 my $newpath = write_file("$table.json", $json, {
@@ -60,7 +60,7 @@ sub new {
 	my $self = {};
 	bless $self;
 	
-	$self->{cli} = SitemasonPl::CLI->new(
+	$self->{io} = SitemasonPl::IO->new(
 		exit_if_running		=> FALSE,
 		commandline_args	=> []
 	);

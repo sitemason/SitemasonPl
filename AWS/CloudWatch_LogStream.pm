@@ -22,7 +22,7 @@ use Time::HiRes qw(gettimeofday);
 
 use lib qw( /opt/lib/site_perl );
 use SitemasonPl::Common;
-use SitemasonPl::CLI qw(mark print_object);
+use SitemasonPl::IO qw(mark print_object);
 
 
 sub new {
@@ -38,11 +38,11 @@ sub new {
 	$class || return;
 	
 	my $self = {
-		cli			=> $arg{cli},
+		io			=> $arg{io},
 		log_group_name	=> $arg{log_group_name},
 		log_stream_name	=> $arg{log_stream_name}
 	};
-	if (!$self->{cli}) { $self->{cli} = SitemasonPl::CLI->new; }
+	if (!$self->{io}) { $self->{io} = SitemasonPl::IO->new; }
 	
 	bless $self, $class;
 	$self->{group} = $self->get_log_group || return;
@@ -77,7 +77,7 @@ sub get_log_group {
 	my $response = $self->_call_cloudwatch_logs("describe-log-groups --log-group-name-prefix $self->{log_group_name}", $debug);
 	foreach my $group (@{$response->{logGroups}}) {
 		if ($group->{logGroupName} eq $self->{log_group_name}) {
-			$debug && $self->{cli}->print_object($group, 'get_log_group()');
+			$debug && $self->{io}->print_object($group, 'get_log_group()');
 			return $group;
 		}
 	}
@@ -103,7 +103,7 @@ sub get_log_streams {
 		}
 	}
 	is_array_with_content($streams) || return;
-	$debug && $self->{cli}->print_object($streams, 'get_log_streams()');
+	$debug && $self->{io}->print_object($streams, 'get_log_streams()');
 	return $streams;
 }
 
@@ -158,7 +158,7 @@ sub put_log_event {
 	
 	my $response = $self->_call_cloudwatch_logs($cmd, $debug);
 	$self->{next_token} = $response->{nextSequenceToken};
-	$debug && $self->{cli}->print_object($response, 'put_log_event() response');
+	$debug && $self->{io}->print_object($response, 'put_log_event() response');
 	return;
 }
 
@@ -196,7 +196,7 @@ sub _call_aws {
 	if (!-e $awscli) {
 		$awscli = '/usr/local/bin/aws';
 		if (!-e $awscli) {
-			$self->{cli}->error("AWS CLI not found.");
+			$self->{io}->error("AWS CLI not found.");
 		}
 	}
 	

@@ -24,7 +24,7 @@ use lib qw( /opt/lib/site_perl );
 use SitemasonPl::AWS;
 use SitemasonPl::Batch;
 use SitemasonPl::Common;
-use SitemasonPl::CLI qw(mark print_object);
+use SitemasonPl::IO qw(mark print_object);
 
 
 sub new {
@@ -35,7 +35,7 @@ sub new {
  use SitemasonPl::AWS::Auto_Scaling_Groups;
  my $asg = SitemasonPl::AWS::Auto_Scaling_Groups->new;
  my $asg = SitemasonPl::AWS::Auto_Scaling_Groups->new(
-	cli		=> $self->{cli},
+	io		=> $self->{io},
 	dry_run	=> $self->{dry_run}
  );
 
@@ -45,10 +45,10 @@ sub new {
 	$class || return;
 	
 	my $self = {
-		cli			=> $arg{cli},
+		io			=> $arg{io},
 		dry_run		=> $arg{dry_run},
 	};
-	if (!$self->{cli}) { $self->{cli} = SitemasonPl::CLI->new; }
+	if (!$self->{io}) { $self->{io} = SitemasonPl::IO->new; }
 	
 	bless $self, $class;
 	return $self;
@@ -78,7 +78,7 @@ sub get_auto_scaling_groups {
 	my $response = $self->_call_asg("describe-auto-scaling-groups$asg_name_string", $debug);
 	if ($asg_name) {
 		if (!is_hash($response->{AutoScalingGroups}->[0])) {
-			$self->{cli}->error("Auto scaling group \"$asg_name\" not found");
+			$self->{io}->error("Auto scaling group \"$asg_name\" not found");
 			return;
 		}
 		return ($response->{AutoScalingGroups}->[0], $asg_name);
@@ -139,10 +139,10 @@ sub set_desired_capacity {
 	my $min_size = $auto_scaling_group->{MinSize};
 	my $max_size = $auto_scaling_group->{MaxSize};
 	if ($desired_capacity < $min_size) {
-		$self->{cli}->error("Cannnot set desired capacity of $desired_capacity to less than the minimum size of $min_size");
+		$self->{io}->error("Cannnot set desired capacity of $desired_capacity to less than the minimum size of $min_size");
 		return;
 	} elsif ($desired_capacity > $max_size) {
-		$self->{cli}->error("Cannnot set desired capacity of $desired_capacity to greater than the maximum size of $max_size");
+		$self->{io}->error("Cannnot set desired capacity of $desired_capacity to greater than the maximum size of $max_size");
 	}
 	
 	my $response = $self->_call_asg("update-auto-scaling-group --auto-scaling-group-name $asg_name --desired-capacity $desired_capacity", $debug, $self->{dry_run});
@@ -192,10 +192,10 @@ sub cycle_instances {
 		if ($auto_scaling_group->{DesiredCapacity} == 2) { $new_cap = 6; }
 # 		$self->set_desired_capacity($auto_scaling_group, $new_cap, $debug);
 		$self->set_min_size($auto_scaling_group, $new_cap, $debug);
-		$debug && $self->{cli}->success("Auto scaling group \"$asg_name\" set to a min capacity of $new_cap");
+		$debug && $self->{io}->success("Auto scaling group \"$asg_name\" set to a min capacity of $new_cap");
 		return TRUE;
 	} else {
-		$self->{cli}->error("Desired capacity for auto scaling group \"$asg_name\" is currently zero.");
+		$self->{io}->error("Desired capacity for auto scaling group \"$asg_name\" is currently zero.");
 		exit;
 	}
 }
@@ -214,10 +214,10 @@ sub increment_group {
 		my $new_cap = $auto_scaling_group->{DesiredCapacity} + 1;
 # 		$self->set_desired_capacity($auto_scaling_group, $new_cap, $debug);
 		$self->set_min_size($auto_scaling_group, $new_cap, $debug);
-		$debug && $self->{cli}->success("Auto scaling group \"$asg_name\" set to a min capacity of $new_cap");
+		$debug && $self->{io}->success("Auto scaling group \"$asg_name\" set to a min capacity of $new_cap");
 		return TRUE;
 	} else {
-		$self->{cli}->error("Desired capacity for auto scaling group \"$asg_name\" is currently zero.");
+		$self->{io}->error("Desired capacity for auto scaling group \"$asg_name\" is currently zero.");
 		exit;
 	}
 }
@@ -235,10 +235,10 @@ sub decrement_group {
 		my $new_cap = $auto_scaling_group->{DesiredCapacity} - 1;
 		$self->set_min_size($auto_scaling_group, $new_cap, $debug);
 		$self->set_desired_capacity($auto_scaling_group, $new_cap, $debug);
-		$debug && $self->{cli}->success("Auto scaling group \"$asg_name\" set to a min capacity of $new_cap");
+		$debug && $self->{io}->success("Auto scaling group \"$asg_name\" set to a min capacity of $new_cap");
 		return TRUE;
 	} else {
-		$self->{cli}->error("Desired capacity for auto scaling group \"$asg_name\" is currently zero.");
+		$self->{io}->error("Desired capacity for auto scaling group \"$asg_name\" is currently zero.");
 		exit;
 	}
 }

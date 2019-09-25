@@ -25,7 +25,7 @@ use lib qw( /opt/lib/site_perl );
 use SitemasonPl::AWS;
 use SitemasonPl::Batch;
 use SitemasonPl::Common;
-use SitemasonPl::CLI qw(mark print_object);
+use SitemasonPl::IO qw(mark print_object);
 
 
 sub new {
@@ -36,7 +36,7 @@ sub new {
  use SitemasonPl::AWS::Lambda;
  my $lambda = SitemasonPl::AWS::Lambda->new(name => $name);
  my $lambda = SitemasonPl::AWS::Lambda->new(
-	cli		=> $self->{cli},
+	io		=> $self->{io},
 	dry_run	=> $self->{dry_run},
 	name	=> $name
  );
@@ -47,12 +47,12 @@ sub new {
 	$class || return;
 	
 	my $self = {
-		cli			=> $arg{cli},
+		io			=> $arg{io},
 		dry_run		=> $arg{dry_run},
 		name		=> $arg{name}
 	};
-	if (!$self->{cli}) { $self->{cli} = SitemasonPl::CLI->new; }
-	if (!$self->{name}) { $self->{cli}->error("A lambda function name is required"); return; }
+	if (!$self->{io}) { $self->{io} = SitemasonPl::IO->new; }
+	if (!$self->{name}) { $self->{io}->error("A lambda function name is required"); return; }
 	
 	bless $self, $class;
 	return $self;

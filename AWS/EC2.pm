@@ -23,7 +23,7 @@ use SitemasonPl::AWS;
 use SitemasonPl::AWS::Launch_Template;
 use SitemasonPl::Batch;
 use SitemasonPl::Common;
-use SitemasonPl::CLI qw(mark print_object);
+use SitemasonPl::IO qw(mark print_object);
 
 
 sub new {
@@ -34,7 +34,7 @@ sub new {
  use SitemasonPl::AWS::EC2;
  my $ec2 = SitemasonPl::AWS::EC2->new();
  my $ec2 = SitemasonPl::AWS::EC2->new(
-	cli		=> $self->{cli},
+	io		=> $self->{io},
 	dry_run	=> $self->{dry_run},
 	name	=> $name
  );
@@ -45,10 +45,10 @@ sub new {
 	$class || return;
 	
 	my $self = {
-		cli			=> $arg{cli},
+		io			=> $arg{io},
 		dry_run		=> $arg{dry_run}
 	};
-	if (!$self->{cli}) { $self->{cli} = SitemasonPl::CLI->new; }
+	if (!$self->{io}) { $self->{io} = SitemasonPl::IO->new; }
 	
 	bless $self, $class;
 	return $self;
@@ -84,7 +84,7 @@ sub get_instances {
 			push(@{$records}, $instance);
 		}
 	}
-	$debug && $self->{cli}->print_object($records, '$records', { limit => 3 });
+	$debug && $self->{io}->print_object($records, '$records', { limit => 3 });
 	return $records;
 }
 
@@ -105,7 +105,7 @@ sub run_instance_from_template {
 	my $debug = shift;
 	
 	my $lt = SitemasonPl::AWS::Launch_Template->new(
-		cli		=> $self->{cli},
+		io		=> $self->{io},
 		dry_run	=> $self->{dry_run},
 		name	=> $template_name
 	);
@@ -123,7 +123,7 @@ sub run_instance_from_template {
 	foreach my $instance (@{$response->{Instances}}) {
 		push(@{$records}, $instance->{PrivateIpAddress});
 	}
-	$debug && $self->{cli}->print_object($records, '$records', { limit => 3 });
+	$debug && $self->{io}->print_object($records, '$records', { limit => 3 });
 	return $records->[0];
 }
 
@@ -147,7 +147,7 @@ sub stop_instance {
 	}
 	
 	my $response = $self->_call_ec2("stop-instances --instance-ids $instance_id$arg", $debug);
-	$debug && $self->{cli}->print_object($response, '$response');
+	$debug && $self->{io}->print_object($response, '$response');
 	return $response;
 }
 
@@ -171,7 +171,7 @@ sub terminate_instance {
 	}
 	
 	my $response = $self->_call_ec2("terminate-instances --instance-ids $instance_id$arg", $debug);
-	$debug && $self->{cli}->print_object($response, '$response');
+	$debug && $self->{io}->print_object($response, '$response');
 	return $response;
 }
 
@@ -221,7 +221,7 @@ sub get_load_balancers {
 	foreach my $record (@{$response->{LoadBalancerDescriptions}}) {
 		push(@{$records}, $record);
 	}
-	$debug && $self->{cli}->print_object($records, '$records', { limit => 3 });
+	$debug && $self->{io}->print_object($records, '$records', { limit => 3 });
 	return $records;
 }
 
@@ -248,7 +248,7 @@ sub get_network_interfaces {
 	foreach my $record (@{$response->{NetworkInterfaces}}) {
 		push(@{$records}, $record);
 	}
-	$debug && $self->{cli}->print_object($records, '$records', { limit => 3 });
+	$debug && $self->{io}->print_object($records, '$records', { limit => 3 });
 	return $records;
 }
 
@@ -272,7 +272,7 @@ sub get_snapshots {
 	
 	my $response = $self->_call_ec2("describe-snapshots$arg", $debug);
 	my $records = $response->{Snapshots};
-	$debug && $self->{cli}->print_object($records, '$records', { limit => 3 });
+	$debug && $self->{io}->print_object($records, '$records', { limit => 3 });
 	return $records;
 }
 
@@ -296,7 +296,7 @@ sub get_volumes {
 	
 	my $response = $self->_call_ec2("describe-volumes$arg", $debug);
 	my $records = $response->{Volumes};
-	$debug && $self->{cli}->print_object($records, '$records', { limit => 3 });
+	$debug && $self->{io}->print_object($records, '$records', { limit => 3 });
 	return $records;
 }
 
@@ -323,7 +323,7 @@ sub get_tags {
 	
 	my $response = $self->_call_ec2("describe-tags$arg", $debug);
 	my $tags = $response->{Tags};
-	$debug && $self->{cli}->print_object($tags, '$tags', { limit => 3 });
+	$debug && $self->{io}->print_object($tags, '$tags', { limit => 3 });
 	return $tags;
 }
 
@@ -370,7 +370,7 @@ sub get_elb_tags_as_ids {
 			$batch->add($elb, $tags);
 		}
 		$batch->end($tags);
-		$debug && $self->{cli}->print_object($tags, '$tags', { limit => 3 });
+		$debug && $self->{io}->print_object($tags, '$tags', { limit => 3 });
 		return $tags;
 	} else {
 		my $arg = '';
@@ -378,7 +378,7 @@ sub get_elb_tags_as_ids {
 	
 		my $response = $self->_call_elb("describe-tags$arg", $debug);
 		my $tags = $response->{Tags};
-		$debug && $self->{cli}->print_object($tags, '$tags', { limit => 3 });
+		$debug && $self->{io}->print_object($tags, '$tags', { limit => 3 });
 		return $tags;
 	}
 }
@@ -404,7 +404,7 @@ sub get_tags_as_ids {
 	foreach my $tag (@{$tags}) {
 		$tag_ref->{$tag->{ResourceId}}->{$tag->{Key}} = $tag->{Value};
 	}
-	$debug && $self->{cli}->print_object($tag_ref, '$tag_ref', { limit => 3 });
+	$debug && $self->{io}->print_object($tag_ref, '$tag_ref', { limit => 3 });
 	return $tag_ref;
 }
 
@@ -444,8 +444,8 @@ sub add_tags {
 		escape_for_bash	=> TRUE
 	});
 	
-	my $response = $self->_call_ec2("create-tags --cli-input-json '$json'", $debug);
-	$debug && $self->{cli}->print_object($response, '$response', { limit => 3 });
+	my $response = $self->_call_ec2("create-tags --io-input-json '$json'", $debug);
+	$debug && $self->{io}->print_object($response, '$response', { limit => 3 });
 	return;
 }
 

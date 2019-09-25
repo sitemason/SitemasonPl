@@ -27,7 +27,7 @@ use lib qw( /opt/lib/site_perl );
 use SitemasonPl::AWS;
 use SitemasonPl::Batch;
 use SitemasonPl::Common;
-use SitemasonPl::CLI qw(mark print_object);
+use SitemasonPl::IO qw(mark print_object);
 
 
 sub new {
@@ -44,12 +44,12 @@ sub new {
 	$class || return;
 	
 	my $self = {
-		cli			=> $arg{cli},
+		io			=> $arg{io},
 		dry_run		=> $arg{dry_run},
 		namespace	=> $arg{namespace},
 		metric_data	=> []
 	};
-	if (!$self->{cli}) { $self->{cli} = SitemasonPl::CLI->new; }
+	if (!$self->{io}) { $self->{io} = SitemasonPl::IO->new; }
 	
 	bless $self, $class;
 	return $self;
@@ -138,7 +138,7 @@ sub put_metrics {
 			if ($self->{dry_run}) {
 				my $payload_count = @{$payload};
 				my $payload_string = "$payload_count " . pluralize('record', $payload_count);
-				$self->{cli}->dry_run("CW put-metric-data --namespace $self->{namespace} --metric-data '[$payload_string]'");
+				$self->{io}->dry_run("CW put-metric-data --namespace $self->{namespace} --metric-data '[$payload_string]'");
 			} else {
 				my $metric_data_json = encode_json($payload);
 				my $response = $self->_call_cw("put-metric-data --namespace $self->{namespace} --metric-data '$metric_data_json'", FALSE);

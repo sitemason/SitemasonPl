@@ -25,7 +25,7 @@ use lib qw( /opt/lib/site_perl );
 use SitemasonPl::AWS;
 use SitemasonPl::Batch;
 use SitemasonPl::Common;
-use SitemasonPl::CLI qw(mark print_object);
+use SitemasonPl::IO qw(mark print_object);
 
 
 sub new {
@@ -36,7 +36,7 @@ sub new {
  use SitemasonPl::AWS::Launch_Template;
  my $lt = SitemasonPl::AWS::Launch_Template->new(name => $name);
  my $lt = SitemasonPl::AWS::Launch_Template->new(
-	cli		=> $self->{cli},
+	io		=> $self->{io},
 	dry_run	=> $self->{dry_run},
 	name	=> $name
  );
@@ -47,12 +47,12 @@ sub new {
 	$class || return;
 	
 	my $self = {
-		cli			=> $arg{cli},
+		io			=> $arg{io},
 		dry_run		=> $arg{dry_run},
 		name		=> $arg{name}
 	};
-	if (!$self->{cli}) { $self->{cli} = SitemasonPl::CLI->new; }
-	if (!$self->{name}) { $self->{cli}->error("A launch template name is required"); return; }
+	if (!$self->{io}) { $self->{io} = SitemasonPl::IO->new; }
+	if (!$self->{name}) { $self->{io}->error("A launch template name is required"); return; }
 	
 	bless $self, $class;
 	return $self;
@@ -106,7 +106,7 @@ sub set_default_version_number {
 	my $version = shift || 1;
 	my $debug = shift;
 	
-	if (!is_pos_int($version)) { $self->{cli}->error("A positive integer for a version number is required"); return; }
+	if (!is_pos_int($version)) { $self->{io}->error("A positive integer for a version number is required"); return; }
 		
 	my $response = $self->_call_ec2("modify-launch-template --launch-template-name $self->{name} --default-version $version", $debug, $self->{dry_run});
 	if (value($response, [qw(LaunchTemplate DefaultVersionNumber)]) == $version) { return TRUE; }
@@ -166,10 +166,10 @@ sub create_version {
 	my $source_version = $data->{source_version};
 	my $user_data = $data->{user_data};
 	
-	if (!$ami_id || ($ami_id !~ /^ami\-[0-9a-f]+/i)) { $self->{cli}->error("A valid AMI ID is required"); return; }
-	if (!$instance_size || ($instance_size !~ /^[a-z][1-9][a-z]?\.(nano|micro|small|medium|x?large|[1-3]?[0-9]xlarge)$/i)) { $self->{cli}->error("A valid instance size is required"); return; }
+	if (!$ami_id || ($ami_id !~ /^ami\-[0-9a-f]+/i)) { $self->{io}->error("A valid AMI ID is required"); return; }
+	if (!$instance_size || ($instance_size !~ /^[a-z][1-9][a-z]?\.(nano|micro|small|medium|x?large|[1-3]?[0-9]xlarge)$/i)) { $self->{io}->error("A valid instance size is required"); return; }
 	if (!is_pos_int($source_version)) { $source_version = $self->get_latest_version_number($debug); }
-	if (!is_pos_int($source_version)) { $self->{cli}->error("A positive integer for a version number is required"); return; }
+	if (!is_pos_int($source_version)) { $self->{io}->error("A positive integer for a version number is required"); return; }
 	
 	my $version_description = '';
 	if ($data->{version_description}) {

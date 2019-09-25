@@ -59,13 +59,13 @@ sub _call_aws {
 	if (!-e $awscli) {
 		$awscli = '/usr/bin/aws';
 		if (!-e $awscli) {
-			$self->{cli}->error("AWS CLI not found.");
+			$self->{io}->error("AWS CLI not found.");
 		}
 	}
 	
 	my $command = "$awscli $args";
 	if ($dry_run) {
-		$self->{cli}->dry_run($command);
+		$self->{io}->dry_run($command);
 		return {};
 	} elsif ($debug) {
 		say $command;
