@@ -496,7 +496,7 @@ sub _call_dynamodb {
 	my $args = shift || return;
 	my $debug = shift;
 	
-	my $awsio = '/usr/bin/aws';
+	my $awscli = '/usr/bin/aws';
 	if (!-e $awscli) {
 		$awscli = '/usr/local/bin/aws';
 		if (!-e $awscli) {
