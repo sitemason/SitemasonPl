@@ -18,10 +18,12 @@ use constant TRUE => 1;
 use constant FALSE => 0;
 
 use Getopt::Long qw(:config bundling);
+use MIME::Base64;
 use Pod::Usage qw(pod2usage);
 use Proc::ProcessTable;
 
 use lib qw( /opt/lib/site_perl );
+use SitemasonPl::AWS::Lambda;
 use SitemasonPl::Common;
 use SitemasonPl::IO::Table;
 
@@ -47,7 +49,8 @@ sub new {
 	
 	my $self = {
 		silent			=> $arg{silent},
-		use_markdown	=> $arg{use_markdown}
+		use_markdown	=> $arg{use_markdown},
+		function_name	=> $arg{function_name}
 	};
 	bless $self, $class;
 	$self->init_formats;
@@ -63,11 +66,22 @@ sub new {
 	
 	if ($arg{commandline_args}) {
 		if (!is_array($arg{commandline_args})) { $arg{commandline_args} = []; }
+		push(@{$arg{commandline_args}}, 'request_bundle=s');
 		push(@{$arg{commandline_args}}, 'help|h');
 		push(@{$arg{commandline_args}}, 'version|V');
 		$self->{options} = $self->get_options(@{$arg{commandline_args}});
 		if ($self->{options}->{help} || $self->{options}->{usage}) { $self->print_usage; exit; }
 		if ($self->{options}->{version}) { $self->print_version; exit; }
+		if ($self->{options}->{request_bundle}) {
+			$self->{request} = $self->decode_request($self->{options}->{request_bundle});
+			my $notify_function_name = 'sam-control-prod-notify';
+			if ($self->{is_dev}) { $notify_function_name =~ s/-prod/-dev/; }
+			$self->{lambda} = SitemasonPl::AWS::Lambda->new(
+				io		=> $self->{io},
+				dry_run	=> $self->{dry_run},
+				name	=> $notify_function_name
+			);
+		}
 	}
 	if ($arg{print_intro}) { $self->print_intro; }
 	
@@ -132,6 +146,13 @@ sub is_already_running_with_args {
 }
 
 
+sub decode_request {
+	my $self = shift || return;
+	my $request_b64 = shift || return;
+	my $request_json = decode_base64($request_b64);
+	return parse_json($request_json);
+}
+
 sub get_options {
 #=====================================================
 
@@ -177,6 +198,30 @@ Given a list of acceptable options, returns a hash of the options with their val
 	}
 	GetOptions(@params);
 	return $options;
+}
+
+
+sub notify {
+	# $self->{setup}->notify($payload);
+	# $self->{setup}->notify({
+	# 	name		=> $function_name,
+	# 	level		=> $level,
+	# 	title		=> $title,
+	# 	text		=> $message,
+	# 	response_url=> $response_url	# optional
+	# });
+	my $self = shift || return;
+	my $payload = shift || return;
+	my $debug = shift;
+	$payload->{name} ||= $self->{function_name} || 'notify';
+	$payload->{level} ||= 1;
+	$payload->{title} ||= '';
+	$payload->{response_url} ||= '';
+	if (is_hash($self->{request}) && $self->{request}->{response_url}) {
+		$payload->{response_url} = $self->{request}->{response_url};
+	}
+	
+	my $response = $self->{lambda}->invoke($payload, $debug);
 }
 
 

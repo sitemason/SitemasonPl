@@ -57,7 +57,8 @@ sub new {
 		use_plain_text	=> $arg{use_plain_text},
 		suppress_colors	=> $arg{suppress_colors},
 		display_nulls	=> $arg{display_nulls},
-		post_args		=> { header => FALSE, output => 'stdout' }
+		post_args		=> { header => FALSE, output => 'stdout' },
+		was_top			=> FALSE
 	};
 	bless $self, $class;
 	

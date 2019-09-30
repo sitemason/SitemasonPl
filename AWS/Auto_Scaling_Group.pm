@@ -55,8 +55,7 @@ sub new {
 	
 	bless $self, $class;
 	
-	$self->{asg} = $self->load($self->{name});
-	$self->{asg} || return;
+	$self->load || return;
 	
 	return $self;
 }
@@ -67,7 +66,7 @@ sub load {
 
 =head2 B<load>
 
-	my $auto_scaling_group = $asg->loads;
+	$asg->load || die;
 
 =cut
 #=====================================================
@@ -82,7 +81,8 @@ sub load {
 		$self->{io}->error("Auto scaling group \"$asg_name\" not found");
 		return;
 	}
-	return $response->{AutoScalingGroups}->[0];
+	$self->{asg} = $response->{AutoScalingGroups}->[0];
+	return TRUE;
 }
 sub reload { return load(@_); }
 
@@ -147,7 +147,7 @@ sub get_healthy_instance_count {
 	my $self = shift || return;
 	my $debug = shift;
 	
-	my $instance_ids = $self->get_healthy_instance_ids;
+	my $instance_ids = $self->get_healthy_instance_ids($debug);
 	return scalar(@{$instance_ids});
 }
 
@@ -156,53 +156,48 @@ sub get_healthy_instance_count {
 
 
 sub set_desired_capacity {
-#=====================================================
-
-=head2 B<set_desired_capacity>
-
-	$asg->set_desired_capacity($desired_capacity);
-
-=cut
-#=====================================================
+	# $asg->set_desired_capacity($desired_capacity);
 	my $self = shift || return;
 	my $desired_capacity = shift;
+	my $force = shift;
 	my $debug = shift;
 	is_pos_int($desired_capacity) || return;
-	
-	my $auto_scaling_group = $self->{asg};
-	is_hash($auto_scaling_group) || return;
 	
 	my $min_size = $self->get_min_size;
 	my $max_size = $self->get_max_size;
 	if ($desired_capacity < $min_size) {
-		$self->{io}->error("Cannnot set desired capacity of $desired_capacity to less than the minimum size of $min_size");
-		return;
+		if ($force) {
+			my $response = $self->_call_asg("update-auto-scaling-group --auto-scaling-group-name $self->{name} --min-size $desired_capacity --desired-capacity $desired_capacity", $debug, $self->{dry_run});
+			$self->{asg}->{MinSize} = $desired_capacity;
+			$self->{asg}->{DesiredCapacity} = $desired_capacity;
+			return TRUE;
+		} else {
+			$self->{io}->error("Cannnot set desired capacity of $desired_capacity to less than the minimum size of $min_size");
+			return;
+		}
 	} elsif ($desired_capacity > $max_size) {
-		$self->{io}->error("Cannnot set desired capacity of $desired_capacity to greater than the maximum size of $max_size");
+		if ($force) {
+			my $response = $self->_call_asg("update-auto-scaling-group --auto-scaling-group-name $self->{name} --max-size $desired_capacity --desired-capacity $desired_capacity", $debug, $self->{dry_run});
+			$self->{asg}->{MaxSize} = $desired_capacity;
+			$self->{asg}->{DesiredCapacity} = $desired_capacity;
+			return TRUE;
+		} else {
+			$self->{io}->error("Cannnot set desired capacity of $desired_capacity to greater than the maximum size of $max_size");
+		}
+	} else {
+		my $response = $self->_call_asg("update-auto-scaling-group --auto-scaling-group-name $self->{name} --desired-capacity $desired_capacity", $debug, $self->{dry_run});
+		$self->{asg}->{DesiredCapacity} = $desired_capacity;
+		return TRUE;
 	}
-	
-	my $response = $self->_call_asg("update-auto-scaling-group --auto-scaling-group-name $self->{name} --desired-capacity $desired_capacity", $debug, $self->{dry_run});
-	$auto_scaling_group->{DesiredCapacity} = $desired_capacity;
-	return TRUE;
 }
 
 
 sub set_min_size {
-#=====================================================
-
-=head2 B<set_min_size>
-
-	$asg->set_min_size($min_size);
-
-=cut
-#=====================================================
+	# $asg->set_min_size($min_size);
 	my $self = shift || return;
 	my $min_size = shift;
 	my $debug = shift;
 	is_pos_int($min_size) || return;
-	
-	my $auto_scaling_group = $self->{asg};
-	is_hash($auto_scaling_group) || return;
 	
 	my $desired_capacity = $self->get_desired_capacity;
 	my $desired_capacity_string = '';
@@ -211,9 +206,9 @@ sub set_min_size {
 	}
 	
 	my $response = $self->_call_asg("update-auto-scaling-group --auto-scaling-group-name $self->{name} --min-size $min_size$desired_capacity_string", $debug, $self->{dry_run});
-	$auto_scaling_group->{MinSize} = $min_size;
+	$self->{asg}->{MinSize} = $min_size;
 	if ($desired_capacity_string) {
-		$auto_scaling_group->{DesiredCapacity} = $min_size;
+		$self->{asg}->{DesiredCapacity} = $min_size;
 	}
 }
 
@@ -223,15 +218,12 @@ sub cycle_instances {
 	my $self = shift || return;
 	my $debug = shift;
 	
-	my $auto_scaling_group = $self->{asg};
-	is_hash($auto_scaling_group) || return;
-	
 	my $desired_capacity = $self->get_desired_capacity;
-	if (value($auto_scaling_group, 'DesiredCapacity')) {
+	if ($desired_capacity) {
 		my $new_cap = $desired_capacity * 2;
 		if ($desired_capacity == 2) { $new_cap = 6; }
-# 		$self->set_desired_capacity($auto_scaling_group, $new_cap, $debug);
-		$self->set_min_size($auto_scaling_group, $new_cap, $debug);
+# 		$self->set_desired_capacity($new_cap, undef, $debug);
+		$self->set_min_size($new_cap, $debug);
 		$debug && $self->{io}->success("Auto scaling group \"$self->{name}\" set to a min capacity of $new_cap");
 		return $new_cap;
 	} else {
@@ -246,18 +238,16 @@ sub increment_group {
 	my $self = shift || return;
 	my $debug = shift;
 	
-	my $auto_scaling_group = $self->{asg};
-	is_hash($auto_scaling_group) || return;
-	
 	my $desired_capacity = $self->get_desired_capacity;
-	if (value($auto_scaling_group, 'DesiredCapacity')) {
+	my $max_size = $self->get_max_size;
+	if ($desired_capacity >= $max_size) {
 		my $new_cap = $desired_capacity + 1;
-# 		$self->set_desired_capacity($auto_scaling_group, $new_cap, $debug);
-		$self->set_min_size($auto_scaling_group, $new_cap, $debug);
+# 		$self->set_desired_capacity($new_cap, undef, $debug);
+		$self->set_min_size($new_cap, $debug);
 		$debug && $self->{io}->success("Auto scaling group \"$self->{name}\" set to a min capacity of $new_cap");
 		return TRUE;
 	} else {
-		$self->{io}->error("Desired capacity for auto scaling group \"$self->{name}\" is currently zero.");
+		$self->{io}->error("Desired capacity for auto scaling group \"$self->{name}\" is already at the max of $max_size.");
 		exit;
 	}
 }
@@ -267,19 +257,12 @@ sub decrement_group {
 	my $self = shift || return;
 	my $debug = shift;
 	
-	my $auto_scaling_group = $self->{asg};
-	is_hash($auto_scaling_group) || return;
-	
 	my $min_size = $self->get_min_size;
 	
 	my $desired_capacity = $self->get_desired_capacity;
-	if (value($auto_scaling_group, 'DesiredCapacity')) {
+	if ($desired_capacity) {
 		my $new_cap = $desired_capacity - 1;
-		if ($new_cap < $min_size) {
-			$self->set_min_size($auto_scaling_group, $new_cap, $debug);
-			$debug && $self->{io}->success("Auto scaling group \"$self->{name}\" set to a min capacity of $new_cap");
-		}
-		$self->set_desired_capacity($auto_scaling_group, $new_cap, $debug);
+		$self->set_desired_capacity($new_cap, TRUE, $debug);
 		$debug && $self->{io}->success("Auto scaling group \"$self->{name}\" set to a desired capacity of $new_cap");
 		return TRUE;
 	} else {
