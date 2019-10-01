@@ -33,7 +33,10 @@ sub new {
 =head2 B<new>
 
  use SitemasonPl::AWS::ELB;
- my $elb = SitemasonPl::AWS::ELB->new;
+ my $elb = SitemasonPl::AWS::ELB->new(
+	io			=> $self->{io},
+	dry_run		=> $self->{dry_run}
+ ) || die "Failed to instantiate ELB\n";
 
 =cut
 #=====================================================
@@ -41,7 +44,8 @@ sub new {
 	$class || return;
 	
 	my $self = {
-		io			=> $arg{io}
+		io			=> $arg{io},
+		dry_run		=> $arg{dry_run}
 	};
 	if (!$self->{io}) { $self->{io} = SitemasonPl::IO->new; }
 	
@@ -62,7 +66,7 @@ sub get_target_groups {
 	my $self = shift || return;
 	my $debug = shift;
 	
-	my $response = $self->_call_elbv2("describe-target-groups", $debug);
+	my $response = $self->_call_elbv2("describe-target-groups", $debug, $self->{dry_run});
 	return $response->{TargetGroups};
 }
 
@@ -80,7 +84,8 @@ sub get_target_group_healthy_host_count {
 	my $target_group_arn = shift || return;
 	my $debug = shift;
 	
-	my $response = $self->_call_elbv2("describe-target-health --target-group-arn $target_group_arn", $debug);
+	my $response = $self->_call_elbv2("describe-target-health --target-group-arn $target_group_arn", $debug, $self->{dry_run});
+	if ($self->{dry_run}) { return 1; }
 	is_array($response->{TargetHealthDescriptions}) || return;
 	my $health_host_count = 0;
 	foreach my $desc (@{$response->{TargetHealthDescriptions}}) {
@@ -100,8 +105,9 @@ sub _call_elbv2 {
 	my $self = shift || return;
 	my $args = shift || return;
 	my $debug = shift;
+	my $dry_run = shift;
 	
-	return $self->SUPER::_call_aws("elbv2 $args", $debug);
+	return $self->SUPER::_call_aws("elbv2 $args", $debug, $dry_run);
 }
 
 

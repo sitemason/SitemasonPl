@@ -35,8 +35,7 @@ sub new {
  my $ec2 = SitemasonPl::AWS::EC2->new();
  my $ec2 = SitemasonPl::AWS::EC2->new(
 	io		=> $self->{io},
-	dry_run	=> $self->{dry_run},
-	name	=> $name
+	dry_run	=> $self->{dry_run}
  );
 
 =cut
@@ -61,6 +60,7 @@ sub get_instances {
 =head2 B<get_instances>
 
  my $instances = $ec2->get_instances;
+ my $instances = $ec2->get_instances($array_of_instance_ids);
  my $instances = $ec2->get_instances($instance_id);
  my $instances = $ec2->get_instances($instance_name);
 
@@ -71,7 +71,8 @@ sub get_instances {
 	my $debug = shift;
 	
 	my $arg = '';
-	if ($identifier =~ /^i-/) { $arg = " --instance-ids $identifier"; }
+	if (is_array($identifier)) { $arg = " --instance-ids " . join(' ', @{$identifier}); }
+	elsif ($identifier =~ /^i-/) { $arg = " --instance-ids $identifier"; }
 	elsif ($identifier) { $arg = " --filters 'Name=tag:Name,Values=$identifier'"; }
 	
 	my $response = $self->_call_ec2("describe-instances$arg", $debug);

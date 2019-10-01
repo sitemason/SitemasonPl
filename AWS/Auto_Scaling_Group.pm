@@ -22,6 +22,7 @@ use JSON;
 
 use lib qw( /opt/lib/site_perl );
 use SitemasonPl::AWS;
+use SitemasonPl::AWS::ELB;
 use SitemasonPl::Batch;
 use SitemasonPl::Common;
 use SitemasonPl::IO qw(mark print_object);
@@ -46,9 +47,12 @@ sub new {
 	$class || return;
 	
 	my $self = {
-		io			=> $arg{io},
-		dry_run		=> $arg{dry_run},
-		name		=> $arg{name}
+		io				=> $arg{io},
+		dry_run			=> $arg{dry_run},
+		name			=> $arg{name},
+		cycle_initial	=> 30,
+		cycle_interval	=> 10,
+		cycle_count		=> 36
 	};
 	if (!$self->{io}) { $self->{io} = SitemasonPl::IO->new; }
 	$self->{name} || $self->{io}->error("An auto scaling group name is required");
@@ -62,14 +66,7 @@ sub new {
 
 
 sub load {
-#=====================================================
-
-=head2 B<load>
-
-	$asg->load || die;
-
-=cut
-#=====================================================
+	# $asg->load || die;
 	my $self = shift || return;
 	my $debug = shift;
 	
@@ -86,26 +83,44 @@ sub load {
 }
 sub reload { return load(@_); }
 
+sub load_target_groups {
+	# my $target_groups = $asg->load_target_groups;
+	my $self = shift || return;
+	my $debug = shift;
+	
+	my $asg_name = $self->{name};
+	my $asg_name_string = " --auto-scaling-group-name $asg_name";
+	
+	my $response = $self->_call_asg("describe-load-balancer-target-groups$asg_name_string", $debug);
+	if (!is_array($response->{LoadBalancerTargetGroups})) {
+		$self->{io}->error("Target groups not found for auto scaling group \"$asg_name\"");
+		return;
+	}
+	$self->{asg_target_groups} = $response->{LoadBalancerTargetGroups};
+	return $self->{asg_target_groups};
+}
+
 
 sub get_full_info {
+	# my $asg_info = $asg->get_full_info;
 	my $self = shift || return;
 	return $self->{asg};
 }
 
 sub get_min_size {
-	# $asg->get_min_size;
+	# my $min_size = $asg->get_min_size;
 	my $self = shift || return;
 	return $self->{asg}->{MinSize};
 }
 
 sub get_max_size {
-	# $asg->get_max_size;
+	# my $max_size = $asg->get_max_size;
 	my $self = shift || return;
 	return $self->{asg}->{MaxSize};
 }
 
 sub get_desired_capacity {
-	# $asg->get_desired_capacity;
+	# my $desired_capacity = $asg->get_desired_capacity;
 	my $self = shift || return;
 	return $self->{asg}->{DesiredCapacity};
 }
@@ -218,17 +233,69 @@ sub cycle_instances {
 	my $self = shift || return;
 	my $debug = shift;
 	
+	my $original_size = $self->get_min_size;
+	my $new_cap = 0;
+	
+	# Add servers
 	my $desired_capacity = $self->get_desired_capacity;
-	if ($desired_capacity) {
-		my $new_cap = $desired_capacity * 2;
-		if ($desired_capacity == 2) { $new_cap = 6; }
-# 		$self->set_desired_capacity($new_cap, undef, $debug);
-		$self->set_min_size($new_cap, $debug);
-		$debug && $self->{io}->success("Auto scaling group \"$self->{name}\" set to a min capacity of $new_cap");
-		return $new_cap;
-	} else {
+	if (!$desired_capacity) {
 		$self->{io}->error("Desired capacity for auto scaling group \"$self->{name}\" is currently zero.");
-		exit;
+		return;
+	}
+	$new_cap = $desired_capacity * 2;
+	if ($desired_capacity == 2) { $new_cap = 6; }
+	$self->set_min_size($new_cap, $debug);
+	$debug && $self->{io}->success("Auto scaling group \"$self->{name}\" set to a min capacity of $new_cap");
+	
+	
+	# Wait until all added
+	my $elb = SitemasonPl::AWS::ELB->new(
+		io			=> $self->{io},
+		dry_run		=> $self->{dry_run}
+	) || die "Failed to instantiate ELB\n";
+	
+	my $ts = get_timestamp;
+	$debug && $self->{io}->body("[$ts] Waiting for scale out");
+	$debug && $self->{io}->pause($self->{cycle_initial}, 'Scale out: initial');
+	my $countdown = $self->{cycle_count};
+	while ($countdown--) {
+		$self->load;
+		my $target_groups = $self->load_target_groups;
+		my $count = $elb->get_target_group_healthy_host_count($target_groups->[0]->{LoadBalancerTargetGroupARN});
+	# 	my $count = $self->get_healthy_instance_count;
+		if ($count >= $new_cap) {
+			my $ts = get_timestamp;
+			$debug && $self->{io}->body("[$ts] Reached scale out");
+			last;
+		} else {
+			my $ts = get_timestamp;
+			$debug && $self->{io}->body("[$ts] $count healthy < $new_cap desired");
+		}
+		$self->{io}->pause($self->{cycle_interval}, 'Scale out');
+	}
+
+	# Remove servers
+	$self->set_desired_capacity($original_size, TRUE);
+
+	# Wait until all removed
+	$ts = get_timestamp;
+	$debug && $self->{io}->body("[$ts] Waiting for scale in");
+	$debug && $self->{io}->pause($self->{cycle_initial}, 'Scale in: initial');
+	$countdown = $self->{cycle_count};
+	while ($countdown--) {
+		$self->load;
+		my $target_groups = $self->load_target_groups;
+		my $count = $elb->get_target_group_healthy_host_count($target_groups->[0]->{LoadBalancerTargetGroupARN});
+	# 	my $count = $self->get_healthy_instance_count;
+		if ($count <= $original_size) {
+			my $ts = get_timestamp;
+			$debug && $self->{io}->body("[$ts] Reached scale in");
+			last;
+		} else {
+			my $ts = get_timestamp;
+			$debug && $self->{io}->body("[$ts] $count healthy > $original_size original");
+		}
+		$self->{io}->pause($self->{cycle_interval}, 'Scale in');
 	}
 }
 
