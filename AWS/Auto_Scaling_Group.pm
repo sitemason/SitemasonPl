@@ -185,6 +185,7 @@ sub set_desired_capacity {
 			my $response = $self->_call_asg("update-auto-scaling-group --auto-scaling-group-name $self->{name} --min-size $desired_capacity --desired-capacity $desired_capacity", $debug, $self->{dry_run});
 			$self->{asg}->{MinSize} = $desired_capacity;
 			$self->{asg}->{DesiredCapacity} = $desired_capacity;
+			$self->{io}->success("Auto scaling group \"$self->{name}\" set to a desired capacity and min size of $desired_capacity");
 			return TRUE;
 		} else {
 			$self->{io}->error("Cannnot set desired capacity of $desired_capacity to less than the minimum size of $min_size");
@@ -202,6 +203,7 @@ sub set_desired_capacity {
 	} else {
 		my $response = $self->_call_asg("update-auto-scaling-group --auto-scaling-group-name $self->{name} --desired-capacity $desired_capacity", $debug, $self->{dry_run});
 		$self->{asg}->{DesiredCapacity} = $desired_capacity;
+		$self->{io}->success("Auto scaling group \"$self->{name}\" set to a desired capacity of $desired_capacity");
 		return TRUE;
 	}
 }
@@ -245,7 +247,7 @@ sub cycle_instances {
 	$new_cap = $desired_capacity * 2;
 	if ($desired_capacity == 2) { $new_cap = 6; }
 	$self->set_min_size($new_cap, $debug);
-	$debug && $self->{io}->success("Auto scaling group \"$self->{name}\" set to a min capacity of $new_cap");
+	$self->{io}->success("Auto scaling group \"$self->{name}\" set to a min capacity of $new_cap");
 	
 	
 	# Wait until all added
@@ -311,7 +313,7 @@ sub increment_group {
 		my $new_cap = $desired_capacity + 1;
 # 		$self->set_desired_capacity($new_cap, undef, $debug);
 		$self->set_min_size($new_cap, $debug);
-		$debug && $self->{io}->success("Auto scaling group \"$self->{name}\" set to a min capacity of $new_cap");
+		$self->{io}->success("Auto scaling group \"$self->{name}\" set to a min capacity of $new_cap");
 		return TRUE;
 	} else {
 		$self->{io}->error("Desired capacity for auto scaling group \"$self->{name}\" is already at the max of $max_size.");
@@ -330,7 +332,7 @@ sub decrement_group {
 	if ($desired_capacity) {
 		my $new_cap = $desired_capacity - 1;
 		$self->set_desired_capacity($new_cap, TRUE, $debug);
-		$debug && $self->{io}->success("Auto scaling group \"$self->{name}\" set to a desired capacity of $new_cap");
+		$self->{io}->success("Auto scaling group \"$self->{name}\" set to a desired capacity of $new_cap");
 		return TRUE;
 	} else {
 		$self->{io}->error("Desired capacity for auto scaling group \"$self->{name}\" is currently zero.");
