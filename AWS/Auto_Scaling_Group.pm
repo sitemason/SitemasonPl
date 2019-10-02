@@ -307,7 +307,7 @@ sub increment_group {
 	
 	my $desired_capacity = $self->get_desired_capacity;
 	my $max_size = $self->get_max_size;
-	if ($desired_capacity >= $max_size) {
+	if ($desired_capacity <= $max_size) {
 		my $new_cap = $desired_capacity + 1;
 # 		$self->set_desired_capacity($new_cap, undef, $debug);
 		$self->set_min_size($new_cap, $debug);
