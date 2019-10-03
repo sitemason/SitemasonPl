@@ -202,8 +202,8 @@ Given a list of acceptable options, returns a hash of the options with their val
 
 
 sub notify {
-	# $self->{setup}->notify($payload);
-	# $self->{setup}->notify({
+	# $self->{io}->notify($payload);
+	# $self->{io}->notify({
 	# 	name		=> $function_name,
 	# 	level		=> $level,
 	# 	title		=> $title,
