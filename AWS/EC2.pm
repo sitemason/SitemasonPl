@@ -121,6 +121,9 @@ sub run_instance_from_template {
 	
 	my $response = $self->_call_ec2("run-instances --launch-template LaunchTemplateName=$template_name,Version=$version --subnet-id $subnet_id$arg", $debug);
 	my $records = [];
+	if ($self->{dry_run}) {
+		return '10.0.0.0';
+	}
 	foreach my $instance (@{$response->{Instances}}) {
 		push(@{$records}, $instance->{PrivateIpAddress});
 	}
@@ -176,6 +179,30 @@ sub terminate_instance {
 	return $response;
 }
 
+sub get_instance_id {
+#=====================================================
+
+=head2 B<get_instance_id>
+
+ my $instance_id = $ec2->get_instance_id($ec2_instance_object);
+ my $instance_id = $ec2->get_instance_id($instance_id);
+
+=cut
+#=====================================================
+	my $self = shift || return;
+	my $instance = shift || return;
+	my $debug = shift;
+	
+	if (is_text($instance)) {
+		my $instances = $self->get_instances($instance);
+		$instance = $instances->[0];
+	}
+	if (is_hash($instance) && $instance->{InstanceId}) {
+		return $instance->{InstanceId};
+	}
+
+}
+
 sub get_instance_status {
 #=====================================================
 
@@ -196,6 +223,30 @@ sub get_instance_status {
 	}
 	if (is_hash($instance) && $instance->{State}) {
 		return $instance->{State}->{Name};
+	}
+
+}
+
+sub get_instance_ip {
+#=====================================================
+
+=head2 B<get_instance_ip>
+
+ my $instance_ip = $ec2->get_instance_ip($ec2_instance_object);
+ my $instance_ip = $ec2->get_instance_ip($instance_id);
+
+=cut
+#=====================================================
+	my $self = shift || return;
+	my $instance = shift || return;
+	my $debug = shift;
+	
+	if (is_text($instance)) {
+		my $instances = $self->get_instances($instance);
+		$instance = $instances->[0];
+	}
+	if (is_hash($instance) && $instance->{PrivateIpAddress}) {
+		return $instance->{PrivateIpAddress};
 	}
 
 }
