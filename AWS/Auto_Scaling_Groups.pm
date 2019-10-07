@@ -83,7 +83,7 @@ sub get_auto_scaling_groups {
 		}
 		return ($response->{AutoScalingGroups}->[0], $asg_name);
 	} else {
-		return ($response->{AutoScalingGroups}, $asg_name);
+		return $response->{AutoScalingGroups};
 	}
 }
 
