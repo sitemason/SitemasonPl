@@ -65,6 +65,7 @@ sub new {
 	}
 	
 	if ($arg{commandline_args}) {
+		@{$self->{original_argv}} = @ARGV;
 		if (!is_array($arg{commandline_args})) { $arg{commandline_args} = []; }
 		push(@{$arg{commandline_args}}, 'request_bundle=s');
 		push(@{$arg{commandline_args}}, 'help|h');
@@ -81,6 +82,8 @@ sub new {
 				dry_run	=> $self->{dry_run},
 				name	=> $notify_function_name
 			);
+		} elsif ($self->{function_name}) {
+# 			$self->prompt_for_args;
 		}
 	}
 	if ($arg{print_intro}) { $self->print_intro; }
@@ -200,6 +203,12 @@ Given a list of acceptable options, returns a hash of the options with their val
 	return $options;
 }
 
+
+sub prompt_for_args {
+	my $self = shift || return;
+	$self->print_object($self->{original_argv}, '$self->{original_argv}');
+# 	$self->print_object(\@ARGV, '@ARGV');
+}
 
 sub notify {
 	# $self->{io}->notify($payload);
