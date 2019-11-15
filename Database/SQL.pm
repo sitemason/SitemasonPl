@@ -431,7 +431,7 @@ sub do {
 		elsif ($command eq 'create') { return $rv; }
 		if ($message) {
 #			$self->{debug}->debug($message, new_hash({ tags => 'results' }, $log));
-		} else {
+		} elsif ($command !~ /^(drop|import)$/i) {
 			$self->{debug}->critical("Failed $command", $log);
 		}
 	} else {
