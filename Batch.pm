@@ -13,19 +13,19 @@ With $container:
  use SitemasonPl::Batch;
  
  my $batch = SitemasonPl::Batch->new(
-  	batch_size	=> 100,		# Maximum number of items allowed in a batch
-  	limit		=> 10,		# Limit the number of items that can be added, for testing purposes
-  	process		=> sub {
- 		my $payload = shift;
- 		my $container = shift;
- 		print Dumper($payload, $container);
- 	},
- 	debug => TRUE
+	batch_size	=> 100,		# Maximum number of items allowed in a batch
+	limit		=> 10,		# Limit the number of items that can be added, for testing purposes
+	process		=> sub {
+		my $payload = shift;
+		my $container = shift;
+		print Dumper($payload, $container);
+	},
+	debug => TRUE
  );
  
  my $container = {};
  foreach my $item (@array) {
- 	$batch->add($item, $container);
+	$batch->add($item, $container);
  }
  $batch->end($container);
 
