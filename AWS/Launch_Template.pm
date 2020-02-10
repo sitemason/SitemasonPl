@@ -64,7 +64,7 @@ sub get_latest_version_number {
 
 =head2 B<get_latest_version_number>
 
-	my $version = $lt->get_latest_version_number;
+	my $latest_version = $lt->get_latest_version_number;
 
 =cut
 #=====================================================
@@ -81,7 +81,7 @@ sub get_default_version_number {
 
 =head2 B<get_default_version_number>
 
-	my $version = $lt->get_default_version_number;
+	my $default_version = $lt->get_default_version_number;
 
 =cut
 #=====================================================
