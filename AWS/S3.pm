@@ -48,6 +48,51 @@ sub new {
 }
 
 
+
+sub get_bucket_list {
+#=====================================================
+
+=head2 B<get_bucket_list>
+
+=cut
+#=====================================================
+	my $self = shift || return;
+	my $debug = shift;
+	
+	my $response = $self->_call_s3api("list-buckets", $debug);
+	
+	my $bucket_list = [];
+	foreach my $bucket (@{$response->{Buckets}}) {
+		push(@{$bucket_list}, $bucket->{Name});
+	}
+	return $bucket_list;
+}
+
+
+sub set_bucket_name {
+	my $self = shift || return;
+	my $bucket = shift || return;
+	$self->{bucket_name} = $bucket;
+	return $self->{bucket_name};
+}
+
+sub get_bucket_size {
+#=====================================================
+
+=head2 B<get_bucket_size>
+
+=cut
+#=====================================================
+	my $self = shift || return;
+	my $debug = shift;
+	
+	my $response = $self->_call_s3api("list-objects --bucket $self->{bucket_name} --output json --query \"[sum(Contents[].Size), length(Contents[])]\"", $debug);
+	if (is_array($response) && is_pos_int($response->[0])) {
+		return $response->[0];
+	}
+}
+
+
 sub get_file_list {
 #=====================================================
 
@@ -94,6 +139,21 @@ sub _call_s3 {
 	my $debug = shift;
 	
 	return $self->SUPER::_call_aws("s3 $args", $debug);
+}
+
+
+sub _call_s3api {
+#=====================================================
+
+=head2 B<_call_s3api>
+
+=cut
+#=====================================================
+	my $self = shift || return;
+	my $args = shift || return;
+	my $debug = shift;
+	
+	return $self->SUPER::_call_aws("s3api $args", $debug);
 }
 
 
