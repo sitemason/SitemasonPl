@@ -21,6 +21,8 @@ use DateTime;
 use DateTime::TimeZone;
 use Text::DoubleMetaphone qw( double_metaphone );
 use Text::Levenshtein::Damerau;
+use Text::Metaphone;
+use Text::Soundex;
 use Text::Unidecode;
 
 use SitemasonPl::Common;
@@ -79,8 +81,9 @@ sub compare_titles {
 		$args = {};
 		$args->{normalizedA} = normalize_full($titleA);
 		$args->{normalizedB} = normalize_full($titleB);
-		$args->{phoneticA} = phoneticize_title($args->{normalizedA});
-		$args->{phoneticB} = phoneticize_title($args->{normalizedB});
+		$args->{phoneticA} = $args->{normalizedA};
+		$args->{phoneticB} = $args->{normalizedB};
+# 		say "$args->{phoneticA} cmp $args->{phoneticB}";
 	}
 	is_hash($args) || return;
 	
@@ -425,7 +428,9 @@ sub phoneticize_title {
 	my @words = split('-', $normalized);
 	my @meta;
 	foreach my $word (@words) {
-		my $code = double_metaphone($word);
+# 		my $code = double_metaphone($word);
+# 		my $code = soundex($word);
+		my $code = Metaphone($word);
 		if (defined($code)) { push(@meta, $code); }
 	}
 	return join('-', @meta);
@@ -1453,7 +1458,7 @@ sub load_translations {
 }
 
 sub load_synonyms {
-	isArray($SitemasonPl::Normalize::synonyms) && return;
+	is_array($SitemasonPl::Normalize::synonyms) && return;
 	$SitemasonPl::Normalize::synonyms = [
 		['arena', 'amphitheater', 'auditorium', 'ballpark', 'center', 'coliseum', 'community-center', 'concert-hall', 'exhibition-hall', 'field', 'hall', 'park', 'sportsplex', 'stadium'],
 		['racetrack', 'race-track', 'racecourse', 'race-course', 'raceway', 'speedway', 'velodrome'],
