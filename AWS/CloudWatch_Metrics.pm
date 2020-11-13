@@ -37,6 +37,9 @@ sub new {
 
  use SitemasonPl::AWS::CloudWatch_Metrics;
  my $metrics = SitemasonPl::AWS::CloudWatch_Metrics->new(namespace => $namespace);
+ 
+Don't forget the prefix!
+ my $metrics = SitemasonPl::AWS::CloudWatch_Metrics->new(namespace => 'AWS/ApplicationELB');
 
 =cut
 #=====================================================
@@ -182,6 +185,33 @@ To grab the past minute as an Average:
 	{ $name => $value },	# dimensions as a hash; optional
 	'SampleCount' || 'Average' || 'Sum' || 'Minimum' || 'Maximum'	# statistics; defaults to 'Average'
  );
+ 
+ aws cloudwatch get-metric-data --cli-input-json '{
+    "MetricDataQueries": [
+        {
+			"Id": "shelbyRequestCount",
+			"Label": "Request Count",
+            "MetricStat": {
+                "Metric": {
+					"Namespace": "AWS/ApplicationELB",
+					"MetricName": "RequestCountPerTarget",
+                    "Dimensions": [
+                        {
+							"Name": "TargetGroup",
+							"Value": "targetgroup/shelby-lor-target/674dec7d65d4cb1e"
+                        }
+                    ]
+                },
+                "Period": 3600,
+                "Stat": "SampleCount"
+            },
+            "ReturnData": true
+        }
+    ],
+    "StartTime": "2020-09-01T00:00:00",
+    "EndTime": "2020-11-11T00:00:00",
+    "ScanBy": "TimestampAscending"
+ }'
 
 =cut
 #=====================================================
