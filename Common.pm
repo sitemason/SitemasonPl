@@ -173,7 +173,8 @@ sub convert_arrays_to_csv {
 	my $cnt;
 	foreach my $row (@{$data}) {
 		my @csv_row;
-		foreach my $value (@{$row}) {
+		foreach my $orig_value (@{$row}) {
+			my $value = $orig_value;
 			$value =~ s/"/""/g;
 			if ($value =~ /[",\n\r]/) { $value = "\"$value\""; }
 			push(@csv_row, $value);
