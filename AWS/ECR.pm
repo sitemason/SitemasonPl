@@ -66,7 +66,7 @@ sub get_repositories {
 	my $self = shift || return;
 	my $debug = shift;
 	
-	my $response = $self->_call_ecr("describe-repositories", $debug, $self->{dry_run});
+	my $response = $self->_call_ecr("describe-repositories", $debug);
 	if (value($response, [qw(repositories)])) {
 		return $response->{repositories};
 	}
@@ -108,7 +108,7 @@ sub get_repository {
 	my $name = shift || return;
 	my $debug = shift;
 	
-	my $response = $self->_call_ecr("describe-repositories --repository-names $name", $debug, $self->{dry_run});
+	my $response = $self->_call_ecr("describe-repositories --repository-names $name", $debug);
 	if (value($response, [qw(repositories 0)])) {
 		return $response->{repositories}->[0];
 	}
