@@ -5375,13 +5375,24 @@ sub _from_camel_case_scalar {
 
 sub is_camel_case {
 	my $text = shift;
+	# Lower
 	if ($text =~ /^[a-z]+[A-Z][a-zA-Z0-9]+$/) { return TRUE; }
+	# Upper
+	if ($text =~ /^[A-Z][a-zA-Z0-9]+$/) { return TRUE; }
 }
 
 sub camel_case {
 	my $text = lc(shift);
-	$text =~ s/[^a-z0-9]+([a-z])/\u$a/g;
-	$text =~ s/[^a-z0-9]+//g;
+	$text =~ s/[^a-z0-9]+([a-z])/\u$1/g;
+	$text =~ s/[^A-Za-z0-9]+//g;
+	return $text;
+}
+
+sub upper_camel_case {
+	my $text = lc(shift);
+	$text =~ s/[^a-z0-9]+([a-z])/\u$1/g;
+	$text =~ s/[^A-Za-z0-9]+//g;
+	$text =~ s/^([a-z])/\u$1/g;
 	return $text;
 }
 
@@ -5391,8 +5402,9 @@ sub is_kebab_case {
 }
 
 sub kebab_case {
-	my $text = lc(shift);
+	my $text = shift;
 	if (is_camel_case($text)) {
+		$text =~ s/^([A-Z]+)/\L$1/g;
 		$text =~ s/([A-Z]+)/-\L$1/g;
 	} else {
 		$text = lc($text);
@@ -5410,6 +5422,7 @@ sub is_snake_case {
 sub snake_case {
 	my $text = shift;
 	if (is_camel_case($text)) {
+		$text =~ s/^([A-Z]+)/\L$1/g;
 		$text =~ s/([A-Z]+)/_\L$1/g;
 	} else {
 		$text = lc($text);
