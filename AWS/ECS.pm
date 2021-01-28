@@ -121,7 +121,7 @@ sub get_service {
 	
 	my $arg = " --cluster $cluster_name --services $service_name";
 	
-	my $response = $self->_call_ecs("describe-services$arg", TRUE);
+	my $response = $self->_call_ecs("describe-services$arg", $debug);
 	if (is_array_with_content($response->{services})) {
 		my $records = $response->{services}->[0];
 		$debug && $self->{io}->print_object($records, '$records', { limit => 3 });
