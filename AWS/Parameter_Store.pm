@@ -118,7 +118,7 @@ sub put_parameter {
 sub _call_parameter_store {
 #=====================================================
 
-=head2 B<_call_stepfunctions>
+=head2 B<_call_parameter_store>
 
 =cut
 #=====================================================
