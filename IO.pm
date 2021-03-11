@@ -301,6 +301,18 @@ sub header {
 	$suppress_newline || print "\n";
 }
 
+sub header2 {
+	my $self = shift || return;
+	my $text = shift;
+	my $suppress_newline = shift;
+	$self->{silent} && return;
+	
+	$text = $self->convert_markdown_to_ansi($text);
+	$text =~ s/^(\s*)(.*)$/$1.$self->make_color($2, ['bold', 'underline'])/egm;
+	print $text;
+	$suppress_newline || print "\n";
+}
+
 sub success {
 	my $self = shift || return;
 	my $text = shift;
