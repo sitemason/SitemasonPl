@@ -67,8 +67,9 @@ sub get_secret_value {
 	
 	my $cmd = "get-secret-value --secret-id $name";
 	my $response = $self->_call_secrets_manager($cmd, $debug, $self->{dry_run});
-	$self->{io}->print_object($response, '$response');
-	return value($response, ['SecretString']);
+	my $secret = value($response, ['SecretString']);
+	if (is_json($secret)) { return parse_json($secret); }
+	return $secret;
 }
 
 

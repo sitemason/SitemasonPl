@@ -549,9 +549,9 @@ Pass 'end' to cleanly stop the progress bar.
 =cut
 #=====================================================
 	my $self = shift || return;
-	my $fraction = shift || return;
+	my $fraction = shift;
 	my $label = shift;
-	my $debug;
+	my $debug = shift;
 	$self->is_person || return;
 	
 	# end
@@ -571,7 +571,8 @@ Pass 'end' to cleanly stop the progress bar.
 	$fraction = int($fraction * 100);
 	
 	if ($debug) {
-		my $progress = $self->{progress} || 0;
+		my $frac = $fraction || '0';
+		my $progress = $self->{progress} || '0';
 		$self->body("$fraction - $progress");
 	}
 	
@@ -585,7 +586,7 @@ Pass 'end' to cleanly stop the progress bar.
 	
 	# update
 	my $progress = $self->{progress} || 0;
-	if ($fraction - $progress) {
+	if (($fraction - $progress) >= 0) {
 		if ($debug) { print STDERR "update\n"; }
 		my $remaining = 100 - $fraction;
 		my $cursor_move = $remaining + 1;
