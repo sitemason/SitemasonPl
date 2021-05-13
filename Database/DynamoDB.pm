@@ -42,6 +42,7 @@ sub new {
 		db_type		=> 'DynamoDB',
 		io			=> $arg{io},
 		dry_run		=> $arg{dry_run},
+		pipe_to_cat	=> $arg{pipe_to_cat}
 	};
 	if (!$self->{io}) { $self->{io} = SitemasonPl::IO->new; }
 	
@@ -505,6 +506,7 @@ sub _call_dynamodb {
 	}
 	
 	my $command = "$awscli dynamodb $args";
+	if ($self->{pipe_to_cat}) { $command .= ' | cat'; }
 	$debug && say $command;
 	my $json = `$command`;
 	is_json($json) || return;
