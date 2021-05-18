@@ -145,7 +145,7 @@ sub get_max_range_value {
 	});
 	$self->{io}->print_object($records, '$records');
 	is_array_with_content($records) || return 0;
-	return $records->{$range_key};
+	return $records->[0]->{$range_key};
 }
 	
 	
