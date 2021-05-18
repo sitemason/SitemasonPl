@@ -133,6 +133,7 @@ sub get_max_range_value {
 	$self->{io}->print_object($records, '$records');
 	
 	return;
+}
 	
 	
 sub query {
