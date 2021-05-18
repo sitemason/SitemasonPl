@@ -143,7 +143,7 @@ sub get_max_range_value {
 		scan_index_forward	=> FALSE,
 		limit				=> 1
 	});
-	$self->{io}->print_object($records, '$records');
+	
 	is_array_with_content($records) || return 0;
 	return $records->[0]->{$range_key};
 }
@@ -247,10 +247,19 @@ sub put_item {
 	my $self = shift || return;
 	my $table_name = shift || return;
 	my $item = shift;
+	my $args = shift;
 	my $debug = shift;
+	if (!$debug && !is_hash($args) && $args) { $debug = TRUE; }
 	
 	my $dd_item = _convert_to_dynamodb($item);
 	my $json = make_json($dd_item, { compress => TRUE, escape_for_bash => TRUE });
+	if (is_hash_with_content($args)) {
+		if ($args->{numeric_keys}) {
+			foreach my $key (@{$args->{numeric_keys}}) {
+				$json->{$key} += 0;
+			}
+		}
+	}
 	if ($self->{dry_run}) {
 		my $json = make_json($item, { compress => TRUE });
 		$self->{io}->dry_run("DD put-item --table-name $table_name");
