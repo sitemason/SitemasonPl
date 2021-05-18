@@ -108,6 +108,33 @@ sub get_table_keys {
 }
 
 
+sub get_max_range_value {
+	my $self = shift || return;
+	my $table_name = shift || return;
+	my $key_value = shift || return;
+	my $debug = shift;
+	
+	my $attr = $self->describe_table($table_name, $debug);
+	$self->{io}->print_object($attr, '$attr');
+	return;
+	
+	my $primary_key;
+	my $range_key;
+	
+	$primary_key || return;
+	$range_key || return;
+	
+	my $records = $self->query($table_name, undef, {
+		$primary_key	=> $key_value
+	}, {
+		scan_index_forward	=> FALSE,
+		limit				=> 1
+	} );
+	$self->{io}->print_object($records, '$records');
+	
+	return;
+	
+	
 sub query {
 #=====================================================
 
@@ -122,14 +149,26 @@ sub query {
 	my $table_name = shift || return;
 	my $index_name = shift;
 	my $data = shift || return;
+	my $args = shift || return;
 	my $debug = shift;
+	if (!$debug && !is_hash($args) && $args) { $debug = TRUE; }
 	
 	my $expression = _convert_to_expression($data);
 	my $key_condition_expression = join(' and ', @{$expression->{comparisons}});
 	
 	my $index = '';
 	if ($index_name) { $index = " --index-name $index_name"; }
-	my $dd_results = $self->_call_dynamodb("query --table-name $table_name$index --max-items 100 --key-condition-expression '$key_condition_expression' --expression-attribute-names '$expression->{names_json}' --expression-attribute-values '$expression->{values_json}'", $debug);
+	my $scan_direction = '';
+	my $max_items = ' --max-items 100';
+	if (is_hash_with_content($args)) {
+		if (exists($args->{scan_index_forward}) && !$args->{scan_index_forward}) {
+			$scan_direction = ' --no-scan-index-forward'
+		}
+		if (exists($args->{limit}) && is_pos_int($args->{limit})) {
+			$max_items = " --max-items $args->{limit}"
+		}
+	}
+	my $dd_results = $self->_call_dynamodb("query --table-name $table_name$index$scan_direction$max_items --key-condition-expression '$key_condition_expression' --expression-attribute-names '$expression->{names_json}' --expression-attribute-values '$expression->{values_json}'", $debug);
 	my $results = _convert_from_dynamodb($dd_results);
 	$debug && $self->{io}->print_object($results, '$results');
 	return $results->{Items};
