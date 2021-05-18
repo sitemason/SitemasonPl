@@ -108,21 +108,34 @@ sub get_table_keys {
 }
 
 
+sub get_keys {
+	my $self = shift || return;
+	my $table_name = shift || return;
+	my $debug = shift;
+	
+	my $attr = $self->describe_table($table_name, $debug);
+	is_array_with_content($attr->{KeySchema}) || return;
+	
+	my $primary_key;
+	my $range_key;
+	foreach my $key (@{$attr->{KeySchema}}) {
+		if ($key->{KeyType} eq 'HASH') { $primary_key = $key->{AttributeName}; }
+		if ($key->{KeyType} eq 'RANGE') { $range_key = $key->{AttributeName}; }
+	}
+	$primary_key || return;
+	$range_key || return;
+	
+	return ($primary_key, $range_key);
+}
+
+
 sub get_max_range_value {
 	my $self = shift || return;
 	my $table_name = shift || return;
 	my $key_value = shift || return;
 	my $debug = shift;
 	
-	my $attr = $self->describe_table($table_name, $debug);
-	$self->{io}->print_object($attr, '$attr');
-	return;
-	
-	my $primary_key;
-	my $range_key;
-	
-	$primary_key || return;
-	$range_key || return;
+	my ($primary_key, $range_key) = $self->get_keys();
 	
 	my $records = $self->query($table_name, undef, {
 		$primary_key	=> $key_value
