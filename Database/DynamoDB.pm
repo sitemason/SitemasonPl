@@ -251,15 +251,16 @@ sub put_item {
 	my $debug = shift;
 	if (!$debug && !is_hash($args) && $args) { $debug = TRUE; }
 	
-	my $dd_item = _convert_to_dynamodb($item);
-	my $json = make_json($dd_item, { compress => TRUE, escape_for_bash => TRUE });
 	if (is_hash_with_content($args)) {
 		if ($args->{numeric_keys}) {
 			foreach my $key (@{$args->{numeric_keys}}) {
-				$json->{$key} += 0;
+				$item->{$key} += 0;
 			}
 		}
 	}
+	my $dd_item = _convert_to_dynamodb($item);
+	$self->{io}->print_object($dd_item, '$dd_item');
+	my $json = make_json($dd_item, { compress => TRUE, escape_for_bash => TRUE });
 	if ($self->{dry_run}) {
 		my $json = make_json($item, { compress => TRUE });
 		$self->{io}->dry_run("DD put-item --table-name $table_name");
