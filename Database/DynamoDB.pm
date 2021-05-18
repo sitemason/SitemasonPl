@@ -262,7 +262,7 @@ sub put_item {
 			}
 		}
 	}
-	$self->{io}->print_object($dd_item, '$dd_item');
+	
 	my $json = make_json($dd_item, { compress => TRUE, escape_for_bash => TRUE });
 	if ($self->{dry_run}) {
 		my $json = make_json($item, { compress => TRUE });
