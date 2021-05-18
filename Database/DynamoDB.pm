@@ -150,7 +150,7 @@ sub query {
 	my $table_name = shift || return;
 	my $index_name = shift;
 	my $data = shift || return;
-	my $args = shift || return;
+	my $args = shift;
 	my $debug = shift;
 	if (!$debug && !is_hash($args) && $args) { $debug = TRUE; }
 	
