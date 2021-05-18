@@ -118,7 +118,9 @@ sub get_keys {
 	
 	my $primary_key;
 	my $range_key;
+	$self->{io}->print_object($attr->{KeySchema}, '$attr->{KeySchema}');
 	foreach my $key (@{$attr->{KeySchema}}) {
+		$self->{io}->print_object($key, '$key');
 		if ($key->{KeyType} eq 'HASH') { $primary_key = $key->{AttributeName}; }
 		if ($key->{KeyType} eq 'RANGE') { $range_key = $key->{AttributeName}; }
 	}
@@ -136,6 +138,7 @@ sub get_max_range_value {
 	my $debug = shift;
 	
 	my ($primary_key, $range_key) = $self->get_keys();
+	print "($primary_key, $range_key)\n";
 	
 	my $records = $self->query($table_name, undef, {
 		$primary_key	=> $key_value
