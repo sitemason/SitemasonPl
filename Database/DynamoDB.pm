@@ -137,7 +137,7 @@ sub get_max_range_value {
 	my $key_value = shift || return;
 	my $debug = shift;
 	
-	my ($primary_key, $range_key) = $self->get_keys();
+	my ($primary_key, $range_key) = $self->get_keys($table_name);
 	print "($primary_key, $range_key)\n";
 	
 	my $records = $self->query($table_name, undef, {
