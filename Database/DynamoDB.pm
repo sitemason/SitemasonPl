@@ -142,7 +142,7 @@ sub get_max_range_value {
 	}, {
 		scan_index_forward	=> FALSE,
 		limit				=> 1
-	} );
+	}, TRUE);
 	$self->{io}->print_object($records, '$records');
 	
 	return;
