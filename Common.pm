@@ -1453,7 +1453,7 @@ sub is_yaml {
 #=====================================================
 	my $value = shift;
 	if (!ref($value) && defined($value)) {
-		if ($value =~ /^---\\n/) { return TRUE; }
+		if ($value =~ /^---\\n/m) { return TRUE; }
 	}
 	return undef;
 }
