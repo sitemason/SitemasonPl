@@ -18,6 +18,8 @@ use utf8;
 use constant TRUE => 1;
 use constant FALSE => 0;
 
+use YAML;
+
 use lib qw( /opt/lib/site_perl );
 use SitemasonPl::AWS;
 use SitemasonPl::Common;
@@ -67,7 +69,11 @@ sub get_parameter_value {
 	
 	my $cmd = "get-parameter --with-decryption --name $name";
 	my $response = $self->_call_parameter_store($cmd, $debug, $self->{dry_run});
-	return value($response, ['Parameter', 'Value']);
+	my $value = value($response, ['Parameter', 'Value']);
+	if (is_yaml($value)) {
+		return Load($value) || {};
+	}
+	return $value;
 }
 
 

@@ -41,7 +41,7 @@ our @EXPORT = qw(read_cookie generate_password
 	get_url post_url parse_query_string url_decode url_encode
 	parse_json make_json jsonify xmlify
 	html_entities_to_text to_html_entities from_html_entities convert_to_utf8 read_vfile
-	is_boolean is_text is_json is_pos_int is_number is_ordinal is_array is_array_with_content is_hash is_hash_with_content is_hash_key is_arrayhash is_arrayhash_with_content is_object
+	is_boolean is_text is_json is_yaml is_pos_int is_number is_ordinal is_array is_array_with_content is_hash is_hash_with_content is_hash_key is_arrayhash is_arrayhash_with_content is_object
 	is_domain is_hostname is_email is_ipv4 is_ipv6 get_domain_name is_state_code get_state_code get_region_code get_region_aliases get_postal_code get_country_code get_month
 	round significant percent max min is_close summarize_number summarize_bytes make_ordinal pluralize join_text
 	array_length first value ref_to_scalar array_to_list list_to_array list_to_array_auto add_to_list remove_from_array to_array to_list to_hash
@@ -1438,6 +1438,22 @@ sub is_json {
 	if (!ref($value) && defined($value)) {
 		if (($value =~ /^\s*\{/) && ($value =~ /\}\s*$/)) { return TRUE; }
 		if (($value =~ /^\s*\[/) && ($value =~ /\]\s*$/)) { return TRUE; }
+	}
+	return undef;
+}
+
+sub is_yaml {
+#=====================================================
+
+=head2 B<is_yaml>
+
+ is_yaml($value) || return;
+
+=cut
+#=====================================================
+	my $value = shift;
+	if (!ref($value) && defined($value)) {
+		if ($value =~ /^---\\n/) { return TRUE; }
 	}
 	return undef;
 }
