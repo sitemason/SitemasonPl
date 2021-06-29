@@ -298,7 +298,7 @@ sub update_item {
 		delete $item->{$name};
 	}
 	
-	my $key_json = _convert_to_key_json($key_hash);
+	my $key_json = _convert_to_key_json($key_hash, $args);
 	my $expressions = _convert_to_expression($item);
 	my $update = "SET " . join(', ', @{$expressions->{comparisons}});
 	if ($self->{dry_run}) {
@@ -352,12 +352,23 @@ sub _convert_to_key_json {
 =cut
 #=====================================================
 	my $keys = shift || return;
+	my $args = shift;
 	my $debug = shift;
 	is_hash($keys) || return;
 	
+	my $numeric_keys = {};
+	if (is_hash_with_content($args) && $args->{numeric_keys}) {
+		$numeric_keys = to_hash($args->{numeric_keys});
+	}
+	
 	my $key_hash = {};
 	while (my($name, $value) = each(%{$keys})) {
-		my $new_value = _convert_to_dynamodb($value, undef, 1) || next;
+		my $new_value;
+		if ($numeric_keys->{$name}) {
+			$new_value = _convert_to_dynamodb($value, 'N', 1) || next;
+		} else {
+			$new_value = _convert_to_dynamodb($value, undef, 1) || next;
+		}
 		$key_hash->{$name} = $new_value;
 	}
 	my $key_json = make_json($key_hash, { compress => TRUE });
