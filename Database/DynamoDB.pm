@@ -289,7 +289,9 @@ sub update_item {
 	my $table_name = shift || return;
 	my $key_hash = shift;
 	my $source = shift;
+	my $args = shift;
 	my $debug = shift;
+	if (!$debug && !is_hash($args) && $args) { $debug = TRUE; }
 	
 	my $item = copy_ref($source);
 	foreach my $name (keys(%{$key_hash})) {
