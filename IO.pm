@@ -355,7 +355,7 @@ sub error {
 	$text = $self->convert_markdown_to_ansi($text);
 	$text = 'ERROR: ' . $text;
 	$text =~ s/^(.*)$/$self->make_quote('maroon_bg').$self->make_color($1,['bold','maroon'])/egm;
-	print STDERR $text;
+	print $text;
 	$suppress_newline || print "\n";
 }
 
@@ -524,11 +524,11 @@ sub pause {
 			my $display = $self->make_color($display_start . "==> $i <== ", 'bold');
 			$last_length = length($display);
 			if ($ENV{TERM} eq 'screen') { $last_length = length($display_start . "==> $i <== "); }
-			print STDERR $display;
+			print $display;
 			sleep 1;
-			print STDERR "\r";
+			print "\r";
 		}
-		print STDERR ' ' x $last_length . "\r";
+		print ' ' x $last_length . "\r";
 	} else {
 		sleep 1;
 	}
@@ -556,12 +556,12 @@ Pass 'end' to cleanly stop the progress bar.
 	
 	# end
 	if ($fraction eq 'end') {
-		if ($debug) { print STDERR "end\n"; }
+		if ($debug) { print "end\n"; }
 		my $label_length = 0;
 		my $progress_length = 102;
 		if ($ENV{TERM} ne 'screen') { $progress_length += length($self->make_color('', 'bold')); }
 		if ($self->{progress_label}) { $label_length = length($self->{progress_label}) + 1; }
-		print STDERR "\r" . ' ' x ($label_length + $progress_length) . "\r";
+		print "\r" . ' ' x ($label_length + $progress_length) . "\r";
 		delete $self->{progress};
 		delete $self->{progress_label};
 		return;
@@ -578,8 +578,8 @@ Pass 'end' to cleanly stop the progress bar.
 	
 	# reset
 	if (exists($self->{progress}) && ($fraction < $self->{progress})) {
-		if ($debug) { print STDERR "reset\n"; }
-		print STDERR "\n";
+		if ($debug) { print "reset\n"; }
+		print "\n";
 		delete $self->{progress};
 		delete $self->{progress_label};
 	}
@@ -587,14 +587,14 @@ Pass 'end' to cleanly stop the progress bar.
 	# update
 	my $progress = $self->{progress} || 0;
 	if (($fraction - $progress) >= 0) {
-		if ($debug) { print STDERR "update\n"; }
+		if ($debug) { print "update\n"; }
 		my $remaining = 100 - $fraction;
 		my $cursor_move = $remaining + 1;
 		if (!$remaining) { $cursor_move--; }
 		if ($label) {
-			print STDERR $self->make_color("\r$label |" . '-'x$fraction . ' 'x$remaining . '|' . "\b"x$cursor_move, 'bold');
+			print $self->make_color("\r$label |" . '-'x$fraction . ' 'x$remaining . '|' . "\b"x$cursor_move, 'bold');
 		} else {
-			print STDERR $self->make_color("\r|" . '-'x$fraction . ' 'x$remaining . '|' . "\b"x$cursor_move, 'bold');
+			print $self->make_color("\r|" . '-'x$fraction . ' 'x$remaining . '|' . "\b"x$cursor_move, 'bold');
 		}
 		$self->{progress_label} = $label;
 		$self->{progress} = $fraction;
