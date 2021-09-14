@@ -39,7 +39,7 @@ our @ISA = qw(Exporter);
 our @EXPORT = qw(read_cookie generate_password
 	get_timestamp get_iso_timestamp get_filename_utc_minute get_filename_utc_hour get_filename_utc_date convert_arrays_to_csv convert_csv_to_arrays read_file_list read_file read_csv_file write_file get_file_age read_cache_file write_cache_file
 	get_url post_url parse_query_string url_decode url_encode
-	parse_json make_json jsonify xmlify
+	parse_json make_json escape_for_bash jsonify xmlify
 	html_entities_to_text to_html_entities from_html_entities convert_to_utf8 read_vfile
 	is_boolean is_text is_json is_yaml is_pos_int is_number is_ordinal is_array is_array_with_content is_hash is_hash_with_content is_hash_key is_arrayhash is_arrayhash_with_content is_object
 	is_domain is_hostname is_email is_ipv4 is_ipv6 get_domain_name is_state_code get_state_code get_region_code get_region_aliases get_postal_code get_country_code get_month
