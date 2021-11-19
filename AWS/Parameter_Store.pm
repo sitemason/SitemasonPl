@@ -94,7 +94,10 @@ sub put_parameter {
 	my $self = shift || return;
 	my $name = shift || return;
 	my $payload = shift || return;
+	my $type = shift || 'yaml';
 	my $debug = shift;
+	
+	if ($name =~ /\.json$/) { $type = 'json'; }
 	
 	my $cmd = "put-parameter --type SecureString --key-id a6cc738d-ec13-4b51-b064-4a185270a08c --name $name";
 	if ($payload->{description}) {
@@ -110,9 +113,15 @@ sub put_parameter {
 	}
 	if ($payload->{value}) {
 		if (is_hash($payload->{value}) || is_array($payload->{value})) {
-			my $value = Dump($payload->{value});
-			$value =~ s/\\'/'"'"'/g;
-			$cmd .= " --value '$value'";
+			if ($type eq 'json') {
+				my $value = make_json($payload->{value});
+				$value =~ s/\\'/'"'"'/g;
+				$cmd .= " --value '$value'";
+			} else {
+				my $value = Dump($payload->{value});
+				$value =~ s/\\'/'"'"'/g;
+				$cmd .= " --value '$value'";
+			}
 		} elsif (is_text($payload->{value})) {
 			$cmd .= " --value '$payload->{value}'";
 		}

@@ -57,7 +57,7 @@ sub get_secret_value {
 
 =head2 B<get_secret_value>
 
-	my $value = $secrets_manager->get_secret_value($name);
+ my $value = $secrets_manager->get_secret_value($name);
 
 =cut
 #=====================================================
