@@ -21,7 +21,7 @@ use constant FALSE => 0;
 
 use DBI;
 use DateTime;
-use Text::Iconv;
+# use Text::Iconv;
 
 use SitemasonPl::Common;
 use SitemasonPl::Debug;
@@ -75,6 +75,8 @@ Errors:
 		$self->{db_port}		||= $ENV{PGPORT};
 		$self->{db_username}	||= $ENV{PGUSER};
 		$self->{db_password}	||= $ENV{PGPASS} || $ENV{PGPASSWORD};
+	} elsif ($self->{db_type} eq 'mysql') {
+		if (!$self->{'db_password'}) { get_password($self); }
 	}
 	
 	if ($arg{debug}) {
@@ -196,6 +198,24 @@ After a statement is executed, check state. 57000 08000
 	return TRUE;
 }
 
+sub get_password {
+	my $self = shift || return;
+	$ENV{HOME} || return;
+	if (! -e "$ENV{HOME}/.mypass") { return; }
+	my $dbhost = 'localhost';
+	if ($self->{'db_host'} ne '127.0.0.1') { $dbhost = $self->{'db_host'}; }
+	
+	open(MYPASS, "<$ENV{HOME}/.mypass");
+	while (my $line = <MYPASS>) {
+		chomp $line;
+		my @part = split(':', $line);
+		if (($part[0] eq $dbhost) && ($part[1] eq $self->{'db_port'}) && ($part[2] eq $self->{'db_name'}) && ($part[3] eq $self->{'db_username'})) {
+			$self->{'db_password'} = $part[4];
+			return;
+		}
+	}
+}
+
 
 #=====================================================
 # DBI-like Methods
@@ -243,11 +263,11 @@ $type can be 'begins', 'ends', 'like', 'qlike', 'word', or default
 		$input =~ s/\x{a0}/\\u00a0/g;
 		
 		# Clear invalid characters for UTF8
-		if (($input !~ /^\d+$/) && ($input =~ /[\x80-\xff]/)) {
-			print STDERR "quote: Stripping bad characters for UTF8\n";
-			my $converter = Text::Iconv->new("UTF8", "UTF8");
-			$input = $converter->convert($input);
-		}
+# 		if (($input !~ /^\d+$/) && ($input =~ /[\x80-\xff]/)) {
+# 			print STDERR "quote: Stripping bad characters for UTF8\n";
+# 			my $converter = Text::Iconv->new("UTF8", "UTF8");
+# 			$input = $converter->convert($input);
+# 		}
 		
 		$quoted = $self->{dbh}->quote($input);
 		$quoted = _modify_quote($quoted, $type);

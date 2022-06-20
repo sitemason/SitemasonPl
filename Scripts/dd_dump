@@ -1,4 +1,4 @@
-#!/usr/bin/perl -CS
+#!/usr/bin/env perl -CS
 $VERSION = 1.00;
 
 =head1 NAME
