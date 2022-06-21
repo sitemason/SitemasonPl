@@ -21,8 +21,8 @@ use constant FALSE => 0;
 use Net::SMTP;
 
 use SitemasonPl::Common;
-use SitemasonPl::Debug;
 use SitemasonPl::Database;
+use SitemasonPl::IO;
 
 
 #=====================================================
@@ -52,6 +52,7 @@ sub new {
 	my ($class, %arg) = @_;
 	$class || return;
 	my $self = {
+		io				=> $arg{io},
 		smtpHostname	=> $arg{smtpHostname},
 		smtpUsername	=> $arg{smtpUsername},
 		smtpPassword	=> $arg{smtpPassword},
@@ -61,18 +62,8 @@ sub new {
 			db		=> 0
 		}
 	};
+	if (!$self->{io}) { $self->{io} = SitemasonPl::IO->new; }
 	bless $self, $class;
-	
-	if ($arg{debug}) {
-		$self->{debug} = $arg{debug};
-	} else {
-		$self->{debug} = SitemasonPl::Debug->new(
-			logLevel	=> 'debug',
-			logLevelAll	=> 'info',
-			logTags		=> []
-		);
-	}
-	$self->{debug}->call;
 	
 	return $self;
 }
@@ -85,7 +76,7 @@ sub new {
 =cut
 #=====================================================
 sub cleanEmailName {
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $name = shift || return;
 	$name =~ s/[^\w \.\-]+//g;
 	return $name;
@@ -99,7 +90,7 @@ sub cleanEmailName {
 =cut
 #=====================================================
 sub cleanAddress {
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $toAddress = shift || return;
 	
 	my @to = split(/\s*,\s*/, $toAddress);
@@ -132,7 +123,7 @@ Sends a test message to the given SMTP server. FROM and TO are set to the addres
 =cut
 #=====================================================
 sub sendTest {
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $mail = shift || return;
 	
 	$mail->{header} ||= 'Sent from mail test';
@@ -206,7 +197,7 @@ userId - Can be used by scripts to specify a different user for each call of sen
 =cut
 #=====================================================
 sub sendMail {
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $mail = shift || return;
 	
 	my $debug = $mail->{debug} || $self->{log}->{send};
@@ -230,7 +221,7 @@ sub sendMail {
 	
 	my $from = refToScalar($mail->{from}, ', ');
 	unless ($from) {
-		$self->{debug}->warning("Missing FROM address when sending mail");
+		$self->{io}->warning("Missing FROM address when sending mail");
 		return;
 	}
 	my $fromName = $self->cleanEmailName($mail->{fromName});
@@ -238,7 +229,7 @@ sub sendMail {
 	else { ($from) = $self->cleanAddress($from); }
 	my $to = refToScalar($mail->{to}, ', ');
 	unless ($to) {
-		$self->{debug}->notice("Missing TO address when sending mail");
+		$self->{io}->warning("Missing TO address when sending mail");
 		return;
 	}
 	my $toName = $self->cleanEmailName($mail->{toName});
@@ -304,7 +295,7 @@ EOL
 	};
 	if ($@) {
 		undef $isSMTPSSL;
-		$self->{debug}->error("Failed to use Net::SMTP::SSL");
+		$self->{io}->error("Failed to use Net::SMTP::SSL");
 	}
 	
 	my $smtpModule = 'SMTP';
@@ -315,7 +306,7 @@ EOL
 Sending via Net::SMTP to $smtpHostname
 $header$addlheaders$body
 EOL
-			$self->{debug}->debug($message);
+			$self->{io}->info($message);
 			if ($isSMTPSSL) {
 				if (!($smtp = Net::SMTP::SSL->new(
 					Host	=> $smtpHostname,
@@ -323,7 +314,7 @@ EOL
 					Timeout	=> 60,
 					Debug	=> 1
 				))) {
-					$self->{debug}->error("Failed to connect to SSL SMTP server ($smtpHostname)");
+					$self->{io}->error("Failed to connect to SSL SMTP server ($smtpHostname)");
 					return;
 				}
 			} else {
@@ -333,7 +324,7 @@ EOL
 					Timeout	=> 60,
 					Debug	=> 1
 				))) {
-					$self->{debug}->error("Failed to connect to SMTP server ($smtpHostname)");
+					$self->{io}->error("Failed to connect to SMTP server ($smtpHostname)");
 					return;
 				}
 			}
@@ -344,7 +335,7 @@ EOL
 					Hello	=> $self->{hostname},
 					Timeout => 60
 				))) {
-					$self->{debug}->error("Failed to connect to SSL SMTP server ($smtpHostname)");
+					$self->{io}->error("Failed to connect to SSL SMTP server ($smtpHostname)");
 					return;
 				}
 			} else {
@@ -353,23 +344,23 @@ EOL
 					Hello	=> $self->{hostname},
 					Timeout => 60
 				))) {
-					$self->{debug}->error("Failed to connect to SMTP server ($smtpHostname)");
+					$self->{io}->error("Failed to connect to SMTP server ($smtpHostname)");
 					return;
 				}
 			}
 		}
 		if ($smtpUsername && $smtpPassword) {
 			if (!$smtp->auth($smtpUsername, $smtpPassword)) {
-				$self->{debug}->error("Failed to auth to SMTP server ($smtpHostname, $smtpUsername)");
+				$self->{io}->error("Failed to auth to SMTP server ($smtpHostname, $smtpUsername)");
 			}
 		}
 		
 		if (!$smtp->mail($from)) {
-			$self->{debug}->warning("Invalid FROM address ($from)");
+			$self->{io}->warning("Invalid FROM address ($from)");
 			return;
 		}
 		if (!$smtp->to(@to)) {
-			$self->{debug}->notice("Invalid TO address ($to)");
+			$self->{io}->warning("Invalid TO address ($to)");
 			return;
 		}
 		if (@cc) { $smtp->cc(@cc); }
@@ -382,9 +373,9 @@ EOL
 		$smtp->dataend();
 		$smtp->quit;
 		if ($debug) {
-			$self->{debug}->notice("Connected to SMTP server. Test message successful.");
+			$self->{io}->warning("Connected to SMTP server. Test message successful.");
 		} else {
-			$self->{debug}->notice("Email sent to $to", { header => 0 });
+			$self->{io}->warning("Email sent to $to", { header => 0 });
 		}
 	}
 	
@@ -410,7 +401,7 @@ sub sendStoredEmail {
 	my $data = shift;
 	
 	my $template = $self->getEmailTemplate($name);
-	if (!is_hash($template)) { $self->{debug}->debug('Mail template "' . $name . '" does not exist'); return; }
+	if (!is_hash($template)) { $self->{io}->info('Mail template "' . $name . '" does not exist'); return; }
 	is_array($template->{body}) || return;
 	
 	if (is_hash($data)) {

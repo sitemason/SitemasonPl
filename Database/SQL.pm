@@ -24,7 +24,7 @@ use DateTime;
 # use Text::Iconv;
 
 use SitemasonPl::Common;
-use SitemasonPl::Debug;
+use SitemasonPl::IO;
 use SitemasonPl::SearchParse;
 
 sub new {
@@ -67,8 +67,10 @@ Errors:
 		db_password	=> $arg{db_password}	|| $SitemasonPl::serverInfo->{db_info}->{db_password},
 		db_sock		=> $arg{db_sock},
 		db_name		=> $arg{db_name},
-		time_zone	=> $arg{time_zone}	|| 'UTC'
+		time_zone	=> $arg{time_zone}	|| 'UTC',
+		io			=> $arg{io}
 	};
+	if (!$self->{io}) { $self->{io} = SitemasonPl::IO->new; }
 	
 	if ($self->{db_type} eq 'pg') {
 		$self->{db_host}		||= $ENV{PGHOST};
@@ -78,17 +80,6 @@ Errors:
 	} elsif ($self->{db_type} eq 'mysql') {
 		if (!$self->{'db_password'}) { get_password($self); }
 	}
-	
-	if ($arg{debug}) {
-		$self->{debug} = $arg{debug};
-	} else {
-		$self->{debug} = SitemasonPl::Debug->new(
-			logLevel	=> 'debug',
-			logLevelAll	=> 'info',
-			logTags		=> []
-		);
-	}
-	$self->{debug}->call;
 	
 	my $host;
 	my $name;
@@ -117,7 +108,7 @@ Errors:
 	}
 	
 	unless (defined($self->{dbh})) {
-		$self->{debug}->emergency("Failed to reach database");
+		$self->{io}->error("Failed to reach database");
 		return;
 	}
 	
@@ -165,21 +156,21 @@ After a statement is executed, check state. 57000 08000
 
 =cut
 #=====================================================
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $state = shift || return;
 	if ($state eq '22021') { return; }
-	if ($state) { $self->{debug}->error("Potential DB idle timeout ($state) $self->{db_name}"); }
+	if ($state) { $self->{io}->error("Potential DB idle timeout ($state) $self->{db_name}"); }
 	
-	unless (($state eq '57000') || ($state eq '08000')) { $self->{debug}->info('Failing based on state number'); return; }
+	unless (($state eq '57000') || ($state eq '08000')) { $self->{io}->info('Failing based on state number'); return; }
 	
 	my $connectInfo = $self->{connectInfo} || $self->get_server_info('connectInfo');
-	if (!$connectInfo) { $self->{debug}->warning('Could not get connection info'); return; }
+	if (!$connectInfo) { $self->{io}->warning('Could not get connection info'); return; }
 	
-	$self->{debug}->info(">>>>>> Reconnecting to db '" . $self->{db_name} . "' <<<<<<");
+	$self->{io}->info(">>>>>> Reconnecting to db '" . $self->{db_name} . "' <<<<<<");
 	$self->{dbh} = DBI->connect($connectInfo, $self->{db_username}, $self->{db_password}, { PrintError => 1, AutoCommit => 1 });
 	
 	unless (defined($self->{dbh})) {
-		$self->{debug}->emergency("Failed to reach database");
+		$self->{io}->error("Failed to reach database");
 		return;
 	}
 	
@@ -232,7 +223,7 @@ $type can be 'begins', 'ends', 'like', 'qlike', 'word', or default
 
 =cut
 #=====================================================
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $input = shift;
 	my $type = shift;
 	my $limit = shift || 10;
@@ -255,7 +246,7 @@ $type can be 'begins', 'ends', 'like', 'qlike', 'word', or default
 			}
 		} else {
 			my $message = 'Trying to quote a reference ' . ref($input) . ' ' . $input . "\n";
-			$self->{debug}->info($message);
+			$self->{io}->info($message);
 			$quoted = 'NULL';
 		}
 	} elsif (defined($input)) {
@@ -317,7 +308,7 @@ sub uncommit {
 
 =cut
 #=====================================================
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	$self->{dbh}->{'AutoCommit'} = 0;
 }
 
@@ -330,7 +321,7 @@ sub commit {
 
 =cut
 #=====================================================
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	$self->{dbh}->{'AutoCommit'} = 1;
 }
 
@@ -342,7 +333,7 @@ sub current_date {
 
 =cut
 #=====================================================
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $time_zone = shift || 'UTC';
 	
 	my $qzone = $self->{dbh}->quote($time_zone);
@@ -360,7 +351,7 @@ sub quoted_current_date {
 
 =cut
 #=====================================================
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $time_zone = shift;
 	my $current_date = $self->current_date($time_zone);
 	return $self->{dbh}->quote($current_date);
@@ -376,7 +367,7 @@ sub nextval {
 
 =cut
 #=====================================================
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $table = shift || return;
 	my $idFieldName = shift;
 	my $log = shift;
@@ -409,7 +400,7 @@ sub do {
 
 =cut
 #=====================================================
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $statement = shift;
 	my $log = shift;
 	$self->_log_sql($statement, [caller(0)], $log);
@@ -450,9 +441,9 @@ sub do {
 		elsif ($command eq 'alter') { return $rv; }
 		elsif ($command eq 'create') { return $rv; }
 		if ($message) {
-#			$self->{debug}->debug($message, new_hash({ tags => 'results' }, $log));
+#			$self->{io}->info($message, new_hash({ tags => 'results' }, $log));
 		} elsif ($command !~ /^(drop|import)$/i) {
-			$self->{debug}->critical("Failed $command", $log);
+			$self->{io}->error("Failed $command", $log);
 		}
 	} else {
 		my $message = '1 row';
@@ -461,9 +452,9 @@ sub do {
 		elsif ($command eq 'update') { $message = 'Updated ' . $message; }
 		elsif ($command eq 'insert') { $message = 'Inserted ' . $message; }
 		if ($message) {
-#			$self->{debug}->debug($message, new_hash({ tags => 'results' }, $log));
+#			$self->{io}->info($message, new_hash({ tags => 'results' }, $log));
 		} else {
-			$self->{debug}->critical("Unrecognized command, $command on " . $message, $log);
+			$self->{io}->error("Unrecognized command, $command on " . $message, $log);
 		}
 	}
 	return $rv;
@@ -479,7 +470,7 @@ sub selectrow_array {
 
 =cut
 #=====================================================
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $statement = shift;
 	my $log = shift;
 	$self->_log_sql($statement, [caller(0)], $log);
@@ -506,7 +497,7 @@ sub selectrow_arrayref {
 
 =cut
 #=====================================================
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $statement = shift;
 	my $log = shift;
 	$self->_log_sql($statement, [caller(0)], $log);
@@ -533,7 +524,7 @@ sub selectrow_hashref {
 
 =cut
 #=====================================================
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $statement = shift;
 	my $log = shift;
 	$self->_log_sql($statement, [caller(0)], $log);
@@ -560,7 +551,7 @@ sub selectcol_arrayref {
 
 =cut
 #=====================================================
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $statement = shift;
 	my $log = shift;
 	$self->_log_sql($statement, [caller(0)], $log);
@@ -587,7 +578,7 @@ $aryRef  = $dbh->selectall_arrayref($statement);
 
 =cut
 #=====================================================
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $statement = shift;
 	my $log = shift;
 	$self->_log_sql($statement, [caller(0)], $log);
@@ -614,7 +605,7 @@ sub selectall_hashref {
 
 =cut
 #=====================================================
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $statement = shift;
 	my $keyField = shift;
 	my $log = shift;
@@ -622,7 +613,7 @@ sub selectall_hashref {
 	$statement = $self->_clean_sql($statement);
 	unless ($statement) { return; }
 	unless ($keyField) {
-		$self->{debug}->critical('No key field', $log);
+		$self->{io}->error('No key field', $log);
 		return;
 	}
 	
@@ -646,7 +637,7 @@ $aryRef  = $dbh->selectall_arrayhash($statement);
 
 =cut
 #=====================================================
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $statement = shift;
 	my $log = shift;
 	$self->_log_sql($statement, [caller(0)], $log);
@@ -691,7 +682,7 @@ In commands, a position of 'a' stands for above and 'b' is below. Do not confuse
 
 =cut
 #=====================================================
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $params = shift || return;
 	my $log = shift;
 	
@@ -937,7 +928,7 @@ sub do_update_insert {
 
 =cut
 #=====================================================
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $args = shift;
 	my $log = shift || $args->{log};
 	my $id = $args->{id};
@@ -1012,7 +1003,7 @@ sub do_update_insert {
 			", $log);
 			if ($rv ne '0E0') { $action = 'update'; }
 		} else {
-			$self->{debug}->info("No content to update for item($id).", $table);
+			$self->{io}->info("No content to update for item($id).", $table);
 		}
 	}
 	
@@ -1041,7 +1032,7 @@ sub do_update_insert {
 				", $log);
 				if ($rv < 1) {
 					undef($id);
-					$self->{debug}->critical("Insert failed in $table (prefetched id)", $table);
+					$self->{io}->error("Insert failed in $table (prefetched id)", $table);
 				} else { $action = 'insert'; }
 			} else {
 				$rv = $self->do("
@@ -1050,7 +1041,7 @@ sub do_update_insert {
 					VALUES
 						($valueSQL)
 				", $log);
-				if ($rv < 1) { $self->{debug}->critical("Insert failed in $table", $table); }
+				if ($rv < 1) { $self->{io}->error("Insert failed in $table", $table); }
 				else {
 					if ($self->{db_type} eq 'mysql') {
 						($id) = $self->{dbh}->selectrow_array("
@@ -1063,22 +1054,14 @@ sub do_update_insert {
 				}
 			}
 # 		} else {
-# 			$self->{debug}->post( {
-# 				caller	=> [caller(0)],
-# 				level	=> 'info',
-# 				message	=> "No content to insert."
-# 			} );
+# 			$self->{io}->info("No content to insert.");
 		}
 	}
 	
 #	print STDERR "$table: Tried $attempt. Did '$action'\n";
 	$self->{lastAction} = $self->{last_action} = $action;
 # 	if (!$action) {
-# 		$self->{debug}->post( {
-# 			caller	=> [caller(0)],
-# 			level	=> 'info',
-# 			message	=> "Attempted $attempt, but no action was taken."
-# 		} );
+# 		$self->{io}->info("Attempted $attempt, but no action was taken.");
 # 	}
 	if (wantarray) { return ($id, $changes); }
 	return $id;
@@ -1094,7 +1077,7 @@ sub copy {
 
 =cut
 #=====================================================
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $table = shift || return;
 	my $records = shift || return;
 	my $log = shift;
@@ -1183,10 +1166,10 @@ sub copy {
 		
 		if (@data) {
 			my $line = join("\t", @data) . "\n";
-			if ($log) { $self->{debug}->debug($line, $log); }
+			if ($log) { $self->{io}->info($line, $log); }
 			if ($log ne 'debug') {
 				my $ret = $self->{dbh}->pg_putcopydata($line);
-				unless ($ret) { $self->{debug}->printObject($ret, 'PUT line failed'); }
+				unless ($ret) { $self->{io}->print_object($ret, 'PUT line failed'); }
 			}
 			push(@finalRecords, $line);
 			$cnt++;
@@ -1199,16 +1182,16 @@ sub copy {
 	$self->_log_transaction($copySQL, $duration, [caller(0)], $log);
 	if ($rv) { return $cnt; }
 	else {
-		$self->{debug}->error('COPY failed - attempting individual line copies', $log);
+		$self->{io}->error('COPY failed - attempting individual line copies', $log);
 		my $cnt;
 		foreach my $line (@finalRecords) {
-			if ($log) { $self->{debug}->debug($line, $log); }
+			if ($log) { $self->{io}->info($line, $log); }
 			my $rv = $self->{dbh}->do($copySQL);
 			my $ret = $self->{dbh}->pg_putcopydata($line);
-			unless ($ret) { $self->{debug}->printObject($ret, 'PUT line failed'); }
+			unless ($ret) { $self->{io}->print_object($ret, 'PUT line failed'); }
 			my $rv = $self->{dbh}->pg_putcopyend();
 			if ($rv) { $cnt += $rv; }
-			else { chomp($line); $self->{debug}->warning("COPY line failed ($copySQL\n$line)", $log); }
+			else { chomp($line); $self->{io}->warning("COPY line failed ($copySQL\n$line)", $log); }
 		}
 		return $cnt;
 	}
@@ -1249,7 +1232,7 @@ sub do_delete {
 
 =cut
 #=====================================================
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $args = shift;
 	my $table = $args->{table} || return;
 	my $where = $args->{where} || return;
@@ -1279,7 +1262,7 @@ sub do_delete {
 			return $where->{$idName};
 		}
 	} else {
-		$self->{debug}->info("No '$idName' for delete on table $table.", $table);
+		$self->{io}->info("No '$idName' for delete on table $table.", $table);
 	}
 	
 	return;
@@ -1299,7 +1282,7 @@ sub _log_sql {
 
 =cut
 #=====================================================
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $statement = shift;
 	my $caller = shift;
 	my $log = shift;
@@ -1315,19 +1298,9 @@ sub _log_sql {
 		my ($tabs) = $statement =~ /^(\s+)/;
 		$statement =~ s/^$tabs/  /mg;
 		$statement =~ s/\t/  /g;
-		$self->{debug}->post( new_hash({
-			caller	=> $caller,
-			level	=> $level,
-			message	=> $statement,
-			tags	=> ['sql', $cmd, $table]
-		}, $log) );
+		$self->{io}->info($statement);
 	} else {
-		$self->{debug}->post( {
-			caller	=> $caller,
-			level	=> 'critical',
-			message	=> 'Blank SQL statement',
-			tags	=> ['sql']
-		} );
+		$self->{io}->error('Blank SQL statement');
 	}
 }
 
@@ -1339,7 +1312,7 @@ sub _log_transaction {
 
 =cut
 #=====================================================
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $statement = shift || return;
 	my $duration = shift;
 	my $caller = shift;
@@ -1355,13 +1328,7 @@ sub _log_transaction {
 		if ($duration) {
 			$message .= " ($duration ms)";
 		}
-		$self->{debug}->post( new_hash({
-			caller		=> $caller,
-			level		=> 'debug',
-			message		=> $message,
-			tags		=> ['transaction', $cmd, $table],
-			duration	=> $duration
-		}, $log) );
+		$self->{io}->info($message);
 	}
 }
 
@@ -1375,7 +1342,7 @@ sub _get_command_from_statement {
 
 =cut
 #=====================================================
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $statement = lc(shift) || return;
 	
 	my ($cmd) = $statement =~ /^\s*(\w+)/;
@@ -1395,7 +1362,7 @@ sub _clean_sql {
 
 =cut
 #=====================================================
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $statement = shift || return;
 	
 	my ($tabs) = $statement =~ /^(\t+)/;
@@ -1430,7 +1397,7 @@ sub _modify_fields {
 
 =cut
 #=====================================================
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $input = shift || return;
 	my $modifiers = shift || return;
 	my $old = shift;
@@ -1487,7 +1454,7 @@ sub timer_start {
 #	my ($parent) = (caller(0))[3];
 	my $unique = unique_key;
 	my $key = 'db_' . $cmd . '_on_' . $table . '_' . $unique;
-	$self->{debug}->timerStart($key);
+	$self->{io}->timer_start($key);
 	return $key;
 }
 
@@ -1503,7 +1470,7 @@ sub timer_stop {
 	my $log = shift || return;
 	if ($log eq 'noLog') { return; }
 	
-	my $duration = $self->{debug}->timerStop($key);
+	my $duration = $self->{io}->timer_stop($key);
 	return $duration;
 }
 
@@ -1535,7 +1502,7 @@ Returns sql for a single field of a where clause. Give it the field name and a l
 
 =cut
 #=====================================================
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $field = shift || return;
 	my $prelist = shift || return;
 	my $comp = shift;
@@ -1641,7 +1608,7 @@ Name/value pairs are pieced together with 'and'. In a future version, a hierarch
 
 =cut
 #=====================================================
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $where = shift || return;
 	my $table = shift;
 	my $tableAbbr = shift;
@@ -1720,7 +1687,7 @@ An easier way to parse searches and call make_search_sql and makeOrderSQL.
 
 =cut
 #=====================================================
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $args = shift || return;
 	
 	my $input = $self->process_make_sql_input($args);
@@ -1764,7 +1731,7 @@ Convert easy field descriptions into map of field specs. easy for human -> easy 
 
 =cut
 #=====================================================
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $args = shift || return;
 	my $settings = $args->{settings};
 	my $fields = $args->{field_map} || return;
@@ -1836,7 +1803,7 @@ Convert easy field descriptions into map of field specs. easy for human -> easy 
 						target_id	=> $target
 					});
 				} else {
-					$self->{debug}->info("Invalid move command: $cmd");
+					$self->{io}->info("Invalid move command: $cmd");
 				}
 			}
 			delete($params->{'m'});
@@ -1850,7 +1817,7 @@ Convert easy field descriptions into map of field specs. easy for human -> easy 
 						id		=> $id
 					});
 				} else {
-					$self->{debug}->info("Invalid id for check command: $id");
+					$self->{io}->info("Invalid id for check command: $id");
 				}
 			}
 			delete($params->{'c'});
@@ -1864,7 +1831,7 @@ Convert easy field descriptions into map of field specs. easy for human -> easy 
 						id		=> $id
 					});
 				} else {
-					$self->{debug}->info("Invalid id for uncheck command: $id");
+					$self->{io}->info("Invalid id for uncheck command: $id");
 				}
 			}
 			delete($params->{'u'});
@@ -1961,7 +1928,7 @@ sub make_search_sql {
 
 =cut
 #=====================================================
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $options = shift || return;
 	my $valid_search = $options->{valid_search} || return;
 	my $search = $options->{search} || {};
@@ -2122,7 +2089,7 @@ sub make_search_sql {
 		$whereSQL = "\n  and " . join("\n  and ", @where);
 	}
 	
-#	$self->{debug}->debug("\$whereSQL: $whereSQL");
+#	$self->{io}->info("\$whereSQL: $whereSQL");
 	return $whereSQL;
 }
 
@@ -2134,7 +2101,7 @@ sub make_suffix_sql {
 
 =cut
 #=====================================================
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $options = shift || return;
 	my $search = $options->{search} || return;
 	my $valid_order_by = $options->{valid_order_by} || {};
@@ -2181,7 +2148,7 @@ sub make_suffix_sql {
 	if ($order_by) { $order_by_sql = "\n		ORDER BY $order_by"; }
 	
 	my $suffixSQL = "$order_by_sql$limit_sql$offset_sql";
-#	$self->{debug}->debug("\$suffixSQL: $suffixSQL");
+#	$self->{io}->info("\$suffixSQL: $suffixSQL");
 	
 	return $suffixSQL;
 }
@@ -2220,7 +2187,7 @@ sub get_table_info {
 
 =cut
 #=====================================================
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $table = shift || return;
 	
 	my $tableInfo = $self->get_server_info('tableInfo');
@@ -2243,7 +2210,7 @@ sub get_column_info {
 
 =cut
 #=====================================================
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $table = shift || return;
 	
 	my $columnInfo = $self->get_server_info('columnInfo');
@@ -2286,7 +2253,7 @@ sub check_input {
 
 =cut
 #=====================================================
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $type = shift || return;
 	my $value = shift || return;
 	
@@ -2310,7 +2277,7 @@ You probably won't need to call this method directly. It is used by other method
 
 =cut
 #=====================================================
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $table = shift || return;
 	my $input = shift;
 	my $old = shift;
@@ -2343,7 +2310,7 @@ You probably won't need to call this method directly. It is used by other method
 		$columns = $self->get_column_info($table);
 	}
 # 	if ($table eq 'item_time_draft') {
-# 		$self->{debug}->print_object($input, 'check_field_input $input');
+# 		$self->{io}->print_object($input, 'check_field_input $input');
 # 	}
 	
 	my $modified;
@@ -2459,12 +2426,7 @@ You probably won't need to call this method directly. It is used by other method
 				} elsif (!$value || ($value eq 'NULL')) {
 					unless ($where) { $quote = 'NULL'; }
 				} else {
-					$self->{debug}->post( {
-						caller	=> [caller(0)],
-						level	=> 'warning',
-						field	=> $field,
-						message	=> "This field ($field) must be a date. ($value)"
-					} );
+					$self->{io}->warning("This field ($field) must be a date. ($value)");
 				}
 			}
 			elsif ($type eq 'interval') {
@@ -2476,12 +2438,7 @@ You probably won't need to call this method directly. It is used by other method
 				} elsif (!$value || ($value eq 'NULL')) {
 					unless ($where) { $quote = 'NULL'; }
 				} else {
-					$self->{debug}->post( {
-						caller	=> [caller(0)],
-						level	=> 'warning',
-						field	=> $field,
-						message	=> "This field ($field) must be an interval. ($value)"
-					} );
+					$self->{io}->warning("This field ($field) must be an interval. ($value)");
 				}
 			}
 			elsif ($type eq 'boolean') {
@@ -2504,12 +2461,7 @@ You probably won't need to call this method directly. It is used by other method
 				} elsif (!$value || ($value eq 'NULL')) {
 					unless ($where) { $quote = 'NULL'; }
 				} else {
-					$self->{debug}->post( {
-						caller	=> [caller(0)],
-						level	=> 'warning',
-						field	=> $field,
-						message	=> "This field ($field) must be a number."
-					} );
+					$self->{io}->warning("This field ($field) must be a number.");
 				}
 			}
 			elsif ($type =~ /^(numeric|real)$/) {
@@ -2520,12 +2472,7 @@ You probably won't need to call this method directly. It is used by other method
 				} elsif (!$value || ($value eq 'NULL')) {
 					unless ($where) { $quote = 'NULL'; }
 				} else {
-					$self->{debug}->post( {
-						caller	=> [caller(0)],
-						level	=> 'warning',
-						field	=> $field,
-						message	=> "This field ($field) must be a number."
-					} );
+					$self->{io}->warning("This field ($field) must be a number.");
 				}
 			}
 			elsif ($type =~ /^(int|smallint)/) {
@@ -2536,12 +2483,7 @@ You probably won't need to call this method directly. It is used by other method
 				} elsif (!$value || ($value eq 'NULL')) {
 					unless ($where) { $quote = 'NULL'; }
 				} else {
-					$self->{debug}->post( {
-						caller	=> [caller(0)],
-						level	=> 'warning',
-						field	=> $field,
-						message	=> "This field ($field) must be an integer."
-					} );
+					$self->{io}->warning("This field ($field) must be an integer.");
 				}
 			}
 			elsif ($type =~ /^(varchar|character varying|text)$/) {
@@ -2578,21 +2520,11 @@ You probably won't need to call this method directly. It is used by other method
 				} elsif (!$value || ($value eq 'NULL')) {
 					unless ($where) { $quote = 'NULL'; }
 				} else {
-					$self->{debug}->post( {
-						caller	=> [caller(0)],
-						level	=> 'warning',
-						field	=> $field,
-						message	=> "This field ($field) must be an inet."
-					} );
+					$self->{io}->warning("This field ($field) must be an inet.");
 				}
 			}
 			else {
-				$self->{debug}->post( {
-					caller	=> [caller(0)],
-					level	=> 'critical',
-					field	=> $field,
-					message	=> "Found unknown field type. table='$table', name='$field', type='$type', prec='$prec'."
-				} );
+				$self->{io}->error("Found unknown field type. table='$table', name='$field', type='$type', prec='$prec'.");
 			}
 #			print STDERR "Found unknown field type. table='$table', name='$field', type='$type', prec='$prec'.\n";
 			if (defined($quote)) {

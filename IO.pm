@@ -17,6 +17,7 @@ use utf8;
 use constant TRUE => 1;
 use constant FALSE => 0;
 
+use Benchmark::Timer;
 use Getopt::Long qw(:config bundling);
 use MIME::Base64;
 use Pod::Usage qw(pod2usage);
@@ -256,6 +257,45 @@ sub print_version {
 	return TRUE;
 }
 
+
+#=====================================================
+
+=head2 B<timer_start>
+
+ $self->{io}->timer_start('tag');
+
+=cut
+#=====================================================
+sub timer_start {
+	my $self = shift || return;
+	my $tag = shift || return;
+	unless ($self->{timer}) {
+		$self->{timer} = Benchmark::Timer->new();
+		$self->{active_timers} = {};
+	}
+	if ($self->{active_timers}->{$tag}) { return; }
+	$self->{timer}->start($tag);
+	$self->{active_timers}->{$tag} = TRUE;
+}
+
+
+#=====================================================
+
+=head2 B<timer_stop>
+
+ my $seconds = $self->{io}->timer_stop('tag');
+ 
+=cut
+#=====================================================
+sub timer_stop {
+	my $self = shift || return;
+	my $tag = shift || return;
+	$self->{timer} || return;
+	if (!$self->{active_timers}->{$tag}) { return; }
+	my $duration = $self->{timer}->stop($tag);
+	delete $self->{active_timers}->{$tag};
+	return round($duration, 3);
+}
 
 
 

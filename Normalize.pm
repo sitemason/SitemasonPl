@@ -767,7 +767,7 @@ sub clean_address {
 	my $address = shift || return;
 	my $debug;
 	$debug && print STDERR "original:   $address\n";
-	$address = stripOutside($address, 'colon');
+	$address = strip_outside($address, 'colon');
 	$debug && print STDERR "strip 1:    $address\n";
 	
 	# Directions
@@ -796,7 +796,7 @@ sub clean_address {
 		$address =~ s/(?:(?:entrance|located|parking)\s+)?(?:\bat|\bin|\bto)\s+.*//i;
 	}
 	$debug && print STDERR "phrases:    $address\n";
-	$address = stripOutside($address, 'colon');
+	$address = strip_outside($address, 'colon');
 	$debug && print STDERR "strip 2:    $address\n";
 	
 	# Strip content around a colon
@@ -808,13 +808,13 @@ sub clean_address {
 	# Strip PO Boxes
 	$address = strip_box_from_address($address);
 	$debug && print STDERR "strip box:  $address\n";
-	$address = stripOutside($address, 'period');
+	$address = strip_outside($address, 'period');
 	$debug && print STDERR "strip 3:    $address\n";
 	
 	# Strip c/o
 	$address =~ s/,\s*c\/o .*?$//i;
 	$debug && print STDERR "strip c/o:  $address\n";
-	$address = stripOutside($address, 'period');
+	$address = strip_outside($address, 'period');
 	$debug && print STDERR "strip 4:    $address\n\n";
 	
 	return $address;

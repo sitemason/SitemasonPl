@@ -5641,25 +5641,25 @@ sub look_up_ip {
 # 	return $json;
 	
 	my $apiKey = 'JE562K-H58HG85G77';
-	my $url = 'http://api.wolframalpha.com/v2/query?input=' . $ip . '&appid=' . $apiKey;
-	my $xml = get_url($url);
+	my $url = 'http://api.wolframalpha.com/v2/query?appid=' . $apiKey . '&output=json&input=' . $ip;
+	my $json = get_url($url);
 	sleep 1;
-	my $xml_ref = read_xml($xml, [qw(pod subpod info state)]);
-	if ($xml_ref->{queryresult} && $xml_ref->{queryresult}->{pod} && @{$xml_ref->{queryresult}->{pod}}) {
+	my $json_ref = parse_json($json);
+	if ($json_ref->{queryresult} && $json_ref->{queryresult}->{pods} && @{$json_ref->{queryresult}->{pods}}) {
 		my ($name, $location);
-		foreach my $pod (@{$xml_ref->{queryresult}->{pod}}) {
-			if ($pod->{sub_attribute}->{id} eq 'HostInformationPodIP:InternetData') {
+		foreach my $pod (@{$json_ref->{queryresult}->{pods}}) {
+			if ($pod->{id} eq 'HostInformationPodIP:InternetData') {
 #				$self->{debug}->print_object($pod, '$pod');
 				my $geo = {};
-				($geo->{name}, $geo->{location}) = $pod->{subpod}->[0]->{plaintext} =~ /name \| (.*?)location \| (.*?)$/;
+				($geo->{name}, $geo->{location}) = $pod->{subpods}->[0]->{plaintext} =~ /name \| (.*?)\nlocation \| (.*?)$/;
 				($geo->{cityName}, $geo->{regionName}, $geo->{countryName}) = split(/\s*,\s*/, $geo->{location});
 				if (!$geo->{countryName} && $geo->{regionName}) { $geo->{countryName} = $geo->{regionName}; delete $geo->{regionName}; }
 				else {
 					my $regionCode = get_state_code($geo->{regionName});
 					if ($regionCode) { $geo->{regionCode} = $regionCode; }
 				}
-				$geo->{url} = $pod->{infos}->{info}->[0]->{link_attr}->{url};
-#				($geo->{lat}, $geo->{long}) = $pod->{infos}->{info}->[0]->{link_attr}->{url} =~ /cp=([\d\.\-]+)~([\d\.\-]+)&/;
+				$geo->{url} = $pod->{infos}->{links}->{url};
+#				($geo->{lat}, $geo->{long}) = $pod->{infos}->{links}->{url} =~ /cp=([\d\.\-]+)~([\d\.\-]+)&/;
 				($geo->{latitude}, $geo->{longitude}) = $geo->{url} =~ /ll=([\d\.\-]+)%2C([\d\.\-]+)&/;
 				$geo->{latitude} += 0; $geo->{longitude} += 0;
 				return $geo;

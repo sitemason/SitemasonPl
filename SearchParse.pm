@@ -15,9 +15,9 @@ SearchParse parses a single string into multiple search parameters.
 use v5.012;
 use strict;
 use SitemasonPl::Common;
-use SitemasonPl::Debug;
 use SitemasonPl::Database;
 use SitemasonPl::Date;
+use SitemasonPl::IO;
 
 use DateTime;
 
@@ -47,20 +47,15 @@ sub new {
 	$class || return;
 	
 	my $self = {
+		io			=> $arg{io},
 		options		=> $arg{options},
 		time_zone	=> $arg{timeZone} || 'US/Central',
 		log			=> {
 			parsers	=> 0
 		}
 	};
+	if (!$self->{io}) { $self->{io} = SitemasonPl::IO->new; }
 	bless $self, $class;
-	
-	if ($arg{debug}) {
-		$self->{debug} = $arg{debug};
-	} else {
-		$self->{debug} = SitemasonPl::Debug->new;
-	}
-	$self->{debug}->call;
 	
 	return $self;
 }
@@ -75,7 +70,7 @@ sub new {
 =cut
 #=====================================================
 sub parse {
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $orig_search = shift;
 	my $search = lc($orig_search);
 	
@@ -182,7 +177,7 @@ sub parse {
 #=====================================================
 
 sub traverse {
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $args = shift;
 	my $search = $args->{search};
 	my $options = $args->{options};

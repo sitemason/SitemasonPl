@@ -16,7 +16,7 @@ use strict;
 use DateTime;
 
 use SitemasonPl::Common;
-use SitemasonPl::Debug;
+use SitemasonPl::IO qw(mark print_object trace);
 
 
 #== new ==============================================
@@ -33,22 +33,18 @@ sub new {
 	my ($class, %arg) = @_;
 	$class || return;
 	my $self = {
+		io			=> $arg{io},
 		timeZone	=> $arg{timeZone} || 'US/Central'
 	};
+	if (!$self->{io}) { $self->{io} = SitemasonPl::IO->new; }
 	bless $self, $class;
-	if ($arg{debug}) {
-		$self->{debug} = $arg{debug};
-	} else {
-		$self->{debug} = SitemasonPl::Debug->new;
-	}
-	$self->{debug}->call;
 	
 	return $self;
 }
 
 
 sub dayOfWeek {
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $year = shift;
 	my $month = shift;
 	my $day = shift;
@@ -71,7 +67,7 @@ sub dayOfWeek {
 }
 
 sub isLeapYear {
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $year = shift;
 	my $leapYear;
 	if ((!($year % 4) && ($year % 100)) || !($year % 400)) {
@@ -81,7 +77,7 @@ sub isLeapYear {
 }
 
 sub weeksInMonth {
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $year = shift;
 	my $month = shift;
 	if (($month == 9) && ($year == 1752)) { return 3; }
@@ -95,7 +91,7 @@ sub weeksInMonth {
 }
 
 sub daysInMonth {
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $year = shift;
 	my $month = shift;
 	my $domList = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
@@ -110,7 +106,7 @@ sub daysInMonth {
 }
 
 sub makeOrdinal {
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $number = shift || return;
 	my $ordinal = $number;
 	if (($number =~ /1$/) && ($number !~ /11$/)) { $ordinal .= 'st'; }
@@ -121,7 +117,7 @@ sub makeOrdinal {
 }
 
 sub dayToWeek {
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $year = shift;
 	my $month = shift;
 	my $day = shift;
@@ -132,7 +128,7 @@ sub dayToWeek {
 }
 
 sub startOfWeek {
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $year = shift;
 	my $month = shift;
 	my $week = shift;
@@ -152,7 +148,7 @@ sub startOfWeek {
 }
 
 sub endOfWeek {
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $year = shift;
 	my $month = shift;
 	my $week = shift;
@@ -174,7 +170,7 @@ sub endOfWeek {
 }
 
 sub lastSunday {
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $year = shift;
 	my $month = shift;
 	my $day = shift;
@@ -189,7 +185,7 @@ sub lastSunday {
 }
 
 sub nextSaturday {
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $year = shift;
 	my $month = shift;
 	my $day = shift;
@@ -210,7 +206,7 @@ sub nextSaturday {
 =cut
 #=====================================================
 sub dayByNum {
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $start = shift;
 	my ($ord, $day) = $start =~ /(\-?\d+)?(\w+)/;
 	my @days = (qw(SU MO TU WE TH FR SA));
@@ -236,7 +232,7 @@ sub dayByNum {
 =cut
 #=====================================================
 sub getTime {
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $args = shift || return;
 	
 	my $dt = DateTime->now( time_zone => $self->{timeZone} );
@@ -321,7 +317,7 @@ sub getTime {
 =cut
 #=====================================================
 sub convert24To12 {
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $hour = shift;
 	
 	my $meridian = 'am';
@@ -340,7 +336,7 @@ sub convert24To12 {
 =cut
 #=====================================================
 sub convert12To24 {
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $hour = shift;
 	my $meridian = lc(shift);
 	
@@ -360,7 +356,7 @@ sub convert12To24 {
 =cut
 #=====================================================
 sub compare {
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $a = shift || return;
 	my $b = shift || return;
 	
@@ -378,7 +374,7 @@ sub compare {
 =cut
 #=====================================================
 sub nextDate {
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my @dates = compressRef(@_);
 	my $dt = DateTime->now( time_zone => $self->{timeZone} );
 	my $mt;
@@ -402,7 +398,7 @@ sub nextDate {
 =cut
 #=====================================================
 sub sortByDate {
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my @dates = compressRef(@_);
 	my @sortedDates = sort byDate @dates;
 	return @sortedDates;
@@ -426,7 +422,7 @@ sub byDate {
 =cut
 #=====================================================
 sub now {
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $dt = DateTime->now( time_zone => $self->{timeZone} );
 	return $dt->ymd . ' ' . $dt->hms;
 }
@@ -489,7 +485,7 @@ sub _checkDates {
 =cut
 #=====================================================
 sub convertDatetimeForDisplay {
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $datetime = shift || return;
 	my $timeZone = shift;
 	
@@ -549,7 +545,7 @@ sub convertDatetimeForDisplay {
 =cut
 #=====================================================
 sub buildDateSummary {
-	my $self = shift || return; $self->{debug}->call;
+	my $self = shift || return;
 	my $time = shift || return;
 	my $timeZone = shift;
 	
