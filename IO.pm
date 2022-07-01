@@ -38,9 +38,12 @@ sub new {
 =head2 B<new>
 
  my $io = SitemasonPl::IO->new(
-	exit_if_running		=> FALSE,
-	commandline_args	=> [],		# As defined in get_options; includes 'help' and 'version'
-	use_markdown		=> FALSE
+	commandline_args			=> [],		# As defined in get_options; includes 'help' and 'version'
+	exit_if_running				=> FALSE,	# Exit if script is running
+	exit_if_running_with_args	=> FALSE,	# Exit if script is running with the same args
+	print_intro					=> FALSE,	# Print timestamp on start
+	use_markdown				=> FALSE,	# Translate Slack markdown in text
+	notify_function_name		=> 'sam-control-prod-notify'
  );
 
 =cut
@@ -49,9 +52,8 @@ sub new {
 	$class || return;
 	
 	my $self = {
-		silent			=> $arg{silent},
-		use_markdown	=> $arg{use_markdown},
-		function_name	=> $arg{function_name}
+		silent					=> $arg{silent},
+		use_markdown			=> $arg{use_markdown}
 	};
 	bless $self, $class;
 	$self->init_formats;
@@ -69,23 +71,23 @@ sub new {
 		@{$self->{original_argv}} = @ARGV;
 		if (!is_array($arg{commandline_args})) { $arg{commandline_args} = []; }
 		push(@{$arg{commandline_args}}, 'request_bundle=s');
+		push(@{$arg{commandline_args}}, 'dry_run|n');
 		push(@{$arg{commandline_args}}, 'help|h');
+		push(@{$arg{commandline_args}}, 'verbose|v');
 		push(@{$arg{commandline_args}}, 'version|V');
 		$self->{options} = $self->get_options(@{$arg{commandline_args}});
 		if ($self->{options}->{help} || $self->{options}->{usage}) { $self->print_usage; exit; }
 		if ($self->{options}->{version}) { $self->print_version; exit; }
-		if ($self->{options}->{request_bundle}) {
-			$self->{request} = $self->decode_request($self->{options}->{request_bundle});
-			my $notify_function_name = 'sam-control-prod-notify';
-			if ($self->{is_dev}) { $notify_function_name =~ s/-prod/-dev/; }
-			$self->{lambda} = SitemasonPl::AWS::Lambda->new(
-				io		=> $self->{io},
-				dry_run	=> $self->{dry_run},
-				name	=> $notify_function_name
-			);
-		} elsif ($self->{function_name}) {
-# 			$self->prompt_for_args;
-		}
+		if ($self->{options}->{dry_run}) { $self->{dry_run} = TRUE; } else { $self->{dry_run} = FALSE; }
+		if ($self->{options}->{verbose}) { $self->{verbose} = TRUE; } else { $self->{verbose} = FALSE; }
+	}
+	
+	if ($arg{notify_function_name}) {
+		if ($self->{is_dev}) { $arg{notify_function_name} =~ s/-prod/-dev/; }
+		$self->{lambda} = SitemasonPl::AWS::Lambda->new(
+			io		=> $self->{io},
+			name	=> $arg{notify_function_name}
+		);
 	}
 	if ($arg{print_intro}) { $self->print_intro; }
 	
@@ -364,6 +366,23 @@ sub success {
 	$suppress_newline || print "\n";
 }
 
+sub run {
+	# if ($self->{io}->run($message)) { }
+	my $self = shift || return;
+	my $text = shift;
+	my $suppress_newline = shift;
+	if ($self->{dry_run}) { $self->dry_run($text, $suppress_newline); return FALSE; }
+	if ($self->{verbose}) { $self->verbose($text, $suppress_newline); }
+	return TRUE;
+}
+
+sub output {
+	my $self = shift || return;
+	my $text = shift;
+	my $suppress_newline = shift;
+	if ($self->{dry_run} || $self->{verbose}) { $self->verbose($text, $suppress_newline); }
+}
+
 sub dry_run {
 	my $self = shift || return;
 	my $text = shift;
@@ -371,7 +390,19 @@ sub dry_run {
 	$self->{silent} && return;
 	
 	$text = $self->convert_markdown_to_ansi($text);
-	$text =~ s/^(.*)$/$self->make_quote('silver_bg').$self->make_color($1,['gray'])/egm;
+	$text =~ s/^(.*)$/$self->make_quote('silver_bg').$self->make_color($1,['silver'])/egm;
+	print $text;
+	$suppress_newline || print "\n";
+}
+
+sub verbose {
+	my $self = shift || return;
+	my $text = shift;
+	my $suppress_newline = shift;
+	$self->{silent} && return;
+	
+	$text = $self->convert_markdown_to_ansi($text);
+	$text =~ s/^(.*)$/$self->make_quote('gray_bg').$self->make_color($1,['gray'])/egm;
 	print $text;
 	$suppress_newline || print "\n";
 }

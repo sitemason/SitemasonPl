@@ -68,7 +68,7 @@ sub _call_aws {
 		$self->{io}->dry_run($command);
 		return {};
 	} elsif ($debug) {
-		say $command;
+		$self->{io}->dry_run($command);
 	}
 	my $json = `$command`;
 	is_json($json) || return $json;

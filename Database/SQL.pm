@@ -1,4 +1,4 @@
-package SitemasonPl::Database::SQL 8.0;
+package SitemasonPl::Database::SQL 9.0;
 @ISA = qw( SitemasonPl::Database );
 
 =head1 NAME
@@ -15,6 +15,7 @@ An interface for working with SQL databases.
 
 use v5.012;
 use strict;
+use warnings;
 use utf8;
 use constant TRUE => 1;
 use constant FALSE => 0;
@@ -24,7 +25,7 @@ use DateTime;
 # use Text::Iconv;
 
 use SitemasonPl::Common;
-use SitemasonPl::IO;
+use SitemasonPl::IO qw(mark print_object trace);
 use SitemasonPl::SearchParse;
 
 sub new {
@@ -49,9 +50,8 @@ Errors:
 	db_name		=> $db_name,
 	db_username	=> $db_username,
 	db_password	=> $db_password,
-	
-	# pass original script's debug to share timing and logging
-	debug		=> $debug
+	time_zone	=> $time_zone,
+	io			=> $self->{io}
  );
 
 =cut
@@ -70,7 +70,8 @@ Errors:
 		time_zone	=> $arg{time_zone}	|| 'UTC',
 		io			=> $arg{io}
 	};
-	if (!$self->{io}) { $self->{io} = SitemasonPl::IO->new; }
+	if ($self->{db_type} eq 'postgres') { $self->{db_type} = 'pg'; }
+	if (!$self->{io}) { $self->{io} = SitemasonPl::IO->new(dry_run => $arg{dry_run}, verbose => $arg{verbose}); }
 	
 	if ($self->{db_type} eq 'pg') {
 		$self->{db_host}		||= $ENV{PGHOST};
@@ -81,18 +82,17 @@ Errors:
 		if (!$self->{'db_password'}) { get_password($self); }
 	}
 	
-	my $host;
-	my $name;
+	my $name = '';
 	if ($self->{db_name}) { $name = "dbname=$self->{db_name}"; }
-	my $host;
+	my $host = '';
 	if ($self->{db_host}) { $host = "host=$self->{db_host};"; }
-	my $port;
+	my $port = '';
 	if ($self->{db_port}) { $port = "port=$self->{db_port};"; }
-	my $sock;
+	my $sock = '';
 	if ($self->{db_sock}) { $sock = "mysql_socket=$self->{db_sock};"; }
-	my $user;
+	my $user = '';
 	if ($self->{db_username}) { $user = $self->{db_username}; }
-	my $pass;
+	my $pass = '';
 	if ($self->{db_password}) { $pass = $self->{db_password}; }
 	
 	my $type;
@@ -103,7 +103,7 @@ Errors:
 	
 	bless $self, $class;
 	if ($type) {
-		my $connectMessage = 'Connecting';
+		$self->{io}->output("Connecting $connectInfo");
 		$self->{dbh} = DBI->connect($connectInfo, $user, $pass, { PrintError => 1, AutoCommit => 1 });
 	}
 	
@@ -270,7 +270,7 @@ $type can be 'begins', 'ends', 'like', 'qlike', 'word', or default
 
 sub _modify_quote {
 	my $quoted = shift || '';
-	my $type = shift;
+	my $type = shift || '';
 	if (($type eq 'begins') || ($type eq 'like')) {
 		$quoted =~ s/'$/%'/;
 	}
@@ -378,7 +378,7 @@ sub nextval {
 	$self->_log_sql($statement, [caller(0)], $log);
 	
 	my $id;
-	if ($log eq 'debug') {
+	if (($log eq 'debug') || $self->{io}->{dry_run}) {
 		($id) = $self->selectrow_array("SELECT max($idFieldName) as id FROM $table", 'noLog');
 	} else {
 		my $timerKey = $self->timer_start($statement, $log);
@@ -402,13 +402,13 @@ sub do {
 #=====================================================
 	my $self = shift || return;
 	my $statement = shift;
-	my $log = shift;
+	my $log = shift || '';
 	$self->_log_sql($statement, [caller(0)], $log);
 	unless ($statement) { return; }
 	
 	my $rv;
 	$statement = $self->_clean_sql($statement);
-	if ($log eq 'debug') {
+	if (($log eq 'debug') || $self->{io}->{dry_run}) {
 		$rv = '1';
 		my ($command, $table) = $self->_get_command_from_statement($statement);
 		if (($command eq 'update') || ($command eq 'delete')) {
@@ -427,9 +427,9 @@ sub do {
 	} else {
 		my $timerKey = $self->timer_start($statement, $log);
 		$rv = $self->{dbh}->do($statement);
-		if ($self->reconnect($self->{dbh}->state)) {
-			$rv = $self->{dbh}->do($statement);
-		}
+# 		if ($self->reconnect($self->{dbh}->state)) {
+# 			$rv = $self->{dbh}->do($statement);
+# 		}
 		my $duration = $self->timer_stop($timerKey, $log);
 		$self->_log_transaction($statement, $duration, [caller(0)], $log);
 	}
@@ -445,7 +445,7 @@ sub do {
 		} elsif ($command !~ /^(drop|import)$/i) {
 			$self->{io}->error("Failed $command", $log);
 		}
-	} else {
+	} elsif (defined($rv)) {
 		my $message = '1 row';
 		if ($rv > 1) { $message = $rv . ' rows'; }
 		if ($command eq 'delete') { $message = 'Deleted ' . $message; }
@@ -473,6 +473,7 @@ sub selectrow_array {
 	my $self = shift || return;
 	my $statement = shift;
 	my $log = shift;
+	if (!$log && $self->{io}->{dry_run}) { $log = 'info'; }
 	$self->_log_sql($statement, [caller(0)], $log);
 	$statement = $self->_clean_sql($statement);
 	unless ($statement) { return; }
@@ -500,6 +501,7 @@ sub selectrow_arrayref {
 	my $self = shift || return;
 	my $statement = shift;
 	my $log = shift;
+	if (!$log && $self->{io}->{dry_run}) { $log = 'info'; }
 	$self->_log_sql($statement, [caller(0)], $log);
 	$statement = $self->_clean_sql($statement);
 	unless ($statement) { return; }
@@ -527,6 +529,7 @@ sub selectrow_hashref {
 	my $self = shift || return;
 	my $statement = shift;
 	my $log = shift;
+	if (!$log && $self->{io}->{dry_run}) { $log = 'info'; }
 	$self->_log_sql($statement, [caller(0)], $log);
 	$statement = $self->_clean_sql($statement);
 	unless ($statement) { return; }
@@ -554,6 +557,7 @@ sub selectcol_arrayref {
 	my $self = shift || return;
 	my $statement = shift;
 	my $log = shift;
+	if (!$log && $self->{io}->{dry_run}) { $log = 'info'; }
 	$self->_log_sql($statement, [caller(0)], $log);
 	$statement = $self->_clean_sql($statement);
 	unless ($statement) { return; }
@@ -581,6 +585,7 @@ $aryRef  = $dbh->selectall_arrayref($statement);
 	my $self = shift || return;
 	my $statement = shift;
 	my $log = shift;
+	if (!$log && $self->{io}->{dry_run}) { $log = 'info'; }
 	$self->_log_sql($statement, [caller(0)], $log);
 	$statement = $self->_clean_sql($statement);
 	unless ($statement) { return; }
@@ -609,6 +614,7 @@ sub selectall_hashref {
 	my $statement = shift;
 	my $keyField = shift;
 	my $log = shift;
+	if (!$log && $self->{io}->{dry_run}) { $log = 'info'; }
 	$self->_log_sql($statement, [caller(0)], $log);
 	$statement = $self->_clean_sql($statement);
 	unless ($statement) { return; }
@@ -640,6 +646,7 @@ $aryRef  = $dbh->selectall_arrayhash($statement);
 	my $self = shift || return;
 	my $statement = shift;
 	my $log = shift;
+	if (!$log && $self->{io}->{dry_run}) { $log = 'info'; }
 	$self->_log_sql($statement, [caller(0)], $log);
 	$statement = $self->_clean_sql($statement);
 	unless ($statement) { return; }
@@ -662,6 +669,28 @@ $aryRef  = $dbh->selectall_arrayhash($statement);
 #=====================================================
 # Aggregated Execute Methods
 #=====================================================
+
+sub get_databases {
+	# my $databases = $self->{dbh}->get_databases;
+	my $self = shift || return;
+	my $log = shift;
+	
+	my $databases = $self->selectcol_arrayref("SELECT datname FROM pg_database", $log);
+	return $databases;
+}
+
+sub database_exists {
+	# if ($self->{dbh}->database_exists($db_name)) { }
+	my $self = shift || return;
+	my $db_name = shift || return FALSE;
+	my $log = shift;
+	
+	my $databases = $self->get_databases($log);
+	foreach my $db (@{$databases}) {
+		if ($db eq $db_name) { return TRUE; }
+	}
+	return FALSE;
+}
 
 sub reorder_records {
 #=====================================================
@@ -1118,7 +1147,7 @@ sub copy {
 	my $timerKey = $self->timer_start($copySQL, $log);
 	
 	my $rv;
-	if ($log eq 'debug') { $rv = '1'; }
+	if (($log eq 'debug') || $self->{io}->{dry_run}) { $rv = '1'; }
 	else { $rv = $self->{dbh}->do($copySQL); }
 	
 	my $cnt = 0;
@@ -1175,8 +1204,8 @@ sub copy {
 			$cnt++;
 		}
 	}
-	my $rv;
-	if ($log eq 'debug') { $rv = '1'; }
+	$rv = undef;
+	if (($log eq 'debug') || $self->{io}->{dry_run}) { $rv = '1'; }
 	else { $rv = $self->{dbh}->pg_putcopyend(); }
 	my $duration = $self->timer_stop($timerKey, $log);
 	$self->_log_transaction($copySQL, $duration, [caller(0)], $log);
@@ -1189,7 +1218,7 @@ sub copy {
 			my $rv = $self->{dbh}->do($copySQL);
 			my $ret = $self->{dbh}->pg_putcopydata($line);
 			unless ($ret) { $self->{io}->print_object($ret, 'PUT line failed'); }
-			my $rv = $self->{dbh}->pg_putcopyend();
+			$rv = $self->{dbh}->pg_putcopyend();
 			if ($rv) { $cnt += $rv; }
 			else { chomp($line); $self->{io}->warning("COPY line failed ($copySQL\n$line)", $log); }
 		}
@@ -1285,8 +1314,12 @@ sub _log_sql {
 	my $self = shift || return;
 	my $statement = shift;
 	my $caller = shift;
-	my $log = shift;
+	my $log = shift || '';
 	if ($log eq 'noLog') { return; }
+	if (!$log) {
+		if ($self->{io}->{dry_run}) { $log = 'debug'; }
+		if ($self->{io}->{verbose}) { $log = 'info'; }
+	}
 	
 	if ($statement) {
 		if ($log eq 'results') { return; }
@@ -1295,10 +1328,11 @@ sub _log_sql {
 		my $level = 'debug';
 		if ($log) { $level = 'info'; }
 		$statement =~ s/^[ \t]*(\r\n|\n|\r)//;
-		my ($tabs) = $statement =~ /^(\s+)/;
+		my ($tabs) = $statement =~ /^(\s*)/;
 		$statement =~ s/^$tabs/  /mg;
 		$statement =~ s/\t/  /g;
-		$self->{io}->info($statement);
+		if ($self->{io}->{dry_run}) { $self->{io}->dry_run($statement); }
+		else { $self->{io}->verbose($statement); }
 	} else {
 		$self->{io}->error('Blank SQL statement');
 	}
@@ -1365,7 +1399,7 @@ sub _clean_sql {
 	my $self = shift || return;
 	my $statement = shift || return;
 	
-	my ($tabs) = $statement =~ /^(\t+)/;
+	my ($tabs) = $statement =~ /^(\t*)/;
 	$statement =~ s/^$tabs//mg;
 	$statement =~ s/(^\s+|\s+$)//g;
 	utf8::downgrade($statement, 1);
@@ -1527,7 +1561,7 @@ Returns sql for a single field of a where clause. Give it the field name and a l
 			$quote =~ s/([a-zA-Z0-9])'$/$1\\\\M'/;
 			push(@sql, $field . ' ' . $notb . '~* E' . $quote);
 		}
-		if (@sql == 1) { $sql = @sql[0]; }
+		if (@sql == 1) { $sql = $sql[0]; }
 		elsif ($ex) { $sql = '(' . join(' and ', @sql) . ')'; }
 		else { $sql = '(' . join(' or ', @sql) . ')'; }
 	} elsif ($comp eq 'begins' || $comp eq 'ends' || $comp eq 'contains') {
@@ -1542,7 +1576,7 @@ Returns sql for a single field of a where clause. Give it the field name and a l
 			}
 			push(@sql, $field . $nott . ' ilike ' . $quote);
 		}
-		if (@sql == 1) { $sql = @sql[0]; }
+		if (@sql == 1) { $sql = $sql[0]; }
 		elsif ($ex) { $sql = '(' . join(' and ', @sql) . ')'; }
 		else { $sql = '(' . join(' or ', @sql) . ')'; }
 	} elsif ($comp eq 'int') {
@@ -1691,7 +1725,6 @@ An easier way to parse searches and call make_search_sql and makeOrderSQL.
 	my $args = shift || return;
 	
 	my $input = $self->process_make_sql_input($args);
-	my ($whereSQL, $suffixSQL);
 	my $whereSQL = $self->make_search_sql( {
 		search				=> $input->{search},
 		valid_search		=> $input->{valid_search}
@@ -2384,7 +2417,7 @@ You probably won't need to call this method directly. It is used by other method
 					if ($part->[6] =~ /^pm$/i) {
 						if ($hour < 12) { $hour += 12; }
 					} else {
-						if ($hour == 12) { $hour == 0; }
+						if ($hour == 12) { $hour = 0; }
 					}
 					my $tz = $part->[7] || $self->{time_zone};
 					if ($part->[3] || $part->[4] || $part->[5]) {
@@ -2555,24 +2588,24 @@ You probably won't need to call this method directly. It is used by other method
 	return ($quoted, $modified);
 }
 
-sub get_iso_timestamp {
-#=====================================================
-
-=head2 B<get_iso_timestamp>
-
- $timestamp = $dbh->get_iso_timestamp;
- returns '2012-10-08T22:24:52.178Z'
-
-=cut
-#=====================================================
-	my $self = shift || return;
-	my ($current) = $self->{dbh}->selectrow_array("
-		SELECT CURRENT_TIMESTAMP(3) at time zone 'UTC'
-	");
-	$current =~ s/ /T/;
-	$current .= 'Z';
-	return $current;
-}
+# sub get_iso_timestamp {
+# #=====================================================
+# 
+# =head2 B<get_iso_timestamp>
+# 
+#  $timestamp = $dbh->get_iso_timestamp;
+#  returns '2012-10-08T22:24:52.178Z'
+# 
+# =cut
+# #=====================================================
+# 	my $self = shift || return;
+# 	my ($current) = $self->{dbh}->selectrow_array("
+# 		SELECT CURRENT_TIMESTAMP(3) at time zone 'UTC'
+# 	");
+# 	$current =~ s/ /T/;
+# 	$current .= 'Z';
+# 	return $current;
+# }
 
 
 sub get_server_info {
@@ -2634,50 +2667,6 @@ sub clear_server_info {
 
 
 
-# sub load_schema {
-# 	my $table = shift;
-# 	my $schema;
-# 	if ($table eq 'server') {
-# 		$schema = <<"EOL";
-# CREATE TABLE "server" (
-#   "id" INTEGER PRIMARY KEY AUTOINCREMENT,
-#   "ami" VARCHAR(24),
-#   "reservation_id" VARCHAR(24),
-#   "instance_id" VARCHAR(24),
-#   "state" VARCHAR(24),
-#   "key" VARCHAR(64),
-#   "public_ip" VARCHAR(15),
-#   "private_ip" VARCHAR(15),
-#   "name" VARCHAR(32),
-#   "enterprise" VARCHAR(32),
-#   "zone" VARCHAR(16),
-#   "last_checkin" INTEGER,
-#   "last_load" VARCHAR(16),
-#   "last_df" VARCHAR(16),
-#   "server_type" VARCHAR(24),
-#   "groups" VARCHAR(128)
-# );
-# EOL
-# 	} elsif ($table eq 'service') {
-# 		$schema = <<"EOL";
-# CREATE TABLE "service" (
-#   "id" INTEGER PRIMARY KEY AUTOINCREMENT,
-#   "name" VARCHAR(32) NOT NULL
-# );
-# EOL
-# 	} elsif ($table eq 'server_service') {
-# 		$schema = <<"EOL";
-# CREATE TABLE "server_service" (
-#   "service_id" INTEGER,
-#   "server_id" INTEGER
-# );
-# EOL
-# 	}
-# 	
-# 	return split("\n", $schema);
-# }
-
-
 
 =head1 CHANGES
 
@@ -2689,6 +2678,7 @@ sub clear_server_info {
   2012-01-05 TJM - v6.0 moved from Sitemason::System to Sitemason6::Library
   2014-03-20 TJM - v7.0 merged 3.50 and 6.0
   2017-11-09 TJM - v8.0 Moved to SitemasonPL open source project and merged with updates
+  2022-06-24 TJM - v9.0 Updated to take advantage of SitemasonPl::IO
 
 =head1 AUTHOR
 

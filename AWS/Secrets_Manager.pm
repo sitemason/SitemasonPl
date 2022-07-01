@@ -63,10 +63,10 @@ sub get_secret_value {
 #=====================================================
 	my $self = shift || return;
 	my $name = shift || return;
-	my $debug = shift;
+	my $debug = shift || $self->{dry_run};
 	
 	my $cmd = "get-secret-value --secret-id $name";
-	my $response = $self->_call_secrets_manager($cmd, $debug, $self->{dry_run});
+	my $response = $self->_call_secrets_manager($cmd, $debug);
 	my $secret = value($response, ['SecretString']);
 	if (is_json($secret)) { return parse_json($secret); }
 	return $secret;
