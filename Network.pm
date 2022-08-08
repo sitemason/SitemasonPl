@@ -46,7 +46,7 @@ sub new {
 		ssh_timeout	=> $arg{ssh_timeout} || 3,
 		io			=> $arg{io}
 	};
-	if (!$self->{io}) { $self->{io} = SitemasonPl::IO->new(dry_run => $self->{dry_run}, verbose => $self->{verbose}); }
+	if (!$self->{io}) { $self->{io} = SitemasonPl::IO->new(dry_run => $arg{dry_run}, verbose => $arg{verbose}); }
 	
 	bless $self, $class;
 	return $self;
@@ -176,7 +176,9 @@ sub create_tunnel {
 	my $ps_cmd = "ps -ef | grep 'ssh -fN' | grep -E '\\-L $local_port:$remote_login' | grep -v grep";
 	my @ps = `$ps_cmd`;
 	chomp(@ps);
-
+	
+	my $mysql_creds = $self->read_pass_file('mysql');
+	
 	my $is_connected;
 	foreach my $ps (@ps) {
 		my ($pid) = $ps =~ /^\s*\d+\s+(\d+)/;
@@ -185,7 +187,7 @@ sub create_tunnel {
 			# Test if given a test login
 			if ($tunnel->{local_login}) {
 				my $cmd = "ssh -p $local_port -o ConnectTimeout=$self->{ssh_timeout} $tunnel->{local_login} \"hostname\"";
-				$self->{io}->verbose($cmd);
+				$self->{io}->output($cmd);
 				my $test = `$cmd`;
 				if ($test =~ /\w+\.\w+/) {
 					$self->{io}->body("Remote server already connected on port $tunnel->{local_port}");
@@ -203,7 +205,7 @@ sub create_tunnel {
 			$tunnel->{db_user} = $1;
 			$tunnel->{db_name} = $2;
 			my $cmd = "psql -p $local_port -h localhost -U $tunnel->{db_user} $tunnel->{db_name} -c \"SELECT 'tunnel';\"";
-			$self->{io}->verbose($cmd);
+			$self->{io}->output($cmd);
 			my $test = `$cmd`;
 			if ($test =~ /tunnel/) {
 				$self->{io}->body("Remote server already connected on port $tunnel->{local_port}");
@@ -219,8 +221,15 @@ sub create_tunnel {
 		} elsif (($remote_login =~ /:3306$/) && $tunnel->{local_login}) {
 			($tunnel->{db_user}, $tunnel->{db_name}) = $tunnel->{local_login} =~ /^([\w-]+)(?:\@([\w.-]+))?$/;
 			$tunnel->{db_name} ||= 'mysql';
-			my $cmd = "echo \"SELECT 'tunnel';\" | mysql -P $local_port -h 127.0.0.1 --ssl-mode=disabled -u $tunnel->{db_user} $tunnel->{db_name}";
-			$self->{io}->verbose($cmd);
+			my $password = '';
+			foreach my $cred (@{$mysql_creds}) {
+				if (($cred->{host} =~ /^(localhost|127\.0\.0\.1)$/) && ($cred->{port} eq $local_port) && ($cred->{dbname} eq $tunnel->{db_name}) && ($cred->{username} eq $tunnel->{db_user})) {
+					$password = $cred->{password};
+					last;
+				}
+			}
+			my $cmd = "echo \"SELECT 'tunnel';\" | mysql -P $local_port -h 127.0.0.1 --ssl-mode=disabled -u $tunnel->{db_user} --password='$password' $tunnel->{db_name}";
+			$self->{io}->output($cmd);
 			my $test = `$cmd`;
 			if ($test =~ /tunnel/) {
 				$self->{io}->body("Remote server already connected on port $tunnel->{local_port}");
@@ -253,7 +262,9 @@ sub run_command {
 	my $self = shift || return;
 	my $cmd = shift || return;
 	
-	if ($self->{io}->run($cmd)) {
+	my $output_cmd = $cmd;
+	$output_cmd =~ s/--password='(.{4}).*?'/--password='$1***'/g;
+	if ($self->{io}->run($output_cmd)) {
 		system($cmd);
 	}
 }

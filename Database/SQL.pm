@@ -675,7 +675,16 @@ sub get_databases {
 	my $self = shift || return;
 	my $log = shift;
 	
-	my $databases = $self->selectcol_arrayref("SELECT datname FROM pg_database", $log);
+	my $sql = "";
+	if ($self->{db_type} eq 'mysql') {
+		$sql = "SHOW databases";
+	} elsif ($self->{db_type} eq 'pg') {
+		$sql = "SELECT datname FROM pg_database";
+	} else {
+		return;
+	}
+	
+	my $databases = $self->selectcol_arrayref($sql, $log);
 	return $databases;
 }
 
