@@ -172,6 +172,7 @@ sub create_tunnel {
 	my $gateway_login = $tunnel->{gateway_login} || return;
 	my $gateway_port = $tunnel->{gateway_port};
 	my $remote_login = $tunnel->{remote_login} || return;
+	my $remote_port = $tunnel->{remote_port} || return;
 	
 	my $ps_cmd = "ps -ef | grep 'ssh -fN' | grep -E '\\-L $local_port:$remote_login' | grep -v grep";
 	my @ps = `$ps_cmd`;
@@ -183,7 +184,7 @@ sub create_tunnel {
 	foreach my $ps (@ps) {
 		my ($pid) = $ps =~ /^\s*\d+\s+(\d+)/;
 		# Test SSH connection
-		if ($remote_login =~ /:22$/) {
+		if ($remote_port eq '22') {
 			# Test if given a test login
 			if ($tunnel->{local_login}) {
 				my $cmd = "ssh -p $local_port -o ConnectTimeout=$self->{ssh_timeout} $tunnel->{local_login} \"hostname\"";
@@ -201,7 +202,7 @@ sub create_tunnel {
 				$self->kill_pid($pid);
 			}
 		# Test Pg connection
-		} elsif (($remote_login =~ /:5432$/) && ($tunnel->{local_login} =~ /^([\w-]+)\@([\w.-]+)$/)) {
+		} elsif (($remote_port eq '5432') && ($tunnel->{local_login} =~ /^([\w-]+)\@([\w.-]+)$/)) {
 			$tunnel->{db_user} = $1;
 			$tunnel->{db_name} = $2;
 			my $cmd = "psql -p $local_port -h localhost -U $tunnel->{db_user} $tunnel->{db_name} -c \"SELECT 'tunnel';\"";
@@ -218,7 +219,7 @@ sub create_tunnel {
 				$self->kill_pid($pid);
 			}
 		# Test MySQL connection
-		} elsif (($remote_login =~ /:3306$/) && $tunnel->{local_login}) {
+		} elsif (($remote_port eq '3306') && $tunnel->{local_login}) {
 			($tunnel->{db_user}, $tunnel->{db_name}) = $tunnel->{local_login} =~ /^([\w-]+)(?:\@([\w.-]+))?$/;
 			$tunnel->{db_name} ||= 'mysql';
 			my $password = '';
@@ -241,6 +242,10 @@ sub create_tunnel {
 				$self->{io}->body("Existing connection failed on port $tunnel->{local_port}. Killing $pid");
 				$self->kill_pid($pid);
 			}
+		# Test Elasticsearch/Opensearch connection
+		} elsif (($remote_port eq '443') && $tunnel->{local_login} && ($tunnel->{remote_host} =~ /(elastic|opensearch|(\b|_)[eo]s(\b|_))/)) {
+			$self->{io}->body("Elasticsearch test not available on port $tunnel->{local_port}");
+			$is_connected = TRUE;
 		# Assume the connection is ok since we can't test for it.
 		} elsif ($pid) {
 			$self->{io}->body("Remote server already connected on port $tunnel->{local_port}");
