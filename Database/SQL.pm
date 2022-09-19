@@ -1496,7 +1496,10 @@ sub timer_start {
 	my ($cmd, $table) = $self->_get_command_from_statement($statement);
 #	my ($parent) = (caller(0))[3];
 	my $unique = unique_key;
-	my $key = 'db_' . $cmd . '_on_' . $table . '_' . $unique;
+	my $key = 'db_' . $cmd . '_' . $unique;
+	if ($table) {
+		$key = 'db_' . $cmd . '_on_' . $table . '_' . $unique;
+	}
 	$self->{io}->timer_start($key);
 	return $key;
 }
